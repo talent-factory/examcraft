@@ -21,11 +21,12 @@
  * anchoring" notes that used to sit here are documented there, next to the
  * code they constrain.
  *
- * Permanent exceptions: seven allowlist entries from BillingPage.tsx (the CHF
- * amounts and the Free/Starter/Professional/Enterprise tier names) are not
- * remaining cleanup work and stay indefinitely. They are listed with their
- * rationale as `PERMANENT_EXCEPTIONS` in the scan module, and asserted below so
- * a regeneration cannot quietly drop them.
+ * Permanent exceptions: a fixed set of allowlist entries (brand and product
+ * names, the CHF tier prices, masked password placeholders, the company's
+ * real contact address/domain, and similar values that are correct as-is)
+ * are not remaining cleanup work and stay indefinitely. They are listed with
+ * their rationale as `PERMANENT_EXCEPTIONS` in the scan module, and asserted
+ * below so a regeneration cannot quietly drop them.
  *
  * ---------------------------------------------------------------------------
  * Error-key convention (TF-772/TF-773) — read this before adding an error key
@@ -183,15 +184,16 @@ describe('i18n hardcoded-string ratchet', () => {
     }
   });
 
-  // TF-772 measures progress by allowlist size, and its target value is these
-  // seven entries — not zero. Without this assertion, "shrink the allowlist"
-  // reads as an invitation to translate "CHF 0" into four identical strings.
-  it('die sieben Dauerausnahmen stehen noch in der Allowlist', () => {
+  // TF-772 measures progress by allowlist size, and its target value is
+  // PERMANENT_EXCEPTIONS — not zero. Without this assertion, "shrink the
+  // allowlist" reads as an invitation to translate "CHF 0" into four identical
+  // strings.
+  it('die Dauerausnahmen stehen noch in der Allowlist', () => {
     const missing = PERMANENT_EXCEPTIONS.filter((k) => !allowed.has(k));
     if (missing.length > 0) {
       throw new Error(
         `${missing.length} Dauerausnahme(n) fehlen in der Allowlist. Sie sind ` +
-        `bewusste Ausnahmen (Preise und Tarifnamen, siehe PERMANENT_EXCEPTIONS ` +
+        `bewusste Ausnahmen (Preise, Tarif- und Eigennamen, siehe PERMANENT_EXCEPTIONS ` +
         `in scripts/i18n-hardcoded-strings-scan.ts) und dürfen nicht übersetzt ` +
         `werden:\n  ${missing.join('\n  ')}`,
       );

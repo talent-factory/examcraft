@@ -431,6 +431,7 @@
       "title": "Willkommen zurück",
       "subtitle": "Melde dich bei deinem Konto an",
       "email": "E-Mail-Adresse",
+      "emailPlaceholder": "du@example.com",
       "password": "Passwort",
       "rememberMe": "Angemeldet bleiben",
       "forgotPassword": "Passwort vergessen?",
@@ -444,10 +445,14 @@
     "register": {
       "title": "Konto erstellen",
       "firstName": "Vorname",
+      "firstNamePlaceholder": "Max",
       "lastName": "Nachname",
+      "lastNamePlaceholder": "Muster",
       "email": "E-Mail",
+      "emailPlaceholder": "deine.email@example.com",
       "institutionCode": "Institutionscode (Optional)",
       "institutionCodeHint": "Gib deinen Institutionscode ein, falls vorhanden",
+      "institutionCodePlaceholder": "name-der-institution",
       "password": "Passwort",
       "passwordReqTitle": "Das Passwort muss enthalten:",
       "passwordReqMinLength": "8+ Zeichen",
@@ -486,6 +491,7 @@
       "title": "Passwort zurücksetzen",
       "subtitle": "Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen deines Passworts.",
       "email": "E-Mail-Adresse",
+      "emailPlaceholder": "deine.email@example.com",
       "sending": "Wird gesendet...",
       "sendResetLink": "Link senden",
       "cancel": "Abbrechen",
@@ -888,13 +894,20 @@
         "colStatus": "Status",
         "colIp": "IP-Adresse",
         "colUserAgent": "User-Agent",
+        "tableLabel": "Audit-Log",
         "impersonatedBy": "Impersoniert von {{name}}",
         "impersonatedByTooltip": "Dieser Eintrag wurde während einer Impersonation-Session erstellt — {{name}} war als der Ziel-Benutzer angemeldet.",
+        "unknownStatusTooltip": "Unbekannter Status — kein bekannter Wert für dieses Feld.",
         "category": {
           "business": "Geschäftlich",
           "admin": "Administration",
           "auth": "Authentifizierung",
           "security": "Sicherheit"
+        },
+        "status": {
+          "success": "Erfolgreich",
+          "failure": "Fehlgeschlagen",
+          "error": "Fehler"
         }
       }
     },
@@ -1053,6 +1066,7 @@
       "paginationNext": "Weiter",
       "paginationPage": "Seite {{page}} von {{total}}",
       "paginationShowing": "Zeige {{from}} bis {{to}} von {{total}} Ergebnissen",
+      "paginationLabel": "Seitennavigation",
       "failedLoad": "Benutzer konnten nicht geladen werden",
       "failedStatus": "Benutzerstatus konnte nicht aktualisiert werden"
     },
@@ -2066,6 +2080,9 @@
       "explanationLabel": "Erklärung",
       "explanationHint": "Optional: Begründung für die Antwort angeben",
       "difficulty": "Schwierigkeit",
+      "difficultyEasy": "Einfach",
+      "difficultyMedium": "Mittel",
+      "difficultyHard": "Schwer",
       "bloomLevel": "Bloom-Taxonomiestufe",
       "bloomNotSpecified": "Nicht angegeben",
       "estimatedTime": "Geschätzte Zeit (Minuten)",
@@ -2174,6 +2191,7 @@
       "createOption": "\"{{value}}\" erstellen",
       "groupGlobal": "Vorgegebene Tags",
       "groupInstitution": "Tags dieser Institution",
+      "groupArchived": "Archiviert",
       "archivedCannotUse": "🚫 Tag “{{name}}” ist archiviert und kann nicht verwendet werden.",
       "existingTags": "Bestehende Tags",
       "searchPlaceholder": "Tags suchen...",
@@ -2573,7 +2591,8 @@
       "expandSidebar": "Sidebar ausklappen"
     },
     "navigationBar": {
-      "userFallback": "Benutzer"
+      "userFallback": "Benutzer",
+      "userMenu": "Benutzermenü"
     },
     "packageTier": {
       "tooltipTitle": "{{package}} Paket - {{displayName}} Stufe",

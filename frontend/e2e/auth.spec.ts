@@ -236,7 +236,9 @@ test.describe('Help Widget — Public Routes', () => {
     await page.keyboard.press('Meta+/');
 
     await expect(page.locator(HELP_FAB)).toHaveCount(0);
-    await expect(page.locator('[aria-label="close"]')).toHaveCount(0);
+    // By test id, not aria-label: a negative assertion on a translated label
+    // would pass vacuously once the label text changes.
+    await expect(page.locator('[data-testid="help-panel-close"]')).toHaveCount(0);
   });
 
   test('should render the help FAB again after login', async ({ page }) => {

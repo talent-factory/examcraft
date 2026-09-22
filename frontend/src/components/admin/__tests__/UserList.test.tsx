@@ -395,3 +395,12 @@ describe('UserList — Impersonate button permission/scope gate (TF-743)', () =>
     expect(screen.queryByTestId('ul-btn-impersonate-7')).not.toBeInTheDocument();
   });
 });
+
+describe('UserList — accessible names (TF-775)', () => {
+  it('names the pagination landmark in the UI language', async () => {
+    renderList();
+    await screen.findByTestId('ul-actions-menu-trigger-7');
+    expect(screen.getByRole('navigation', { name: 'Seitennavigation' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument();
+  });
+});

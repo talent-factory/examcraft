@@ -431,6 +431,7 @@
       "title": "Bon retour",
       "subtitle": "Connecte-toi à ton compte",
       "email": "Adresse e-mail",
+      "emailPlaceholder": "toi@example.com",
       "password": "Mot de passe",
       "rememberMe": "Se souvenir de moi",
       "forgotPassword": "Mot de passe oublié ?",
@@ -444,10 +445,14 @@
     "register": {
       "title": "Créer un compte",
       "firstName": "Prénom",
+      "firstNamePlaceholder": "Jean",
       "lastName": "Nom de famille",
+      "lastNamePlaceholder": "Dupont",
       "email": "E-mail",
+      "emailPlaceholder": "ton.email@example.com",
       "institutionCode": "Code d'institution (Optionnel)",
       "institutionCodeHint": "Entre ton code d'institution si tu en as un",
+      "institutionCodePlaceholder": "nom-de-l-institution",
       "password": "Mot de passe",
       "passwordReqTitle": "Le mot de passe doit contenir :",
       "passwordReqMinLength": "8+ caractères",
@@ -486,6 +491,7 @@
       "title": "Réinitialiser le mot de passe",
       "subtitle": "Entre ton adresse e-mail et nous t'enverrons un lien pour réinitialiser ton mot de passe.",
       "email": "Adresse e-mail",
+      "emailPlaceholder": "ton.email@example.com",
       "sending": "Envoi en cours...",
       "sendResetLink": "Envoyer le lien",
       "cancel": "Annuler",
@@ -888,13 +894,20 @@
         "colStatus": "Statut",
         "colIp": "Adresse IP",
         "colUserAgent": "Agent utilisateur",
+        "tableLabel": "Journal d'audit",
         "impersonatedBy": "Usurpé par {{name}}",
         "impersonatedByTooltip": "Cette entrée a été créée pendant une session d'usurpation d'identité — {{name}} était connecté en tant qu'utilisateur cible.",
+        "unknownStatusTooltip": "Statut inconnu — aucune valeur reconnue pour ce champ.",
         "category": {
           "business": "Métier",
           "admin": "Administration",
           "auth": "Authentification",
           "security": "Sécurité"
+        },
+        "status": {
+          "success": "Réussi",
+          "failure": "Échec",
+          "error": "Erreur"
         }
       }
     },
@@ -1052,6 +1065,7 @@
       "paginationNext": "Suivant",
       "paginationPage": "Page {{page}} sur {{total}}",
       "paginationShowing": "Affichage de {{from}} à {{to}} sur {{total}} résultats",
+      "paginationLabel": "Pagination",
       "failedLoad": "Impossible de charger les utilisateurs",
       "failedStatus": "Impossible de mettre à jour le statut",
       "btnImpersonate": "Se connecter en tant qu'utilisateur"
@@ -2066,6 +2080,9 @@
       "explanationLabel": "Explication",
       "explanationHint": "Optionnel : fournir une explication pour la réponse",
       "difficulty": "Difficulté",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Moyen",
+      "difficultyHard": "Difficile",
       "bloomLevel": "Niveau de la taxonomie de Bloom",
       "bloomNotSpecified": "Non spécifié",
       "estimatedTime": "Temps estimé (minutes)",
@@ -2174,6 +2191,7 @@
       "createOption": "Créer \"{{value}}\"",
       "groupGlobal": "Tags prédéfinis",
       "groupInstitution": "Tags de cette institution",
+      "groupArchived": "Archivés",
       "archivedCannotUse": "🚫 Le tag « {{name}} » est archivé et ne peut pas être utilisé.",
       "existingTags": "Tags existants",
       "searchPlaceholder": "Rechercher des tags...",
@@ -2573,7 +2591,8 @@
       "expandSidebar": "Développer la barre latérale"
     },
     "navigationBar": {
-      "userFallback": "Utilisateur"
+      "userFallback": "Utilisateur",
+      "userMenu": "Menu utilisateur"
     },
     "packageTier": {
       "tooltipTitle": "Forfait {{package}} - Niveau {{displayName}}",

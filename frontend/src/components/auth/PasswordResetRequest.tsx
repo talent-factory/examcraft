@@ -104,7 +104,7 @@ export const PasswordResetRequest: React.FC<PasswordResetRequestProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="your.email@example.com"
+              placeholder={t('auth.resetRequest.emailPlaceholder')}
               disabled={isLoading}
               autoComplete="email"
               autoFocus

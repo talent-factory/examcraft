@@ -93,12 +93,11 @@ export async function loginUser(page: Page, email: string, password: string): Pr
  * Logout helper function
  */
 export async function logoutUser(page: Page): Promise<void> {
-  // Click user menu or avatar
-  const userMenu = page.locator('[data-testid="user-menu"], [aria-label="User menu"], button:has-text("Logout")');
-  await userMenu.first().click();
-
-  // Click logout button
-  await page.click('text=Logout, text=Abmelden, [data-testid="logout-button"]');
+  // Both the trigger's aria-label and the logout button's text are
+  // translated (t('layout.navigationBar.userMenu'), t('nav.logout')), so
+  // only the language-independent data-testid can be matched here.
+  await page.locator('[data-testid="user-menu"]').first().click();
+  await page.click('[data-testid="logout-button"]');
 
   // Wait for redirect to login
   await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
@@ -109,8 +108,10 @@ export async function logoutUser(page: Page): Promise<void> {
  */
 export async function isLoggedIn(page: Page): Promise<boolean> {
   try {
-    // Check for elements that indicate logged-in state
-    const loggedInIndicator = page.locator('[data-testid="user-menu"], nav a[href="/dashboard"], [aria-label="User menu"]');
+    // Check for elements that indicate logged-in state. data-testid is
+    // language-independent; the user menu's aria-label is translated, so it
+    // cannot be matched as a fixed English string here.
+    const loggedInIndicator = page.locator('[data-testid="user-menu"], nav a[href="/dashboard"]');
     return await loggedInIndicator.first().isVisible({ timeout: 3000 });
   } catch {
     return false;

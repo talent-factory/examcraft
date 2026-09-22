@@ -127,7 +127,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               value={formData.first_name}
               onChange={handleChange}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="John"
+              placeholder={t('auth.register.firstNamePlaceholder')}
               disabled={isLoading}
               autoComplete="given-name"
             />
@@ -148,7 +148,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               value={formData.last_name}
               onChange={handleChange}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="Doe"
+              placeholder={t('auth.register.lastNamePlaceholder')}
               disabled={isLoading}
               autoComplete="family-name"
             />
@@ -169,7 +169,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               value={formData.email}
               onChange={handleChange}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="your.email@example.com"
+              placeholder={t('auth.register.emailPlaceholder')}
               disabled={isLoading}
               autoComplete="email"
             />
@@ -190,7 +190,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
               value={formData.institution_slug}
               onChange={handleChange}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="university-name"
+              placeholder={t('auth.register.institutionCodePlaceholder')}
               disabled={isLoading}
             />
             <p className="text-xs text-gray-500 mt-1">

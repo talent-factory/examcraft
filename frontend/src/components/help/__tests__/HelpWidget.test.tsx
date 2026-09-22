@@ -59,6 +59,14 @@ describe('HelpWidget', () => {
     renderWidget();
     expect(screen.getByRole('button', { name: /hilfe/i })).toBeInTheDocument();
   });
+
+  // Regression guard: the panel close button was previously announced as the raw "close".
+  it('gives the panel close button a translated accessible name', () => {
+    renderWidget();
+    fireEvent.click(screen.getByRole('button', { name: /hilfe/i }));
+    expect(screen.getByRole('button', { name: 'Schliessen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'close' })).not.toBeInTheDocument();
+  });
 });
 
 describe('HelpWidget — clampPanelDimension (panel resize)', () => {

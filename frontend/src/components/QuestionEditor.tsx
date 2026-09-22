@@ -456,28 +456,30 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
               disabled={loading}
               label={t('components.questionEditor.difficulty')}
             >
-              <MenuItem value="easy">Easy</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="hard">Hard</MenuItem>
+              <MenuItem value="easy">{t('components.questionEditor.difficultyEasy')}</MenuItem>
+              <MenuItem value="medium">{t('components.questionEditor.difficultyMedium')}</MenuItem>
+              <MenuItem value="hard">{t('components.questionEditor.difficultyHard')}</MenuItem>
             </Select>
           </FormControl>
 
           {/* Bloom Level */}
           <FormControl fullWidth>
-            <InputLabel>{t('components.questionEditor.bloomLevel')}</InputLabel>
+            <InputLabel shrink>{t('components.questionEditor.bloomLevel')}</InputLabel>
             <Select
+              displayEmpty
+              notched
               value={formData.bloom_level || ''}
               onChange={(e) => handleFieldChange('bloom_level', e.target.value ? Number(e.target.value) : undefined)}
               disabled={loading}
               label={t('components.questionEditor.bloomLevel')}
             >
               <MenuItem value="">{t('components.questionEditor.bloomNotSpecified')}</MenuItem>
-              <MenuItem value={1}>1 - Remember</MenuItem>
-              <MenuItem value={2}>2 - Understand</MenuItem>
-              <MenuItem value={3}>3 - Apply</MenuItem>
-              <MenuItem value={4}>4 - Analyze</MenuItem>
-              <MenuItem value={5}>5 - Evaluate</MenuItem>
-              <MenuItem value={6}>6 - Create</MenuItem>
+              <MenuItem value={1}>1 - {t('composer.questionPool.bloomRemember')}</MenuItem>
+              <MenuItem value={2}>2 - {t('composer.questionPool.bloomUnderstand')}</MenuItem>
+              <MenuItem value={3}>3 - {t('composer.questionPool.bloomApply')}</MenuItem>
+              <MenuItem value={4}>4 - {t('composer.questionPool.bloomAnalyze')}</MenuItem>
+              <MenuItem value={5}>5 - {t('composer.questionPool.bloomEvaluate')}</MenuItem>
+              <MenuItem value={6}>6 - {t('composer.questionPool.bloomCreate')}</MenuItem>
             </Select>
           </FormControl>
 
@@ -500,7 +502,6 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
               setHasChanges(true);
             }}
             disabled={loading}
-            label="Tags"
             deferCreation
           />
 

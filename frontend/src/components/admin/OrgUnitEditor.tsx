@@ -26,12 +26,21 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
+import type { SelectProps } from '@mui/material/Select';
 
 import { OrgUnitOut } from '../../types/orgUnit';
 import { OrgUnitsService } from '../../services/orgUnitsService';
 import { translateError } from '../../errors';
 import AdminService from '../../services/AdminService';
 import { Role } from '../../types/auth';
+
+// MUI's SelectProps type has no index signature for data-* attributes, so a
+// literal with 'data-testid' fails the object-literal excess-property check
+// when assigned directly. Route it through `unknown` instead of `never` so a
+// genuine typo elsewhere in the object (e.g. `displayEmpty`) still surfaces
+// as a structural mismatch against `Partial<SelectProps>`.
+const withTestId = (props: Partial<SelectProps> & { 'data-testid': string }) =>
+  props as unknown as Partial<SelectProps>;
 
 export interface OrgUnitEditorProps {
   open: boolean;
@@ -200,7 +209,7 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
           fullWidth
           margin="normal"
           disabled={isEdit}
-          SelectProps={{ 'data-testid': 'ou-editor-field-unit-type' } as never}
+          SelectProps={withTestId({ 'data-testid': 'ou-editor-field-unit-type' })}
         >
           {UNIT_TYPES.map(type => (
             <MenuItem key={type} value={type}>
@@ -223,7 +232,8 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
           }
           fullWidth
           margin="normal"
-          SelectProps={{ 'data-testid': 'ou-editor-field-parent' } as never}
+          SelectProps={withTestId({ displayEmpty: true, 'data-testid': 'ou-editor-field-parent' })}
+          InputLabelProps={{ shrink: true }}
         >
           <MenuItem value="">{t('admin.orgUnits.fieldParentNone')}</MenuItem>
           {parentOptions.map(option => (
@@ -239,7 +249,8 @@ const OrgUnitEditor: React.FC<OrgUnitEditorProps> = ({
           onChange={e => setRoleId(e.target.value === '' ? '' : Number(e.target.value))}
           fullWidth
           margin="normal"
-          SelectProps={{ 'data-testid': 'ou-editor-field-role' } as never}
+          SelectProps={withTestId({ displayEmpty: true, 'data-testid': 'ou-editor-field-role' })}
+          InputLabelProps={{ shrink: true }}
         >
           <MenuItem value="">{t('admin.orgUnits.fieldGrantedRoleNone')}</MenuItem>
           {allRoles.map(role => (

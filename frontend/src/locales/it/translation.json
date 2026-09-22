@@ -431,6 +431,7 @@
       "title": "Bentornato",
       "subtitle": "Accedi al tuo account",
       "email": "Indirizzo e-mail",
+      "emailPlaceholder": "tu@example.com",
       "password": "Password",
       "rememberMe": "Ricordami",
       "forgotPassword": "Password dimenticata?",
@@ -444,10 +445,14 @@
     "register": {
       "title": "Crea account",
       "firstName": "Nome",
+      "firstNamePlaceholder": "Mario",
       "lastName": "Cognome",
+      "lastNamePlaceholder": "Rossi",
       "email": "E-mail",
+      "emailPlaceholder": "tua.email@example.com",
       "institutionCode": "Codice istituzione (Opzionale)",
       "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
+      "institutionCodePlaceholder": "nome-istituzione",
       "password": "Password",
       "passwordReqTitle": "La password deve contenere:",
       "passwordReqMinLength": "8+ caratteri",
@@ -486,6 +491,7 @@
       "title": "Reimposta password",
       "subtitle": "Inserisci il tuo indirizzo e-mail e ti invieremo un link per reimpostare la password.",
       "email": "Indirizzo e-mail",
+      "emailPlaceholder": "tua.email@example.com",
       "sending": "Invio in corso...",
       "sendResetLink": "Invia link",
       "cancel": "Annulla",
@@ -888,13 +894,20 @@
         "colStatus": "Stato",
         "colIp": "Indirizzo IP",
         "colUserAgent": "User agent",
+        "tableLabel": "Log di audit",
         "impersonatedBy": "Impersonato da {{name}}",
         "impersonatedByTooltip": "Questa voce è stata creata durante una sessione di impersonazione — {{name}} era connesso come utente di destinazione.",
+        "unknownStatusTooltip": "Stato sconosciuto — nessun valore riconosciuto per questo campo.",
         "category": {
           "business": "Aziendale",
           "admin": "Amministrazione",
           "auth": "Autenticazione",
           "security": "Sicurezza"
+        },
+        "status": {
+          "success": "Riuscito",
+          "failure": "Non riuscito",
+          "error": "Errore"
         }
       }
     },
@@ -1052,6 +1065,7 @@
       "paginationNext": "Successivo",
       "paginationPage": "Pagina {{page}} di {{total}}",
       "paginationShowing": "Visualizzazione da {{from}} a {{to}} di {{total}} risultati",
+      "paginationLabel": "Paginazione",
       "failedLoad": "Impossibile caricare gli utenti",
       "failedStatus": "Impossibile aggiornare lo stato dell'utente",
       "btnImpersonate": "Accedi come utente"
@@ -2066,6 +2080,9 @@
       "explanationLabel": "Spiegazione",
       "explanationHint": "Opzionale: fornisci una spiegazione per la risposta",
       "difficulty": "Difficoltà",
+      "difficultyEasy": "Facile",
+      "difficultyMedium": "Medio",
+      "difficultyHard": "Difficile",
       "bloomLevel": "Livello della tassonomia di Bloom",
       "bloomNotSpecified": "Non specificato",
       "estimatedTime": "Tempo stimato (minuti)",
@@ -2174,6 +2191,7 @@
       "createOption": "Crea \"{{value}}\"",
       "groupGlobal": "Tag predefiniti",
       "groupInstitution": "Tag di questa istituzione",
+      "groupArchived": "Archiviati",
       "archivedCannotUse": "🚫 Il tag “{{name}}” è archiviato e non può essere usato.",
       "existingTags": "Tag esistenti",
       "searchPlaceholder": "Cerca tag...",
@@ -2573,7 +2591,8 @@
       "expandSidebar": "Espandi la barra laterale"
     },
     "navigationBar": {
-      "userFallback": "Utente"
+      "userFallback": "Utente",
+      "userMenu": "Menu utente"
     },
     "packageTier": {
       "tooltipTitle": "Pacchetto {{package}} - Livello {{displayName}}",

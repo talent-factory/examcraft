@@ -204,8 +204,8 @@ const HelpFeedbackQueue: React.FC = () => {
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
             <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>{t('admin.helpFeedbackQueue.status')}</InputLabel>
-              <Select value={statusFilter} label={t('admin.helpFeedbackQueue.status')} onChange={(e) => setStatusFilter(e.target.value)}>
+              <InputLabel shrink>{t('admin.helpFeedbackQueue.status')}</InputLabel>
+              <Select displayEmpty notched value={statusFilter} label={t('admin.helpFeedbackQueue.status')} onChange={(e) => setStatusFilter(e.target.value)}>
                 <MenuItem value="">{t('admin.helpFeedbackQueue.statusAll')}</MenuItem>
                 <MenuItem value="offen">{t('admin.helpFeedbackQueue.statusOpen')}</MenuItem>
                 <MenuItem value="in_bearbeitung">{t('admin.helpFeedbackQueue.statusInProgress')}</MenuItem>

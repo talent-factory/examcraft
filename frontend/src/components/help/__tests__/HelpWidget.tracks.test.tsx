@@ -421,7 +421,7 @@ describe('HelpWidget — neu freigeschaltete Vertiefungen', () => {
     await screen.findByTestId('help-track-new-auswertungen');
     expect(JSON.parse(localStorage.getItem('examcraft.help.seenTracks') || '[]')).toEqual([]);
 
-    fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Schliessen' }));
 
     await waitFor(() =>
       expect(

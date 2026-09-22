@@ -132,10 +132,12 @@ const AuswertungenStudierende: React.FC = () => {
           sx={{ minWidth: 280 }}
         />
         <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel id="class-filter-label">
+          <InputLabel id="class-filter-label" shrink>
             {t('auswertungen.studierende.filterClass')}
           </InputLabel>
           <Select
+            displayEmpty
+            notched
             labelId="class-filter-label"
             label={t('auswertungen.studierende.filterClass')}
             value={classFilter}

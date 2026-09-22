@@ -110,8 +110,10 @@ export const SemanticSearchTester: React.FC = () => {
           {/* Filters */}
           <Grid item xs={12} md={6}>
             <FormControl fullWidth>
-              <InputLabel>{t('admin.semanticSearch.categoryLabel')}</InputLabel>
+              <InputLabel shrink>{t('admin.semanticSearch.categoryLabel')}</InputLabel>
               <Select
+                displayEmpty
+                notched
                 value={category}
                 label={t('admin.semanticSearch.categoryLabel')}
                 onChange={(e: SelectChangeEvent) => setCategory(e.target.value)}

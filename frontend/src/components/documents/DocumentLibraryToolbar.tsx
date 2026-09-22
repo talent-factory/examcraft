@@ -186,8 +186,10 @@ export default function DocumentLibraryToolbar({
 
         {/* 2. Visibility single-select */}
         <FormControl size="small" sx={{ minWidth: 130 }}>
-          <InputLabel>{t('components.documentLibrary.toolbar.visibility', 'Sichtbarkeit')}</InputLabel>
+          <InputLabel shrink>{t('components.documentLibrary.toolbar.visibility', 'Sichtbarkeit')}</InputLabel>
           <Select
+            displayEmpty
+            notched
             value={params.visibility ?? ''}
             label={t('components.documentLibrary.toolbar.visibility', 'Sichtbarkeit')}
             onChange={handleVisibilityChange}

@@ -66,7 +66,8 @@ export const NavigationBar: React.FC = () => {
                 type="button"
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center space-x-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full p-1 hover:bg-gray-100 transition-colors"
-                aria-label="User menu"
+                aria-label={t('layout.navigationBar.userMenu')}
+                data-testid="user-menu"
               >
                 {/* Avatar Image or Initials */}
                 {user?.id && !avatarError ? (
@@ -134,6 +135,7 @@ export const NavigationBar: React.FC = () => {
                       type="button"
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                      data-testid="logout-button"
                     >
                       🚪 {t('nav.logout')}
                     </button>

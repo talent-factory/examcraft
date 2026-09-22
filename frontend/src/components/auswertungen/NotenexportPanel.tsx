@@ -338,10 +338,12 @@ const NotenexportPanel: React.FC<NotenexportPanelProps> = ({
       {schemeReady && (
         <Paper sx={{ p: 3, mb: 3 }}>
           <FormControl fullWidth size="small">
-            <InputLabel id="exam-grading-scheme-label">
+            <InputLabel id="exam-grading-scheme-label" shrink>
               {t('auswertungen.export.gradingSchemeLabel')}
             </InputLabel>
             <Select
+              displayEmpty
+              notched
               labelId="exam-grading-scheme-label"
               label={t('auswertungen.export.gradingSchemeLabel')}
               value={schemeId ?? ''}

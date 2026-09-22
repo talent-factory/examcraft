@@ -708,7 +708,12 @@ const HelpWidget: React.FC = () => {
             }}
           >
             <Typography variant="h6">{t('help.title', 'Hilfe')}</Typography>
-            <IconButton onClick={toggle} sx={{ color: 'white' }} aria-label="close">
+            <IconButton
+              onClick={toggle}
+              sx={{ color: 'white' }}
+              aria-label={t('common.close')}
+              data-testid="help-panel-close"
+            >
               <Close />
             </IconButton>
           </Box>

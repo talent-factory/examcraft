@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { appErrorFromApiError, translateError } from '../../errors';
 import { fetchAuditLogs } from '../../services/auditService';
-import { AuditCategory, AuditLogItem, AuditQueryParams } from '../../types/audit';
+import { AuditCategory, AuditLogItem, AuditQueryParams, AuditStatus } from '../../types/audit';
 
 interface AuditLogViewProps {
   /** Drives which categories + filters are offered (server still enforces scope). */
@@ -16,6 +16,7 @@ interface AuditLogViewProps {
 
 const CATEGORIES_BASE: AuditCategory[] = ['business', 'admin'];
 const CATEGORIES_SUPER: AuditCategory[] = ['business', 'admin', 'auth', 'security'];
+const STATUSES: AuditStatus[] = ['success', 'failure', 'error'];
 
 // TF-761: impersonation.start/impersonation.end live in the "admin" category
 // alongside unrelated actions (create_user, assign_role, ...), so isolating
@@ -83,8 +84,10 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
     <Box data-testid="audit-log-view">
       <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
         <FormControl size="small" sx={{ minWidth: 160 }} disabled={impersonationOnly}>
-          <InputLabel>{t('pages.admin.audit.filterCategory')}</InputLabel>
+          <InputLabel shrink>{t('pages.admin.audit.filterCategory')}</InputLabel>
           <Select
+            displayEmpty
+            notched
             data-testid="audit-filter-category"
             value={category}
             label={t('pages.admin.audit.filterCategory')}
@@ -114,17 +117,19 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
         />
 
         <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>{t('pages.admin.audit.filterStatus')}</InputLabel>
+          <InputLabel shrink>{t('pages.admin.audit.filterStatus')}</InputLabel>
           <Select
+            displayEmpty
+            notched
             data-testid="audit-filter-status"
             value={status}
             label={t('pages.admin.audit.filterStatus')}
             onChange={(e) => { setPage(0); setStatus(e.target.value); }}
           >
             <MenuItem value="">{t('pages.admin.audit.filterAll')}</MenuItem>
-            <MenuItem value="success">success</MenuItem>
-            <MenuItem value="failure">failure</MenuItem>
-            <MenuItem value="error">error</MenuItem>
+            {STATUSES.map((s) => (
+              <MenuItem key={s} value={s}>{t(`pages.admin.audit.status.${s}`)}</MenuItem>
+            ))}
           </Select>
         </FormControl>
 
@@ -143,7 +148,7 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
       {loading && <CircularProgress size={24} />}
 
       <TableContainer component={Paper}>
-        <Table size="small" aria-label="audit-log">
+        <Table size="small" aria-label={t('pages.admin.audit.tableLabel')}>
           <TableHead>
             <TableRow>
               <TableCell>{t('pages.admin.audit.colTime')}</TableCell>
@@ -176,7 +181,19 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
                 <TableCell><Chip size="small" label={row.category} /></TableCell>
                 <TableCell>{row.action}</TableCell>
                 <TableCell>{row.resource_type ? `${row.resource_type}#${row.resource_id ?? '?'}` : '—'}</TableCell>
-                <TableCell>{row.status}</TableCell>
+                {/* The DB column is a free String(20); show an unknown value raw rather than a missing key. */}
+                <TableCell>
+                  {STATUSES.includes(row.status) ? (
+                    t(`pages.admin.audit.status.${row.status}`)
+                  ) : (
+                    <Chip
+                      size="small"
+                      color="default"
+                      label={row.status}
+                      title={t('pages.admin.audit.unknownStatusTooltip')}
+                    />
+                  )}
+                </TableCell>
                 {isSuperuser && <TableCell>{row.ip_address ?? '—'}</TableCell>}
                 {isSuperuser && (
                   <TableCell

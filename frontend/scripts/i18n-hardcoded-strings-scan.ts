@@ -113,7 +113,12 @@ export function walk(dir: string, out: string[] = []): string[] {
 }
 
 export function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  // Blank out block comments char-by-char (keep newlines) rather than
+  // deleting them outright — deleting swallows the comment's own newlines
+  // and shifts every reported line number after it in the file.
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/^\s*\/\/.*$/gm, '');
 }
 
 function lineOf(src: string, index: number): number {
@@ -263,12 +268,34 @@ export function allowlistFor(findings: Finding[]): string[] {
  * - `Free`, `Starter`, `Professional`, `Enterprise` are subscription tier
  *   *names*, not descriptions. They are proper nouns that appear untranslated
  *   in invoices, in the RBAC tier column and in the backend's own enums.
+ *   InstitutionCreateDialog's tier `<select>` shows the same four names.
+ * - `ExamCraft AI` is the product name (AuthPage, NavigationBar, the legal page
+ *   header); `Google` and `Microsoft` label the OAuth buttons with the
+ *   providers' own brand names. Proper nouns, identical in every language.
+ * - `••••••••` is the password-field placeholder: a mask glyph, not text.
+ * - `PDF` is the invoice download link, a file-format name that reads the same
+ *   in de/en/fr/it.
+ * - `support@talent-factory.ch` appears on both the imprint and privacy pages;
+ *   `talent-factory.xyz` only on the imprint page. Both are the company's
+ *   actual contact address/domain and must stay byte-identical to what is
+ *   registered, in every language.
  *
  * Nobody should try to "finish" these by translating "CHF 0" or "Starter";
  * `i18n-hardcoded-strings.test.ts` asserts they are still present so that a
  * well-meaning regeneration cannot quietly drop them.
  */
 export const PERMANENT_EXCEPTIONS: string[] = [
+  'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Enterprise',
+  'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Free',
+  'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Professional',
+  'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Starter',
+  'core/frontend/src/components/auth/AuthPage.tsx::jsx-text::ExamCraft AI',
+  'core/frontend/src/components/auth/LoginForm.tsx::jsx-text::Google',
+  'core/frontend/src/components/auth/LoginForm.tsx::jsx-text::Microsoft',
+  'core/frontend/src/components/auth/LoginForm.tsx::placeholder::••••••••',
+  'core/frontend/src/components/auth/PasswordResetConfirm.tsx::placeholder::••••••••',
+  'core/frontend/src/components/auth/RegisterForm.tsx::placeholder::••••••••',
+  'core/frontend/src/components/layout/NavigationBar.tsx::jsx-text::ExamCraft AI',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::CHF 0',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::CHF 49',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::CHF 9',
@@ -276,4 +303,9 @@ export const PERMANENT_EXCEPTIONS: string[] = [
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::Free',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::Professional',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::Starter',
+  'core/frontend/src/pages/SubscriptionManagementPage.tsx::jsx-text::PDF',
+  'core/frontend/src/pages/legal/ImprintPage.tsx::jsx-text::support@talent-factory.ch',
+  'core/frontend/src/pages/legal/ImprintPage.tsx::jsx-text::talent-factory.xyz',
+  'core/frontend/src/pages/legal/LegalPageLayout.tsx::jsx-text::ExamCraft AI',
+  'core/frontend/src/pages/legal/PrivacyPage.tsx::jsx-text::support@talent-factory.ch',
 ];

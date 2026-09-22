@@ -359,8 +359,10 @@ const ReviewQueue: React.FC = () => {
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
           <FilterList />
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>{t('components.reviewQueue.filterStatus')}</InputLabel>
+            <InputLabel shrink>{t('components.reviewQueue.filterStatus')}</InputLabel>
             <Select
+              displayEmpty
+              notched
               value={filters.status || ''}
               onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
               label={t('components.reviewQueue.filterStatus')}
@@ -375,8 +377,10 @@ const ReviewQueue: React.FC = () => {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>{t('components.reviewQueue.filterDifficulty')}</InputLabel>
+            <InputLabel shrink>{t('components.reviewQueue.filterDifficulty')}</InputLabel>
             <Select
+              displayEmpty
+              notched
               value={filters.difficulty || ''}
               onChange={(e) => handleFilterChange('difficulty', e.target.value || undefined)}
               label={t('components.reviewQueue.filterDifficulty')}
@@ -389,8 +393,10 @@ const ReviewQueue: React.FC = () => {
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>{t('components.reviewQueue.filterQuestionType')}</InputLabel>
+            <InputLabel shrink>{t('components.reviewQueue.filterQuestionType')}</InputLabel>
             <Select
+              displayEmpty
+              notched
               value={filters.question_type || ''}
               onChange={(e) => handleFilterChange('question_type', e.target.value || undefined)}
               label={t('components.reviewQueue.filterQuestionType')}

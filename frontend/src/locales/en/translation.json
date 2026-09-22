@@ -431,6 +431,7 @@
       "title": "Welcome back",
       "subtitle": "Sign in to your account",
       "email": "Email address",
+      "emailPlaceholder": "you@example.com",
       "password": "Password",
       "rememberMe": "Remember me",
       "forgotPassword": "Forgot password?",
@@ -444,10 +445,14 @@
     "register": {
       "title": "Create Account",
       "firstName": "First Name",
+      "firstNamePlaceholder": "John",
       "lastName": "Last Name",
+      "lastNamePlaceholder": "Doe",
       "email": "Email",
+      "emailPlaceholder": "your.email@example.com",
       "institutionCode": "Institution Code (Optional)",
       "institutionCodeHint": "Enter your institution code if you have one",
+      "institutionCodePlaceholder": "university-name",
       "password": "Password",
       "passwordReqTitle": "Password must contain:",
       "passwordReqMinLength": "8+ characters",
@@ -486,6 +491,7 @@
       "title": "Reset Password",
       "subtitle": "Enter your email address and we'll send you a link to reset your password.",
       "email": "Email Address",
+      "emailPlaceholder": "your.email@example.com",
       "sending": "Sending...",
       "sendResetLink": "Send Reset Link",
       "cancel": "Cancel",
@@ -888,13 +894,20 @@
         "colStatus": "Status",
         "colIp": "IP address",
         "colUserAgent": "User agent",
+        "tableLabel": "Audit log",
         "impersonatedBy": "Impersonated by {{name}}",
         "impersonatedByTooltip": "This entry was created during an impersonation session — {{name}} was signed in as the target user.",
+        "unknownStatusTooltip": "Unknown status — no recognized value for this field.",
         "category": {
           "business": "Business",
           "admin": "Administration",
           "auth": "Authentication",
           "security": "Security"
+        },
+        "status": {
+          "success": "Success",
+          "failure": "Failure",
+          "error": "Error"
         }
       }
     },
@@ -1053,6 +1066,7 @@
       "paginationNext": "Next",
       "paginationPage": "Page {{page}} of {{total}}",
       "paginationShowing": "Showing {{from}} to {{to}} of {{total}} results",
+      "paginationLabel": "Pagination",
       "failedLoad": "Failed to load users",
       "failedStatus": "Failed to update user status"
     },
@@ -2066,6 +2080,9 @@
       "explanationLabel": "Explanation",
       "explanationHint": "Optional: Provide an explanation for the answer",
       "difficulty": "Difficulty",
+      "difficultyEasy": "Easy",
+      "difficultyMedium": "Medium",
+      "difficultyHard": "Hard",
       "bloomLevel": "Bloom's Taxonomy Level",
       "bloomNotSpecified": "Not specified",
       "estimatedTime": "Estimated Time (minutes)",
@@ -2174,6 +2191,7 @@
       "createOption": "Create \"{{value}}\"",
       "groupGlobal": "Predefined tags",
       "groupInstitution": "Tags of this institution",
+      "groupArchived": "Archived",
       "archivedCannotUse": "🚫 Tag “{{name}}” is archived and cannot be used.",
       "existingTags": "Existing tags",
       "searchPlaceholder": "Search tags...",
@@ -2573,7 +2591,8 @@
       "expandSidebar": "Expand sidebar"
     },
     "navigationBar": {
-      "userFallback": "User"
+      "userFallback": "User",
+      "userMenu": "User menu"
     },
     "packageTier": {
       "tooltipTitle": "{{package}} Package - {{displayName}} Tier",

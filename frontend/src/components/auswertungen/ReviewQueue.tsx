@@ -262,10 +262,12 @@ const ReviewQueue: React.FC<Props> = ({
               />
             </Box>
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="filter-question-label">
+              <InputLabel id="filter-question-label" shrink>
                 {t('auswertungen.exam.review.filterQuestion')}
               </InputLabel>
               <Select
+                displayEmpty
+                notched
                 labelId="filter-question-label"
                 value={questionFilter}
                 label={t('auswertungen.exam.review.filterQuestion')}
@@ -287,10 +289,12 @@ const ReviewQueue: React.FC<Props> = ({
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="filter-student-label">
+              <InputLabel id="filter-student-label" shrink>
                 {t('auswertungen.exam.review.filterStudent')}
               </InputLabel>
               <Select
+                displayEmpty
+                notched
                 labelId="filter-student-label"
                 value={studentFilter}
                 label={t('auswertungen.exam.review.filterStudent')}

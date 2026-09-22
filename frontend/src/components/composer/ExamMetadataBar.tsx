@@ -401,10 +401,12 @@ const ExamMetadataBar: React.FC<ExamMetadataBarProps> = ({ exam, onExport, onInv
               onChange={(e) => setForm({ ...form, passing_percentage: e.target.value })}
             />
             <FormControl fullWidth>
-              <InputLabel id="grading-scheme-label">
+              <InputLabel id="grading-scheme-label" shrink>
                 {t('composer.examMetadata.fieldGradingScheme')}
               </InputLabel>
               <Select
+                displayEmpty
+                notched
                 labelId="grading-scheme-label"
                 label={t('composer.examMetadata.fieldGradingScheme')}
                 value={gradingSchemeId ?? ''}
