@@ -7,6 +7,14 @@
  */
 import { createErrorReporter, safeUrl, type ClientErrorPayload } from '../errorReporting';
 
+// TF-867: reportClientError() koppelt das Session-Replay-Sample-Rate-Upgrade an denselben
+// Fehler-Signal-Pfad (AC2) -- gemockt, damit diese Tests nicht von rrweb/fetch-Details in
+// sessionReplay.ts abhaengen (die hat ihre eigene Testsuite, sessionReplay.test.ts).
+const mockNotifySessionReplayError = jest.fn();
+jest.mock('../sessionReplay', () => ({
+  notifySessionReplayError: () => mockNotifySessionReplayError(),
+}));
+
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
@@ -234,6 +242,27 @@ describe('errorReporting', () => {
       await reportClientError(payload);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('benachrichtigt Session-Replay (TF-867 AC2) nur, wenn tatsaechlich gemeldet wird', async () => {
+      process.env.REACT_APP_ENVIRONMENT = 'production';
+      jest.resetModules();
+      mockFetch.mockResolvedValueOnce({ ok: true } as Response);
+      const { reportClientError } = await import('../errorReporting');
+
+      await reportClientError(payload);
+
+      expect(mockNotifySessionReplayError).toHaveBeenCalledTimes(1);
+    });
+
+    it('benachrichtigt Session-Replay nicht in development (dasselbe Gating wie der Report selbst)', async () => {
+      process.env.REACT_APP_ENVIRONMENT = 'development';
+      jest.resetModules();
+      const { reportClientError } = await import('../errorReporting');
+
+      await reportClientError(payload);
+
+      expect(mockNotifySessionReplayError).not.toHaveBeenCalled();
     });
   });
 

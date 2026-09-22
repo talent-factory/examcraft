@@ -28,6 +28,8 @@
  * verschwinden.
  */
 
+import { notifySessionReplayError } from './sessionReplay';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ENDPOINT = `${API_BASE_URL}/api/v1/monitoring/client-errors`;
 const DEFAULT_MAX_REPORTS = 5;
@@ -238,6 +240,11 @@ export function reportClientError(payload: ClientErrorPayload): Promise<void> {
   if (!isReportingEnabled()) {
     return Promise.resolve();
   }
+  // TF-867 AC2: koppelt das Session-Replay-Sample-Rate-Upgrade an denselben Signal-Pfad wie
+  // Fehler-Reports (jeder tatsaechlich gemeldete Fehler laeuft durch diese Funktion, egal ob
+  // globaler Handler, ErrorBoundary oder reportHandledError) -- analog Sentrys Kopplung von
+  // "100% Replay-Sampling bei erfasstem Fehler" an dessen eigene Error-Erfassung.
+  notifySessionReplayError();
   return defaultReporter.reportError(payload);
 }
 
