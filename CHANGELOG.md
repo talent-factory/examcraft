@@ -9,6 +9,76 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-22
+
+### Added
+
+- **Sentry → Specula Migration (TF-847-Epic, TF-863–TF-870/TF-872,
+  #297–#305/#309):** Backend- und Frontend-Fehler-Tracking laufen jetzt
+  über den self-hosted Specula-Stack statt Sentry. Backend-Init über
+  `specula-client-python` (TF-865), Frontend-Init über lokales
+  Error-Reporting + `specula-client-js`-Äquivalent (TF-866),
+  Session-Replay über einen rrweb-Wrapper statt Sentry Replay (TF-867),
+  ein neuer `/client-errors`-Proxy-Endpoint nach ADR-012-Muster für
+  unauthentifizierte Frontend-Fehlermeldungen (TF-864), die alten
+  Sentry-Testrouten wurden durch Specula-Smoke-Test-Routen ersetzt
+  (TF-868), `premium/` geprüft (kein eigener SDK-Init nötig, TF-869),
+  und abschliessend `sentry-sdk`/`@sentry/*`-Abhängigkeiten,
+  Sentry-Env-Vars sowie `SENTRY_DSN`/`SENTRY_AUTH_TOKEN` als
+  Fly-Secrets entfernt (TF-870). Doku (`FLY_IO_DEPLOYMENT.md`,
+  `SENTRY.md`) auf Specula umgestellt (TF-872).
+- **ILIAS-QTI-Export für Prüfungen (TF-782):** Neuer Export-Weg für
+  Prüfungen nach ILIAS via QTI-Format, hinter eigenem
+  Opt-in-Permission (`ilias:use`).
+- **Live Activity im Ops-Dashboard (TF-826/TF-828/TF-833/TF-838,
+  #284/#286):** Neuer Activity-Count-Service mit REST-Endpoints sowie
+  ein Live-Activity-Tab im Ops-Dashboard mit Heartbeat-Integration.
+- **Sidebar ein-/ausklappbar (TF-819, #275).**
+- **Mehrsprachiges „Was ist neu"-Dialog mit sprachabhängigen
+  Screenshots (TF-802/TF-810, #263/#266).**
+- **SubscribeFlow-Marketing für den ersten ExamCraft-Newsletter
+  (TF-805/TF-808):** Newsletter-Template und Campaign-Erstellungs-Skript.
+- **RAG: Untererfüllte Fragengenerierung sichtbar und dauerhaft
+  (TF-736 Teil A+B):** Wenn die RAG-Pipeline weniger Fragen liefert als
+  angefordert, ist das jetzt für Nutzende sichtbar statt stillschweigend
+  verworfen zu werden.
+
+### Changed
+
+- **Fehlercode-Vereinheitlichung Backend + Frontend, weitere Etappen
+  (TF-772/TF-773, #269/#273/#281/#283/#290):** Restliche Core- und
+  Premium-Router auf maschinenlesbare `error_code`s umgestellt (u. a.
+  44 Wurfstellen/11 Router im Core, 114 Wurfstellen im
+  Premium-Backend), Fehlerpfade ohne `str(exc)`-Durchreichung, Du-Anrede
+  konsistent im Produkt.
+- **i18n-Gates konsolidiert (TF-772 PR 6, TF-775 Teil A+C, #292–#294):**
+  Ein Key-Gate, ein Literal-Gate, CI auf gestapelten PRs; 39
+  Restliterale aus der Guard-Allowlist entfernt, Hilfetexte erhalten
+  `{{ competencies }}` jetzt explizit.
+- **LLM-Gateway-Preflight-Check in `just dev` (TF-840, #287):** Prüft
+  Erreichbarkeit des LLM-Gateways beim Dev-Start.
+- **Backend-Testsuite-Coverage Richtung 90 %, Etappe 1+2 (TF-389,
+  #285/#288):** Zusätzliche Tests für Avatar/Storage/Claude/Help sowie
+  GDPR/RBAC/Billing/Admin-Module.
+
+### Fixed
+
+- **RabbitMQ Management-API (15672) intern nicht erreichbar
+  (TF-817, #270/#272/#276):** `management.tcp.ip` auf `::` gesetzt,
+  damit echte IPv6-Verbindungen angenommen werden.
+- **Ops-Alert-Telegram nutzte falsche Redis-DB (TF-815, #267/#268):**
+  Zunächst auf DB 3 statt der nicht unterstützten DB 4 korrigiert,
+  im Follow-up auf die tatsächlich beabsichtigte DB 0.
+
+### Security
+
+- **Redis-DB-Partitionierung für Blacklist/Ratelimit/MCP-OAuth
+  behoben (TF-816, #271).**
+- **PII-Fluss vom Ops-Chat an den LLM-Subprozessor unterbunden
+  (TF-790, #274).**
+- **`sanitize_url()` strippt Userinfo-Credentials aus der
+  URL-Autorität (TF-895, #299).**
+
 ## [1.11.0] - 2026-09-09
 
 ### Added
