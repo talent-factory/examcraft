@@ -7,6 +7,7 @@ present, subprocessor list is complete) rather than exact wording.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 
 from services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES
@@ -18,9 +19,9 @@ REQUIRED_SUBPROCESSORS = {
     "Fly.io",
     "Tigris",
     "Stripe",
-    "Sentry",
     "PostgreSQL",
     "Redis",
+    "Specula",
     "Google",
     "Microsoft",
     "SubscribeFlow",
@@ -84,6 +85,32 @@ def test_subprocessor_list_includes_every_required_service() -> None:
         assert any(required in name for name in names), (
             f"Subprocessor list missing: {required}"
         )
+
+
+def test_sentry_is_no_longer_referenced_anywhere_in_the_compliance_content() -> None:
+    """Regression test (TF-873): Sentry was replaced by the self-hosted
+    Specula stack (TF-847 epic) and must no longer appear anywhere in the
+    compliance package — not just the subprocessor list and TOM text, but
+    also the AVV, the VVT text and the state-specific notes.
+    """
+    content = get_compliance_content()
+    full_text = str(dataclasses.asdict(content))
+
+    assert "Sentry" not in full_text
+
+
+def test_tom_names_specula_as_the_self_hosted_error_tracking_system() -> None:
+    """Regression test (TF-873): the TOM annex must credit Specula, not
+    Sentry, as the (self-hosted) error-tracking system.
+    """
+    content = get_compliance_content()
+    tom_text = " ".join(
+        section.heading + " " + " ".join(section.paragraphs)
+        for section in content.tom.sections
+    )
+
+    assert "Specula" in tom_text
+    assert "selbst betrieben" in tom_text
 
 
 def test_every_subprocessor_documents_location_and_change_notice() -> None:

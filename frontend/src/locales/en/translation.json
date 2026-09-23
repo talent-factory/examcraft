@@ -547,7 +547,7 @@
       },
       "hosting": {
         "title": "Hosting and data location",
-        "text": "The platform is operated in the Fly.io region Frankfurt (Germany). Databases, vector DB and message queue run in the same region. Error tracking is handled via Sentry with DE ingest and masked data."
+        "text": "The platform is operated in the Fly.io region Frankfurt (Germany). Databases, vector DB and message queue run in the same region. Error tracking is handled via the self-hosted error-tracking system Specula (operated in the Frankfurt region, DE), with masked data."
       },
       "subprocessors": {
         "title": "Processors and subprocessors",
@@ -571,12 +571,12 @@
             "description": "Payment processing; Provider: Stripe, Inc., USA/Ireland (SCC/DPF)"
           },
           {
-            "name": "Sentry",
-            "description": "Error tracking (DE ingest, PII-masked); Provider: Functional Software, Inc., USA (SCC/DPF)"
-          },
-          {
             "name": "PostgreSQL/Redis",
             "description": "Database and cache (self-hosted, Frankfurt region, DE); part of our Fly.io hosting"
+          },
+          {
+            "name": "Specula",
+            "description": "Error tracking, logging and masked session-replay recordings (self-hosted, Frankfurt region, DE); part of our Fly.io hosting"
           },
           {
             "name": "SubscribeFlow",

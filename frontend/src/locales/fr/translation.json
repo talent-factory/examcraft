@@ -547,7 +547,7 @@
       },
       "hosting": {
         "title": "Hébergement et localisation des données",
-        "text": "La plateforme est exploitée dans la région Fly.io de Francfort (Allemagne). Les bases de données, la base vectorielle et la file de messages fonctionnent dans la même région. Le suivi des erreurs est géré via Sentry avec ingestion en Allemagne et données masquées."
+        "text": "La plateforme est exploitée dans la région Fly.io de Francfort (Allemagne). Les bases de données, la base vectorielle et la file de messages fonctionnent dans la même région. Le suivi des erreurs est géré via Specula, notre système de suivi des erreurs à hébergement propre (exploité dans la région de Francfort, DE), avec des données masquées."
       },
       "subprocessors": {
         "title": "Sous-traitants et sous-processeurs",
@@ -571,12 +571,12 @@
             "description": "Traitement des paiements; Fournisseur : Stripe, Inc., USA/Irlande (SCC/DPF)"
           },
           {
-            "name": "Sentry",
-            "description": "Analyse des erreurs (ingestion DE, PII masquées); Fournisseur : Functional Software, Inc., USA (SCC/DPF)"
-          },
-          {
             "name": "PostgreSQL/Redis",
             "description": "Base de données et cache (hébergement propre, région Francfort, DE); fait partie de notre hébergement Fly.io"
+          },
+          {
+            "name": "Specula",
+            "description": "Suivi des erreurs, journalisation et enregistrements de session masqués (hébergement propre, région Francfort, DE); fait partie de notre hébergement Fly.io"
           },
           {
             "name": "SubscribeFlow",

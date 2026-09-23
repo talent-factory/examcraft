@@ -291,9 +291,9 @@ def _build_tom() -> ComplianceDocument:
                 "geplante Restore-Rehearsal-Pipeline eingerichtet.",
                 "Die Infrastruktur ist containerbasiert und horizontal "
                 "skalierbar; Fehler und Ausfälle werden über ein "
-                "Error-Tracking-System (Sentry, EU-Region; ohne "
-                "standardmässige Übermittlung personenbezogener Inhalte) "
-                "überwacht.",
+                "selbst betriebenes Error-Tracking-System (Specula, "
+                "Frankfurt am Main/EU; ohne standardmässige Übermittlung "
+                "personenbezogener Inhalte) überwacht.",
             ),
         ),
         ComplianceSection(
@@ -407,18 +407,21 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
-            name="Sentry (Functional Software, Inc.)",
-            purpose="Fehler- und Performance-Überwachung",
-            location="EU (Sentry-Projektregion; genaue Ingest-Subdomain "
-            "ausserhalb dieses Codebase-Checks zu bestätigen); "
-            "PII-Maskierung aktiv (send_default_pii=False)",
-            transfer_mechanism="EU-Datenverarbeitung; EU-Standardvertrags"
-            "klauseln (SCC) für etwaige Sub-Verarbeitung",
+            name="PostgreSQL / Redis (selbst betrieben)",
+            purpose="Primärdatenbank und Session-/Cache-Speicher",
+            location="Frankfurt am Main, Deutschland (EU) — als Fly.io-"
+            "App im gleichen Rechenzentrum wie die Applikation betrieben",
+            transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "
+            "innerhalb der EU)",
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
-            name="PostgreSQL / Redis (selbst betrieben)",
-            purpose="Primärdatenbank und Session-/Cache-Speicher",
+            name="Specula (selbst betrieben)",
+            purpose="Error-Tracking, Traces und strukturiertes Logging "
+            "(Backend, Worker, Frontend) sowie Session-Replay-"
+            "Aufzeichnungen der Web-Oberfläche (Eingaben und Texte "
+            "standardmässig maskiert); ohne standardmässige "
+            "Übermittlung weiterer personenbezogener Inhalte",
             location="Frankfurt am Main, Deutschland (EU) — als Fly.io-"
             "App im gleichen Rechenzentrum wie die Applikation betrieben",
             transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "

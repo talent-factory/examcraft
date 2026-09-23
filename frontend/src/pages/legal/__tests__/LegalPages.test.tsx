@@ -118,4 +118,22 @@ describe('Legal pages', () => {
       }
     );
   });
+
+  describe('Hosting/subprocessors section names Specula, not Sentry (TF-873)', () => {
+    afterEach(async () => {
+      // Reset to the suite default so a later test in this file doesn't
+      // inherit a non-German locale.
+      await i18n.changeLanguage('de');
+    });
+
+    it.each(['de', 'en', 'fr', 'it'])(
+      'locale "%s" mentions Specula and never Sentry in the hosting/subprocessors copy',
+      async (locale) => {
+        await i18n.changeLanguage(locale);
+        renderWithRouter(<PrivacyPage />);
+        expect(screen.getAllByText(/Specula/i).length).toBeGreaterThan(0);
+        expect(screen.queryByText(/Sentry/i)).not.toBeInTheDocument();
+      }
+    );
+  });
 });
