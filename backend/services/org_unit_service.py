@@ -329,18 +329,20 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
     for the confirmation itself.
 
     Raises ``ValueError`` (-> 409 at the caller) if documents, prompts,
-    questions, exams, or competency frameworks still reference this --
-    or one of its descendant OrgUnits -- via ``visibility='team'``
-    (TF-620/TF-641/TF-642/TF-643/TF-644): ``documents.org_unit_id``,
-    ``prompts.org_unit_id``, ``question_reviews.org_unit_id``,
-    ``exams.org_unit_id``, and ``competency_frameworks.org_unit_id`` all
-    five deliberately have no ``ON DELETE CASCADE/SET NULL`` (see
-    migrations ``tf620_doc_org_unit_scope``,
-    ``tf641_prompt_org_unit_scope``, ``tf642_question_visibility``,
-    ``tf643_exam_visibility``, and ``tf644_competency_visibility``
-    respectively), so the DB-side FK fails here with an
-    ``IntegrityError`` instead of silently deleting the referencing rows
-    or leaving them in a constraint-violated state.
+    questions, exams, competency frameworks, or portfolio-assessment
+    templates still reference this -- or one of its descendant OrgUnits --
+    via ``visibility='team'`` (TF-620/TF-641/TF-642/TF-643/TF-644/TF-906):
+    ``documents.org_unit_id``, ``prompts.org_unit_id``,
+    ``question_reviews.org_unit_id``, ``exams.org_unit_id``,
+    ``competency_frameworks.org_unit_id``, and
+    ``portfolio_templates.org_unit_id`` all six deliberately have no
+    ``ON DELETE CASCADE/SET NULL`` (see migrations
+    ``tf620_doc_org_unit_scope``, ``tf641_prompt_org_unit_scope``,
+    ``tf642_question_visibility``, ``tf643_exam_visibility``,
+    ``tf644_competency_visibility``, and
+    ``portfolio_templates_foundation`` respectively), so the DB-side FK
+    fails here with an ``IntegrityError`` instead of silently deleting the
+    referencing rows or leaving them in a constraint-violated state.
     """
     descendant_count = len(get_descendant_ids(db, org_unit.id)) - 1
     db.delete(org_unit)
@@ -349,20 +351,22 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
     except IntegrityError as exc:
         db.rollback()
         # ``documents.org_unit_id``, ``prompts.org_unit_id``,
-        # ``question_reviews.org_unit_id``, ``exams.org_unit_id`` and
-        # ``competency_frameworks.org_unit_id`` are the only FKs onto
+        # ``question_reviews.org_unit_id``, ``exams.org_unit_id``,
+        # ``competency_frameworks.org_unit_id``, and
+        # ``portfolio_templates.org_unit_id`` are the only FKs onto
         # org_units without ON DELETE CASCADE/SET NULL today (see
-        # docstring), so one of the five is the only thing that can raise
+        # docstring), so one of the six is the only thing that can raise
         # here in practice -- but don't just assume which: inspect the
         # actual constraint name so a future non-cascading FK onto org_units
         # doesn't get silently mislabeled with any of the specific messages
         # (TF-641 regression: the message stayed hardcoded to "Dokumente"
         # after prompts.org_unit_id was added, misleading admins about which
-        # resource actually blocks the delete -- TF-642/TF-643/TF-644 repeat
-        # the same risk for their own org_unit_id column if left unhandled),
-        # and log the raw exception either way so a wrong guess is still
-        # debuggable (409s are typically treated as expected client errors
-        # and never reach error tracking) (TF-620/TF-641/TF-642/TF-643/TF-644).
+        # resource actually blocks the delete -- TF-642/TF-643/TF-644/TF-906
+        # repeat the same risk for their own org_unit_id column if left
+        # unhandled), and log the raw exception either way so a wrong guess
+        # is still debuggable (409s are typically treated as expected client
+        # errors and never reach error tracking)
+        # (TF-620/TF-641/TF-642/TF-643/TF-644/TF-906).
         constraint_name = getattr(
             getattr(exc.orig, "diag", None), "constraint_name", None
         )
@@ -385,11 +389,14 @@ def delete_org_unit(db: Session, org_unit: OrgUnit) -> int:
             blocking_resource = "Prüfungen"
         elif constraint_name is not None and "competency" in constraint_name.lower():
             blocking_resource = "Kompetenz-Frameworks"
+        elif constraint_name is not None and "portfolio" in constraint_name.lower():
+            blocking_resource = "Portfolio-Bewertungs-Templates"
         elif constraint_name is None or "org_unit_id" in constraint_name.lower():
             # Matches the FK but the naming convention doesn't tell us which
-            # table -- name all five rather than guess and mislabel.
+            # table -- name all six rather than guess and mislabel.
             blocking_resource = (
-                "Dokumente, Prompts, Fragen, Prüfungen oder Kompetenz-Frameworks"
+                "Dokumente, Prompts, Fragen, Prüfungen, Kompetenz-Frameworks "
+                "oder Portfolio-Bewertungs-Templates"
             )
         else:
             raise ValueError(

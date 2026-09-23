@@ -14,7 +14,8 @@ new admin GUI must not silently strip permissions it already held.
 A third group is opt-in only: registered here so it is assignable via the
 custom role editor, but deliberately never seeded to any default role — see
 ``OPT_IN_ONLY_PERMISSIONS`` for the current set (``users:impersonate``,
-TF-740, was the first member; ``ilias:use``, TF-782, the second).
+TF-740, was the first member; ``ilias:use``, TF-782, the second;
+``portfolio_templates:manage``/``:read``, TF-906, the third and fourth).
 """
 
 import json
@@ -114,6 +115,17 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "label": "ILIAS-Export/Import verwenden",
         "category": "Integration",
     },
+    # TF-906: opt-in only, same reasoning as users:impersonate/ilias:use above
+    # -- Portfolio-Assessment is a new pilot capability, no institution gets
+    # it by default.
+    "portfolio_templates:manage": {
+        "label": "Portfolio-Bewertungs-Templates verwalten",
+        "category": "Portfolio-Bewertung",
+    },
+    "portfolio_templates:read": {
+        "label": "Portfolio-Bewertungs-Templates einsehen",
+        "category": "Portfolio-Bewertung",
+    },
 }
 
 # Read-only view: prevents accidental mutation of the single source of truth
@@ -126,7 +138,14 @@ KNOWN_PERMISSIONS: Mapping[str, PermissionMeta] = MappingProxyType(_KNOWN_PERMIS
 # only. test_known_permissions_covers_all_seeded_strings excludes this set
 # when comparing KNOWN_PERMISSIONS against the seeded permission union, so
 # any *other* drift between the two is still caught.
-OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset({"users:impersonate", "ilias:use"})
+OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        "users:impersonate",
+        "ilias:use",
+        "portfolio_templates:manage",
+        "portfolio_templates:read",
+    }
+)
 
 # Fail fast at import time if an opt-in permission is ever added here
 # without a matching KNOWN_PERMISSIONS entry (silent otherwise: set

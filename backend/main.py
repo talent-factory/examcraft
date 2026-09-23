@@ -452,6 +452,11 @@ async def lifespan(app: FastAPI):
         try:
             from premium.models.chat_db import ChatSession, ChatMessage  # noqa: F401
             from premium.models.prompt import Prompt, PromptTemplate, PromptUsageLog  # noqa: F401
+            from premium.models.portfolio_assessment import (  # noqa: F401
+                PortfolioCriterion,
+                PortfolioTemplate,
+                PortfolioTemplatePhase,
+            )
             from database import engine
             from database import Base
 
@@ -472,6 +477,24 @@ async def lifespan(app: FastAPI):
             print(f"⚠️  Premium Prompts API not available: {e}")
         except Exception as e:
             print(f"❌ Error loading Premium Prompts API: {e}")
+
+        # Premium: Portfolio-Template-API (Epic 1, TF-906)
+        try:
+            from premium.api.v1 import portfolio_templates as portfolio_templates_api
+
+            app.include_router(portfolio_templates_api.router)
+            print("✅ Premium Portfolio-Templates API loaded")
+        except ImportError as e:
+            # logger.warning (not print()), same reasoning as the
+            # email-webhooks block above (TF-865): print() would let a
+            # broken router registration boot the app "successfully"
+            # (health checks pass) with zero logged error and zero
+            # observability event.
+            logger.warning(f"Premium Portfolio-Templates API not available: {e}")
+        except Exception as e:
+            logger.error(
+                f"Error loading Premium Portfolio-Templates API: {e}", exc_info=True
+            )
 
         # Premium: Chat API (Document ChatBot)
         try:

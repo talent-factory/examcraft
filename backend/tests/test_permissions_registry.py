@@ -75,3 +75,13 @@ def test_opt_in_only_permissions_is_subset_of_known_permissions():
     # fast at import time even if this test file isn't collected — close
     # that gap explicitly, for every current and future opt-in permission.
     assert OPT_IN_ONLY_PERMISSIONS <= set(KNOWN_PERMISSIONS.keys())
+
+
+def test_known_permissions_has_portfolio_template_permissions_deliberately_unseeded():
+    # Epic 1 (TF-906): Portfolio-Assessment ist eine neue Pilot-Faehigkeit,
+    # analog "ilias:use" (TF-782) opt-in only -- ein Institutions-Admin
+    # vergibt sie explizit ueber den Custom-Role-Editor.
+    for permission in ("portfolio_templates:manage", "portfolio_templates:read"):
+        assert permission in KNOWN_PERMISSIONS
+        assert permission in OPT_IN_ONLY_PERMISSIONS
+        assert KNOWN_PERMISSIONS[permission]["category"] == "Portfolio-Bewertung"
