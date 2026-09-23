@@ -31,8 +31,15 @@ os.environ["CLAUDE_SKIP_MODEL_VALIDATION"] = "true"
 # a fresh `TestClient(app)` entry in tests/test_task_result.py (new in this
 # PR, alphabetically early enough to be first to trip it) hit RecursionError
 # in CI. Same cause as before, same fix: more headroom, no code change.
-if sys.getrecursionlimit() < 8000:
-    sys.setrecursionlimit(8000)
+# TF-902: 8000 was exhausted again — reproduces only with `--cov=.` (the CI/
+# pytest.ini default) *and* a large-enough prior slice of the full suite in
+# the same session, never in isolation. Coverage.py's tracer adds Python-level
+# frame overhead to every call, and by the time `test_task_result.py`'s first
+# fresh `TestClient(app)` rebuilds the (further grown) OpenAPI schema, that
+# overhead is what tips 8000 over — not a new reference cycle. Same fix, more
+# headroom again.
+if sys.getrecursionlimit() < 15000:
+    sys.setrecursionlimit(15000)
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
