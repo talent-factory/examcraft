@@ -854,7 +854,14 @@ async def app_unhandled_exception_handler(request: Request, exc: Exception):
     for locally.
     """
     logger.exception(
-        "Unhandled exception on %s %s", request.method, request.url.path, exc_info=exc
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+        extra={
+            "specula_signal_type": "unhandled_exception",
+            "specula_origin": "backend",
+        },
     )
     return JSONResponse(
         {

@@ -582,3 +582,70 @@ def test_unhandled_error_endpoint_forbidden_for_non_superadmin():
     resp = client.post("/api/admin/specula-test/unhandled-error")
 
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# TF-915: real signal_type tagging (unhandled_exception, celery_task_failure)
+# ---------------------------------------------------------------------------
+
+
+def test_unhandled_exception_handler_tags_signal_type(caplog):
+    """main.py's global Exception handler must tag its log record with
+    specula_signal_type=unhandled_exception, or even a REAL unhandled
+    backend exception never reaches the examcraft-unhandled-exception
+    trigger rule (the previous logger.exception() call had no extra=... at
+    all — TF-915)."""
+    app.dependency_overrides[get_current_superuser] = lambda: SimpleNamespace(
+        id=7, is_superuser=True
+    )
+
+    with caplog.at_level(logging.ERROR, logger="main"):
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.post("/api/admin/specula-test/unhandled-error")
+
+    assert resp.status_code == 500
+    matching = [
+        r
+        for r in caplog.records
+        if getattr(r, "specula_signal_type", None) == "unhandled_exception"
+    ]
+    assert len(matching) == 1
+    assert matching[0].specula_origin == "backend"
+
+
+def test_task_failure_signal_logs_with_celery_task_failure_signal_type(caplog):
+    """Every failing Celery task -- not just the TF-359 diagnostic one --
+    must produce an ERROR log tagged specula_signal_type=celery_task_failure,
+    or the examcraft-celery-task-failure trigger rule never fires in
+    production (TF-915). Fires the real Celery signal rather than calling
+    the receiver directly, so a signal (dis)connection regression would also
+    be caught."""
+    from celery.signals import task_failure
+
+    import celery_app  # noqa: F401  (import registers the task_failure receiver)
+
+    class _FakeTask:
+        name = "tasks.example.some_task"
+
+    with caplog.at_level(logging.ERROR, logger="celery_app"):
+        task_failure.send(
+            sender=_FakeTask(),
+            task_id="fake-task-id",
+            exception=RuntimeError("boom"),
+            args=(),
+            kwargs={},
+            traceback=None,
+            einfo=None,
+        )
+
+    matching = [
+        r
+        for r in caplog.records
+        if getattr(r, "specula_signal_type", None) == "celery_task_failure"
+    ]
+    assert len(matching) == 1
+    record = matching[0]
+    assert record.levelno == logging.ERROR
+    assert record.specula_origin == "worker"
+    assert record.specula_task_name == "tasks.example.some_task"
+    assert record.specula_task_id == "fake-task-id"

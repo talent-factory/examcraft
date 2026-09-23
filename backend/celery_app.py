@@ -5,7 +5,7 @@ Handles asynchronous task processing with RabbitMQ broker
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import celeryd_init
+from celery.signals import celeryd_init, task_failure
 from kombu import Exchange, Queue
 import os
 import logging
@@ -32,6 +32,37 @@ def _init_worker_observability(**_kwargs):
     from config.observability import init_worker_observability
 
     init_worker_observability()
+
+
+@task_failure.connect
+def _log_task_failure_for_observability(
+    sender=None, task_id=None, exception=None, **_kwargs
+):
+    """Tag every failing task with specula_signal_type=celery_task_failure (TF-915).
+
+    Celery's OTel instrumentation (``instrument_celery=True`` in
+    ``config/observability.py``) already captures task failures as span
+    exceptions for tracing, but the examcraft-celery-task-failure Specula
+    trigger rule (TF-863) matches on a LOG record's ``specula.signal_type``
+    attribute, not span data. Before this handler, only the TF-359 diagnostic
+    task (``tasks/diagnostics_tasks.py::trigger_test_error``) ever logged
+    anything at all -- a genuine production task failure never reached
+    specula-notifier. Global handler, not per-task logging, so newly added
+    tasks are covered automatically.
+    """
+    task_name = getattr(sender, "name", "unknown")
+    logger.error(
+        "Celery task failed: %s (task_id=%s): %s",
+        task_name,
+        task_id,
+        exception,
+        extra={
+            "specula_signal_type": "celery_task_failure",
+            "specula_origin": "worker",
+            "specula_task_name": task_name,
+            "specula_task_id": str(task_id) if task_id else "",
+        },
+    )
 
 
 @celeryd_init.connect
