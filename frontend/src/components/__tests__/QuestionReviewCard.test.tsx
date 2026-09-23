@@ -97,8 +97,8 @@ describe('QuestionReviewCard', () => {
 
       expect(screen.getByText(/medium/i)).toBeInTheDocument();
       expect(screen.getByText(/85%/i)).toBeInTheDocument();
-      // Bloom level is displayed as "3 - Apply" (number - label format)
-      expect(screen.getByText(/3 - Apply/i)).toBeInTheDocument();
+      // Bloom level is displayed as "3 - Anwenden" (number - label format, translated)
+      expect(screen.getByText(/3 - Anwenden/i)).toBeInTheDocument();
       expect(screen.getByText(/5 min/i)).toBeInTheDocument();
       expect(screen.getByText(/Tier A/i)).toBeInTheDocument();
     });

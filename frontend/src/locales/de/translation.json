@@ -1990,6 +1990,8 @@
       "aiConfidence": "KI-Konfidenz",
       "confidenceLabel": "{{score}}% Konfidenz",
       "bloomLevel": "Bloom-Taxonomiestufe",
+      "bloomNotAvailable": "N/A",
+      "bloomUnknown": "Unbekannt",
       "estimatedTime": "Geschätzte Zeit",
       "qualityTier": "Qualitätsstufe",
       "topic": "Thema",

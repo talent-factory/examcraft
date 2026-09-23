@@ -133,11 +133,17 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
     }
   };
 
-  // Bloom taxonomy labels are standardized educational terms used internationally
   const getBloomLevelLabel = (level?: number): string => {
-    if (!level) return 'N/A';
-    const labels = ['', 'Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
-    return `${level} - ${labels[level] || 'Unknown'}`;
+    if (!level) return t('components.questionCard.bloomNotAvailable');
+    const labels: Record<number, string> = {
+      1: t('composer.questionPool.bloomRemember'),
+      2: t('composer.questionPool.bloomUnderstand'),
+      3: t('composer.questionPool.bloomApply'),
+      4: t('composer.questionPool.bloomAnalyze'),
+      5: t('composer.questionPool.bloomEvaluate'),
+      6: t('composer.questionPool.bloomCreate'),
+    };
+    return `${level} - ${labels[level] || t('components.questionCard.bloomUnknown')}`;
   };
 
   const formatQuestionType = (type: string): string => {

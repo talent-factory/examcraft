@@ -1990,6 +1990,8 @@
       "aiConfidence": "Confidenza dell'IA",
       "confidenceLabel": "{{score}}% di confidenza",
       "bloomLevel": "Livello della tassonomia di Bloom",
+      "bloomNotAvailable": "N/D",
+      "bloomUnknown": "Sconosciuto",
       "estimatedTime": "Tempo stimato",
       "qualityTier": "Livello di qualità",
       "topic": "Argomento",
