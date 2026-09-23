@@ -22,6 +22,11 @@ and this project adheres to
 - **SuperAdmin-Endpoint für Prod-Smoke-Test von unbehandelten Exceptions
   (TF-871 Nachzug):** Analog zum bestehenden Worker-Error-Trigger, da
   der Dev-only-Endpoint in Prod 403 liefert.
+- **Datenschutz-Review-Checkliste für PRs (TF-922):** Neuer Abschnitt
+  „Datenschutzrelevanz?" im PR-Template sowie eine projektlokale
+  `privacy-review`-Skill mit konkreten Kriterien (neuer Subprozessor,
+  neue Personendatenkategorie, Drittlandtransfer, Lösch-/
+  Aufbewahrungslogik, EU-AI-Act-Bezug).
 
 ### Changed
 
@@ -31,6 +36,11 @@ and this project adheres to
   `SPECULA.md`/`FLY_IO_DEPLOYMENT.md` sowie die Compliance-Doku
   (TOM/Datenschutzerklärung) auf Specula aktualisiert, Sentry als
   Subprozessor entfernt.
+- **AVV/TOM: ENTWURF-Hinweis entfernt (TF-920):** Die interne
+  Datenschutzbeauftragte hat die AVV-/TOM-Inhalte aus TF-746 geprüft
+  und freigegeben — der Hinweis „ENTWURF – juristische Prüfung
+  ausstehend" auf `/legal/compliance` (JSON-API, PDF-Export, UI) ist
+  damit überholt und entfernt.
 
 ### Fixed
 
