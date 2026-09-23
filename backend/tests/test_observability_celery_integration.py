@@ -649,3 +649,59 @@ def test_task_failure_signal_logs_with_celery_task_failure_signal_type(caplog):
     assert record.specula_origin == "worker"
     assert record.specula_task_name == "tasks.example.some_task"
     assert record.specula_task_id == "fake-task-id"
+
+
+def test_after_setup_logger_signal_reattaches_observability(monkeypatch):
+    """Celery's own logging setup (worker_hijack_root_logger=True, the
+    default) wipes every root-logger handler AFTER celeryd_init already
+    attached SpeculaLogHandler there -- silently destroying it. The
+    after_setup_logger hook must re-run init_worker_observability() to
+    restore it, or no worker log (including celery_task_failure) ever
+    reaches Specula (TF-916)."""
+    import celery_app  # noqa: F401  (import registers the after_setup_logger receiver)
+    import config.observability as observability_cfg
+    from celery.signals import after_setup_logger
+
+    calls = {"n": 0}
+    monkeypatch.setattr(
+        observability_cfg,
+        "init_worker_observability",
+        lambda: calls.__setitem__("n", calls["n"] + 1),
+    )
+
+    after_setup_logger.send(sender=None, logger=logging.getLogger())
+
+    assert calls["n"] >= 1
+
+
+def test_worker_hijack_root_logger_does_not_lose_speculaloghandler(monkeypatch):
+    """End-to-end regression guard for the actual production bug (TF-916):
+    simulate Celery's worker_hijack_root_logger=True wipe (root.handlers = [])
+    between celeryd_init and after_setup_logger -- exactly what
+    celery.app.log.Logging.setup_logging_subsystem() does -- and verify a
+    SpeculaLogHandler is attached again afterwards. Without the
+    after_setup_logger re-attach hook, this reproduces the bug: the handler
+    attached during celeryd_init is gone and never comes back."""
+    import celery_app  # noqa: F401  (import registers both signal receivers)
+    from celery.signals import after_setup_logger, celeryd_init
+    from specula_client.logging import SpeculaLogHandler
+
+    monkeypatch.setenv("OTEL_EXPORTER_ENDPOINT", "https://otel-collector.example.com")
+    monkeypatch.setenv("SPECULA_TEAM_API_KEY", "fake-team-api-key")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+
+    root = logging.getLogger()
+    original_handlers = list(root.handlers)
+    try:
+        celeryd_init.send(sender="test-worker")
+        assert any(isinstance(h, SpeculaLogHandler) for h in root.handlers), (
+            "precondition: celeryd_init must attach the handler first"
+        )
+
+        root.handlers = []  # simulate Celery's setup_logging_subsystem() wipe
+
+        after_setup_logger.send(sender=None, logger=root)
+
+        assert any(isinstance(h, SpeculaLogHandler) for h in root.handlers)
+    finally:
+        root.handlers = original_handlers

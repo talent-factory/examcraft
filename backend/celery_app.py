@@ -5,7 +5,7 @@ Handles asynchronous task processing with RabbitMQ broker
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import celeryd_init, task_failure
+from celery.signals import after_setup_logger, celeryd_init, task_failure
 from kombu import Exchange, Queue
 import os
 import logging
@@ -28,6 +28,32 @@ def _init_worker_observability(**_kwargs):
     ``init_worker_observability()`` is a no-op unless ``OTEL_EXPORTER_ENDPOINT``
     and ``SPECULA_TEAM_API_KEY`` are set, so booting a worker locally without
     those stays silent.
+    """
+    from config.observability import init_worker_observability
+
+    init_worker_observability()
+
+
+@after_setup_logger.connect
+def _reattach_observability_log_handler(**_kwargs):
+    """Re-attach SpeculaLogHandler after Celery's own logging setup (TF-916).
+
+    ``celery.app.log.Logging.setup_logging_subsystem()`` runs AFTER
+    ``celeryd_init`` (the hook above) and, with the default
+    ``worker_hijack_root_logger=True``, unconditionally wipes every root-
+    logger handler (``root.handlers = []``) before installing its own --
+    silently destroying the ``SpeculaLogHandler`` that ``celeryd_init``
+    just attached. Without this second hook, NOTHING logged from the
+    worker ever reaches Specula regardless of level or content (confirmed
+    in production: even a deliberately-raised, correctly-tagged ERROR log
+    never left the process -- root cause of the celery_task_failure
+    trigger rule never firing, TF-915).
+
+    ``after_setup_logger`` fires once, right after that wipe, making it the
+    correct re-attachment point. Safe to call again: ``init_worker_observability()``
+    is idempotent for the log-handler part (isinstance guard in
+    ``_attach_log_handler``) and re-running the tracing setup is a no-op
+    (OTel only honours the first ``set_tracer_provider()`` call per process).
     """
     from config.observability import init_worker_observability
 
