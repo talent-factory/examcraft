@@ -115,7 +115,7 @@ export const CompliancePage: React.FC = () => {
               {content.avv.title}
             </h2>
             <p className="text-sm text-gray-500 mb-2">{content.avv.last_updated}</p>
-            <p className="text-sm italic text-amber-700 mb-4">
+            <p className="text-sm italic text-gray-500 mb-4">
               {content.avv.draft_notice}
             </p>
             <a
@@ -143,7 +143,7 @@ export const CompliancePage: React.FC = () => {
               {content.tom.title}
             </h2>
             <p className="text-sm text-gray-500 mb-2">{content.tom.last_updated}</p>
-            <p className="text-sm italic text-amber-700 mb-4">
+            <p className="text-sm italic text-gray-500 mb-4">
               {content.tom.draft_notice}
             </p>
             <a

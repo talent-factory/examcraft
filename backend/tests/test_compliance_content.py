@@ -11,7 +11,7 @@ import dataclasses
 import re
 
 from services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES
-from services.compliance_content import DRAFT_NOTICE, get_compliance_content
+from services.compliance_content import REVIEW_NOTICE, get_compliance_content
 
 REQUIRED_SUBPROCESSORS = {
     "Anthropic",
@@ -50,10 +50,29 @@ REQUIRED_TOM_CATEGORIES = (
 )
 
 
-def test_avv_carries_the_draft_notice() -> None:
+def test_avv_carries_the_review_notice() -> None:
     content = get_compliance_content()
 
-    assert content.avv.draft_notice == DRAFT_NOTICE
+    assert content.avv.draft_notice == REVIEW_NOTICE
+
+
+def test_tom_carries_the_review_notice() -> None:
+    content = get_compliance_content()
+
+    assert content.tom.draft_notice == REVIEW_NOTICE
+
+
+def test_entwurf_notice_is_no_longer_referenced_anywhere_in_the_compliance_content() -> (
+    None
+):
+    """Regression test (TF-920): the draft/legal-review-pending notice was
+    replaced by REVIEW_NOTICE once the internal DPO approved the content —
+    "ENTWURF" must no longer appear anywhere in the compliance package.
+    """
+    content = get_compliance_content()
+    full_text = str(dataclasses.asdict(content))
+
+    assert "ENTWURF" not in full_text
 
 
 def test_avv_covers_every_required_art_28_topic() -> None:

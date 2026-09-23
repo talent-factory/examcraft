@@ -50,13 +50,13 @@ const STUB_RESPONSE = {
   avv: {
     title: 'Muster — Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO',
     last_updated: 'Stand: August 2026',
-    draft_notice: 'ENTWURF – juristische Prüfung ausstehend.',
+    draft_notice: 'Freigegeben durch die interne Datenschutzbeauftragte.',
     sections: [{ heading: '1. Gegenstand und Dauer', paragraphs: ['Text A'] }],
   },
   tom: {
     title: 'Anlage — Technische und organisatorische Massnahmen (TOM)',
     last_updated: 'Stand: August 2026',
-    draft_notice: 'ENTWURF – juristische Prüfung ausstehend.',
+    draft_notice: 'Freigegeben durch die interne Datenschutzbeauftragte.',
     sections: [{ heading: '1. Vertraulichkeit', paragraphs: ['Text B'] }],
   },
   subprocessors: [

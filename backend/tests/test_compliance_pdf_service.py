@@ -2,7 +2,7 @@
 
 Pure unit tests — exporters take a ``ComplianceDocument`` and are
 stateless. PDF tests use ``pypdf`` to spot-check that the byte stream
-is a valid PDF and contains the title/draft-notice/section headings
+is a valid PDF and contains the title/review-notice/section headings
 (don't assert layout — that flakes across reportlab versions).
 """
 
@@ -40,14 +40,14 @@ def test_avv_exporter_produces_a_valid_pdf() -> None:
     assert pdf_bytes.startswith(b"%PDF")
 
 
-def test_avv_pdf_contains_title_and_draft_notice() -> None:
+def test_avv_pdf_contains_title_and_review_notice() -> None:
     pytest.importorskip("reportlab")
     content = get_compliance_content()
 
     text = _extract_text(AvvPdfExporter.export(content.avv))
 
     assert "Auftragsverarbeitungsvertrag" in text
-    assert "ENTWURF" in text
+    assert "Freigegeben durch die interne Datenschutzbeauftragte" in text
 
 
 def test_avv_pdf_contains_every_section_heading() -> None:
@@ -123,9 +123,9 @@ def test_pdf_export_escapes_xml_markup_in_content() -> None:
     """
     pytest.importorskip("reportlab")
     document = ComplianceDocument(
-        title="AVV & TOM <Entwurf>",
+        title="AVV & TOM <Muster>",
         last_updated="Stand: <heute>",
-        draft_notice="ENTWURF & unreviewed",
+        draft_notice="Freigegeben & geprüft <Status>",
         sections=(
             ComplianceSection(
                 heading="1. Vertraulichkeit & Integrität <Art. 32>",

@@ -7,13 +7,13 @@ frontend compliance page (``GET /api/v1/legal/compliance``) and the
 PDF exporters (``services.compliance_pdf_service``) render from this
 one module, so page and PDF content cannot drift apart.
 
-DRAFT STATUS (TF-746): every document carries ``DRAFT_NOTICE`` — this
-content has not been reviewed or approved by external legal/DPO
-counsel yet (see the ticket's explicit note). Content is grounded in
-what the codebase actually does today (Fly.io Frankfurt hosting,
-force_https, audit_service.py, RBACService, the backup/restore-
-rehearsal GitHub Actions workflows) — it does not claim certifications
-or measures that are not implemented.
+REVIEW STATUS (TF-746 draft, reviewed & signed off under TF-920):
+every document carries ``REVIEW_NOTICE`` confirming that the internal
+DPO (Datenschutzbeauftragte) has reviewed and approved the content.
+Content is grounded in what the codebase actually does today (Fly.io
+Frankfurt hosting, force_https, audit_service.py, RBACService, the
+backup/restore-rehearsal GitHub Actions workflows) — it does not claim
+certifications or measures that are not implemented.
 """
 
 from __future__ import annotations
@@ -22,11 +22,13 @@ from dataclasses import dataclass
 
 from services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES
 
-DRAFT_NOTICE = (
-    "ENTWURF – juristische Prüfung ausstehend. Dieses Dokument ist ein "
-    "Muster auf Basis gängiger DSGVO-Vorlagen (u. a. DSK-Struktur) und "
-    "wurde noch nicht von einem externen Datenschutz-/IT-Rechtsspezialisten "
-    "geprüft oder freigegeben. Es ist nicht rechtsverbindlich."
+# Keep the "Stand: ..." date below in sync with _LAST_UPDATED whenever the
+# content changes — two independent literals that must not drift apart.
+REVIEW_NOTICE = (
+    "Freigegeben durch die interne Datenschutzbeauftragte der Talent "
+    "Factory GmbH (Stand: September 2026). Dieses Dokument basiert auf "
+    "gängigen DSGVO-Vorlagen (u. a. DSK-Struktur) und ersetzt keine "
+    "individuelle Rechtsberatung für den Einzelfall."
 )
 
 _LAST_UPDATED = "Stand: September 2026"
@@ -42,6 +44,9 @@ class ComplianceSection:
 class ComplianceDocument:
     title: str
     last_updated: str
+    # Historical name; carries REVIEW_NOTICE since TF-920. Kept unrenamed to
+    # avoid rippling into the Pydantic schema, PDF exporter, TS interface and
+    # frontend prop for what is a content-only change.
     draft_notice: str
     sections: tuple[ComplianceSection, ...]
 
@@ -240,7 +245,7 @@ def _build_avv() -> ComplianceDocument:
     return ComplianceDocument(
         title="Muster — Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO",
         last_updated=_LAST_UPDATED,
-        draft_notice=DRAFT_NOTICE,
+        draft_notice=REVIEW_NOTICE,
         sections=sections,
     )
 
@@ -342,7 +347,7 @@ def _build_tom() -> ComplianceDocument:
         title="Anlage — Technische und organisatorische Massnahmen (TOM) "
         "nach Art. 32 DSGVO",
         last_updated=_LAST_UPDATED,
-        draft_notice=DRAFT_NOTICE,
+        draft_notice=REVIEW_NOTICE,
         sections=sections,
     )
 
@@ -519,7 +524,7 @@ _STATE_SPECIFIC_NOTES = ComplianceSection(
         "an digitale Lernmittel) sind gesondert zu prüfen; eine hessische "
         "Landesfassung dieses AVV-Pakets liegt noch nicht vor.",
         "Diese Liste ist nicht abschliessend — weitere Länder sind bei "
-        "Bedarf zu ergänzen. Bis zum Abschluss der juristischen Prüfung "
+        "Bedarf zu ergänzen. Bis zum Vorliegen geprüfter Landesfassungen "
         "gilt ausschliesslich die allgemeine Muster-AVV.",
     ),
 )
