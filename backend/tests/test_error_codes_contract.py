@@ -195,6 +195,7 @@ def test_keine_dynamischen_codes_ohne_konstante():
         "core/backend/utils/document_visibility.py",  # detail_key-Parameter
         "core/backend/api/submissions.py",  # ImportDriverError.code
         "premium/backend/api/v1/wizard.py",  # WizardServiceError.code
+        "premium/backend/api/v1/portfolio_assessments.py",  # PortfolioAssessmentValidationError.code
     }
     unerwartet = [d for d in DYNAMIC if d.rsplit(":", 1)[0] not in ERLAUBT]
     assert not unerwartet, (
@@ -238,6 +239,36 @@ def test_erlaubte_dynamische_quellen_liefern_nur_echte_schluessel():
         f"TransferError-Code(s) ohne Schlüssel in t.{_REFERENCE_LANG}.json: "
         f"{fehlend_transfer}"
     )
+
+    # premium portfolio_assessments.py: PortfolioAssessmentValidationError.code
+    # — gleiches Muster wie TransferError, Literale direkt aus jedem
+    # `PortfolioAssessmentValidationError("...", ...)`-Aufruf im Service
+    # extrahiert (TF-921). Im core/-Mirror fehlt premium/ — dann entfällt
+    # dieser Teil, weil es auch keinen Aufrufer gibt.
+    assessment_service = (
+        REPO_ROOT / "premium/backend/services/portfolio_assessment_service.py"
+    )
+    if assessment_service.is_file():
+        tree = ast.parse(assessment_service.read_text(encoding="utf-8"))
+        assessment_codes = {
+            node.args[0].value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "PortfolioAssessmentValidationError"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        }
+        assert assessment_codes, (
+            "PortfolioAssessmentValidationError-Scan hat nichts gefunden — "
+            "Klasse umbenannt oder verschoben?"
+        )
+        fehlend_assessment = sorted(c for c in assessment_codes if c not in keys)
+        assert not fehlend_assessment, (
+            "PortfolioAssessmentValidationError-Code(s) ohne Schlüssel in "
+            f"t.{_REFERENCE_LANG}.json: {fehlend_assessment}"
+        )
 
     # document_visibility.py: assert_document_visible_for()'s `detail_key` —
     # geprüft wird der Default UND, dass niemand im Repo ihn überschreibt;

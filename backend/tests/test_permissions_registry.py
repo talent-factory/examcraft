@@ -85,3 +85,12 @@ def test_known_permissions_has_portfolio_template_permissions_deliberately_unsee
         assert permission in KNOWN_PERMISSIONS
         assert permission in OPT_IN_ONLY_PERMISSIONS
         assert KNOWN_PERMISSIONS[permission]["category"] == "Portfolio-Bewertung"
+
+
+def test_known_permissions_has_portfolio_assessment_permissions_deliberately_unseeded():
+    # Epic 2 (TF-921): Assessment-Ingestion ist Teil derselben Pilot-
+    # Faehigkeit wie die Templates (TF-906) -- opt-in only.
+    for permission in ("portfolio_assessments:manage", "portfolio_assessments:read"):
+        assert permission in KNOWN_PERMISSIONS
+        assert permission in OPT_IN_ONLY_PERMISSIONS
+        assert KNOWN_PERMISSIONS[permission]["category"] == "Portfolio-Bewertung"

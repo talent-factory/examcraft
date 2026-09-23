@@ -496,6 +496,40 @@ async def lifespan(app: FastAPI):
                 f"Error loading Premium Portfolio-Templates API: {e}", exc_info=True
             )
 
+        # Premium: Portfolio-GitHub-Credential-API (Epic 2, TF-921)
+        try:
+            from premium.api.v1 import (
+                portfolio_github_credentials as portfolio_github_credentials_api,
+            )
+
+            app.include_router(portfolio_github_credentials_api.router)
+            print("✅ Premium Portfolio-GitHub-Credential API loaded")
+        except ImportError as e:
+            logger.warning(
+                f"Premium Portfolio-GitHub-Credential API not available: {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error loading Premium Portfolio-GitHub-Credential API: {e}",
+                exc_info=True,
+            )
+
+        # Premium: Portfolio-Assessment-API (Epic 2, TF-921)
+        try:
+            from premium.api.v1 import (
+                portfolio_assessments as portfolio_assessments_api,
+            )
+
+            app.include_router(portfolio_assessments_api.router)
+            print("✅ Premium Portfolio-Assessments API loaded")
+        except ImportError as e:
+            logger.warning(f"Premium Portfolio-Assessments API not available: {e}")
+        except Exception as e:
+            logger.error(
+                f"Error loading Premium Portfolio-Assessments API: {e}",
+                exc_info=True,
+            )
+
         # Premium: Chat API (Document ChatBot)
         try:
             from premium.api.v1 import chat as chat_api

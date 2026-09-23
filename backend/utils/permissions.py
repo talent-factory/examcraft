@@ -126,6 +126,16 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "label": "Portfolio-Bewertungs-Templates einsehen",
         "category": "Portfolio-Bewertung",
     },
+    # TF-921: opt-in only, gleiche Begruendung wie portfolio_templates:*
+    # oben -- Assessment-Ingestion ist Epic 2 derselben Pilot-Faehigkeit.
+    "portfolio_assessments:manage": {
+        "label": "Portfolio-Assessments anlegen und Ingestion starten",
+        "category": "Portfolio-Bewertung",
+    },
+    "portfolio_assessments:read": {
+        "label": "Portfolio-Assessments und Ingestion-Status einsehen",
+        "category": "Portfolio-Bewertung",
+    },
 }
 
 # Read-only view: prevents accidental mutation of the single source of truth
@@ -144,6 +154,8 @@ OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset(
         "ilias:use",
         "portfolio_templates:manage",
         "portfolio_templates:read",
+        "portfolio_assessments:manage",
+        "portfolio_assessments:read",
     }
 )
 

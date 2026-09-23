@@ -418,3 +418,66 @@ _premium_ops_alert_beat, _premium_ops_alert_routes = (
 )
 celery_app.conf.beat_schedule.update(_premium_ops_alert_beat)
 celery_app.conf.task_routes.update(_premium_ops_alert_routes)
+
+
+def _resolve_premium_portfolio_ingestion_task_registration(
+    deployment_mode: str,
+) -> dict:
+    """Bedingte Celery-Registrierung fuer den Portfolio-Ingestion-Task
+    (Epic 2, TF-921).
+
+    Mirrors ``_resolve_premium_ops_alert_registration``'s Rueckgabe-statt-
+    Seiteneffekt-Form (reine Funktion, kein Effekt auf ``celery_app`` selbst
+    ausser dem Import -- unit-testbar ohne Neuaufbau der echten Celery-App,
+    siehe ``test_celery_config.py::test_premium_portfolio_ingestion_task_*``),
+    aber ohne Beat-Schedule-Haelfte: dieser Task ist on-demand (via
+    ``.apply_async()`` aus der API, Task 9) -- es reicht der reine
+    Modul-Import, damit ``@celery_app.task`` beim Worker-Start registriert
+    wird. Ohne diesen Import bliebe der Task fuer den Worker unsichtbar und
+    jeder ``apply_async()``-Aufruf würde ergebnislos in der Queue verharren
+    (gleiche Fehlerklasse wie TF-412/TF-759 "celery-include-Gotcha", hier
+    fuer Premium-Tasks statt fuer die statische ``include=[...]``-Liste
+    oben, die nur Core-``tasks.*``-Module auflistet).
+
+    Liefert zusaetzlich den ``task_routes``-Eintrag auf die bestehende
+    ``document_processing``-Queue zurueck (Review-Fix): der reine
+    Modul-Import macht den Task nur fuer die Worker-*Discovery* sichtbar --
+    ohne Route landet ``apply_async()`` auf der Default-Queue ``celery``,
+    die kein Worker (weder docker-compose noch Fly) konsumiert. Exakt die
+    TF-412/TF-759-Fehlerklasse, hier auf Routing- statt Import-Ebene: der
+    Job bliebe fuer immer ``queued``.
+
+    MUSS erst aufgerufen werden, nachdem ``celery_app = Celery(...)`` oben
+    vollstaendig konstruiert ist (siehe Aufrufstelle unten) -- gleiche
+    Begruendung wie bei ``_resolve_premium_ops_alert_registration``.
+    """
+    if deployment_mode != "full":
+        return {}
+    try:
+        import premium.tasks.portfolio_ingestion_tasks  # noqa: F401
+    except ImportError as e:
+        logger.warning("Premium portfolio-ingestion task not available: %s", e)
+        return {}
+    except Exception:
+        logger.error(
+            "Premium portfolio-ingestion task import failed unexpectedly — "
+            "degrading (task will not run)",
+            exc_info=True,
+        )
+        return {}
+
+    task_name = "premium.tasks.portfolio_ingestion_tasks.run_portfolio_ingestion"
+    return {
+        task_name: {
+            "queue": "document_processing",
+            "routing_key": "document.process",
+        }
+    }
+
+
+_premium_portfolio_ingestion_routes = (
+    _resolve_premium_portfolio_ingestion_task_registration(
+        os.getenv("DEPLOYMENT_MODE", "core")
+    )
+)
+celery_app.conf.task_routes.update(_premium_portfolio_ingestion_routes)

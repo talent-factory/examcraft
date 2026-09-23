@@ -154,3 +154,97 @@ def test_ops_alert_task_is_registered_and_routed_in_running_app():
     if task_name not in celery_app.conf.task_routes:
         pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
     assert "check-ops-alert-thresholds" in celery_app.conf.beat_schedule
+
+
+def test_premium_portfolio_ingestion_task_registration_empty_in_core_mode():
+    from celery_app import _resolve_premium_portfolio_ingestion_task_registration
+
+    routes = _resolve_premium_portfolio_ingestion_task_registration("core")
+    assert routes == {}
+
+
+def test_premium_portfolio_ingestion_task_registration_reflects_actual_importability_in_full_mode():
+    """Mirrors
+    ``test_premium_ops_alert_registration_reflects_actual_importability_in_full_mode``:
+    in 'full' mode, the resolver populates the route entry ONLY if
+    ``premium.tasks.portfolio_ingestion_tasks`` is actually importable in
+    this test environment."""
+    from celery_app import _resolve_premium_portfolio_ingestion_task_registration
+
+    try:
+        import premium.tasks.portfolio_ingestion_tasks  # noqa: F401
+
+        premium_importable = True
+    except ImportError:
+        premium_importable = False
+
+    routes = _resolve_premium_portfolio_ingestion_task_registration("full")
+
+    if not premium_importable:
+        assert routes == {}
+        return
+
+    task_name = "premium.tasks.portfolio_ingestion_tasks.run_portfolio_ingestion"
+    assert routes[task_name] == {
+        "queue": "document_processing",
+        "routing_key": "document.process",
+    }
+
+
+def test_premium_portfolio_ingestion_task_registration_import_error_deterministically_degrades(
+    monkeypatch,
+):
+    """Deterministic counterpart to the "reflects actual importability" test
+    above — mirrors
+    ``test_premium_ops_alert_registration_import_error_deterministically_degrades``."""
+    from celery_app import _resolve_premium_portfolio_ingestion_task_registration
+
+    real_import = builtins.__import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "premium.tasks.portfolio_ingestion_tasks":
+            raise ImportError(
+                "No module named 'premium.tasks.portfolio_ingestion_tasks'"
+            )
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    routes = _resolve_premium_portfolio_ingestion_task_registration("full")
+
+    assert routes == {}
+
+
+def test_premium_portfolio_ingestion_task_registration_non_import_error_degrades_gracefully(
+    monkeypatch,
+):
+    """Mirrors
+    ``test_premium_ops_alert_registration_non_import_error_degrades_gracefully``
+    — a non-``ImportError`` bug on import must not propagate and crash
+    ``celery_app`` (and with it ``main.py``, which also imports it)."""
+    from celery_app import _resolve_premium_portfolio_ingestion_task_registration
+
+    real_import = builtins.__import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "premium.tasks.portfolio_ingestion_tasks":
+            raise AttributeError("boom: simulierter Bug beim Import")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    routes = _resolve_premium_portfolio_ingestion_task_registration("full")
+
+    assert routes == {}
+
+
+def test_portfolio_ingestion_task_is_registered_and_routed_in_running_app():
+    """Läuft die Suite im Full-Modus, muss der echte, bereits konstruierte
+    celery_app diesen Task routen — nicht nur die reine Resolver-Funktion
+    oben. Mirrors ``test_ops_alert_task_is_registered_and_routed_in_running_app``."""
+    from celery_app import celery_app
+
+    task_name = "premium.tasks.portfolio_ingestion_tasks.run_portfolio_ingestion"
+    if task_name not in celery_app.conf.task_routes:
+        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+    assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
