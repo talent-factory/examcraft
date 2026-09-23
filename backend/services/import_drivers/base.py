@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Protocol
 
+from errors import RESERVED_INTERPOLATION_NAMES
 from services.import_drivers.payloads import ImportPayload
 
 
@@ -28,7 +29,37 @@ class ImportDriverError(Exception):
     Driver errors abort the import (job ``status='failed'``, no
     persistence). Per-row issues go into ``ImportPayload.errors``
     instead.
+
+    Carries a machine-readable ``code`` (TF-773 PR 2c). Unlike the other
+    routers converted in that ticket, the import path could not collapse
+    onto one code per endpoint: here the driver's sentence *is* the
+    message the teacher acts on -- «Die Datei ist leer.» and «Quelle ist
+    kein gültiges JSON.» call for different fixes, and a shared
+    ``submissions_import_failed`` would have thrown that difference away.
+
+    ``code`` is verbatim the key in ``core/backend/locales/t.*.json``
+    (ADR 0005); ``log_message`` is the old German sentence, which the
+    endpoint writes to the log instead of to the response, and
+    ``params`` feed both the interpolation and ``error_params``.
+
+    Both leading arguments are positional-only for the reason
+    ``errors.api_error`` documents: an interpolation variable may
+    legitimately be named ``code``, and a keyword parameter of that name
+    would swallow it.
     """
+
+    def __init__(self, code: str, log_message: str, /, **params: Any) -> None:
+        collision = RESERVED_INTERPOLATION_NAMES.intersection(params)
+        if collision:
+            raise TypeError(
+                f"Import error params must not use {sorted(collision)} -- "
+                "they collide with t()'s own parameters further down the "
+                "call chain (see errors.api_error)."
+            )
+        super().__init__(log_message)
+        self.code = code
+        self.log_message = log_message
+        self.params = params
 
 
 class ColumnMappingError(ImportDriverError):

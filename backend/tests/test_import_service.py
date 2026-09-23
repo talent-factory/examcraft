@@ -8,6 +8,7 @@ deterministic grading of MC + true/false answers, plus the
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 
 import pytest
@@ -223,7 +224,7 @@ def test_validate_rejects_mismatched_exam_id(
 
 
 def test_validate_rejects_question_id_outside_exam(
-    test_db: Session, exam_with_questions: Exam
+    test_db: Session, exam_with_questions: Exam, caplog
 ) -> None:
     """AttemptAnswer with a foreign exam_question_id ⇒ hard failure."""
     from services.import_drivers import (
@@ -243,10 +244,14 @@ def test_validate_rejects_question_id_outside_exam(
             )
         ],
     )
-    with pytest.raises(ImportValidationError) as excinfo:
-        ImportService._validate_payload(payload, exam_with_questions)
-    assert excinfo.value.issues
-    assert any("exam_question_id" in iss for iss in excinfo.value.issues)
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(ImportValidationError) as excinfo:
+            ImportService._validate_payload(payload, exam_with_questions)
+    assert excinfo.value.code == "submissions_import_exam_mismatch"
+    assert excinfo.value.params == {"count": 1}
+    # The offending id is diagnostic: it is logged and no longer travels to
+    # the client (TF-773 PR 2c).
+    assert any("99999" in r.getMessage() for r in caplog.records)
 
 
 def test_validate_rejects_empty_attempts(
@@ -1026,10 +1031,16 @@ def test_unexpected_pipeline_failure_rolls_back_partial_data(
 
 
 def test_validation_failure_collects_all_invalid_question_ids(
-    test_db: Session, exam_with_questions: Exam
+    test_db: Session, exam_with_questions: Exam, caplog
 ) -> None:
-    """Hard-fail validation should report every offending answer at
-    once so the teacher fixes the CSV in one round."""
+    """Hard-fail validation counts every offending answer, not just the first.
+
+    It used to return one sentence per answer so the teacher could "fix the
+    CSV in one round" -- but those sentences named ``exam_question_id`` values
+    of our own schema, which no teacher can act on. The count still has to be
+    complete: it is what tells apart "one stray answer" from "this export
+    belongs to a different exam" (TF-773 PR 2c).
+    """
     from services.import_drivers import (
         AnswerRecord,
         AttemptRecord,
@@ -1055,18 +1066,24 @@ def test_validation_failure_collects_all_invalid_question_ids(
             ),
         ],
     )
-    with pytest.raises(ImportValidationError) as excinfo:
-        ImportService._validate_payload(payload, exam_with_questions)
-    assert len(excinfo.value.issues) == 3
-    assert any("99001" in issue for issue in excinfo.value.issues)
-    assert any("99003" in issue for issue in excinfo.value.issues)
+    with caplog.at_level(logging.WARNING):
+        with pytest.raises(ImportValidationError) as excinfo:
+            ImportService._validate_payload(payload, exam_with_questions)
+    assert excinfo.value.params == {"count": 3}
+    logged = " ".join(r.getMessage() for r in caplog.records)
+    assert "99001" in logged
+    assert "99003" in logged
 
 
 def test_failed_job_for_unparseable_source_records_step(
     test_db: Session, exam_with_questions: Exam
 ) -> None:
-    """When the driver hard-fails (invalid JSON), the job error_log
-    captures step + exception class so the operator can triage."""
+    """When the driver hard-fails (invalid JSON), the job error_log captures
+    step + code so the operator can triage — and the operator-only diagnostic
+    text (exception class + message) lives in ``details``, never in the
+    top-level ``reason`` a client could read verbatim (TF-773 PR 2c review:
+    ``_import_job_to_out`` translates ``code`` into the actual response and
+    strips ``details.diagnostic``/``details.traceback`` before serialising)."""
     from services.import_drivers import ImportDriverError
 
     service = ImportService(test_db)
@@ -1083,7 +1100,9 @@ def test_failed_job_for_unparseable_source_records_step(
     assert job.error_log
     entry = job.error_log[0]
     assert entry.get("step") == "validate"
-    assert "ImportDriverError" in entry["reason"]
+    assert entry.get("code") == "submissions_import_file_not_json"
+    assert "kein gültiges JSON" in entry["details"]["diagnostic"]
+    assert "ImportDriverError" in entry["details"]["traceback"]
 
 
 def test_unknown_scoring_strategy_raises(

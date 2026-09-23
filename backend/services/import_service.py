@@ -77,17 +77,23 @@ _BENIGN_RACE_CONSTRAINTS = frozenset(
 )
 
 
-class ImportValidationError(Exception):
-    """Hard failure validating payload against the exam.
+class ImportValidationError(ImportDriverError):
+    """Hard failure validating the payload against the exam.
 
-    May carry a list of structured per-row issues so the operator sees
-    every offending question_id at once instead of having to re-upload
-    the CSV after each fix.
+    Same shape as ``ImportDriverError`` (code + log message + params), a
+    subclass rather than a sibling so a caller that only wants "the
+    import refused the source" can catch one type. The endpoints still
+    catch them separately, because the two map to different statuses:
+    a driver error is a 400 (the source could not be read), a validation
+    error a 422 (it was read and does not fit this exam).
+
+    It used to carry an ``issues`` list of per-row sentences. Those
+    sentences were built from internal identifiers — «Attempt #0 (s123):
+    AttemptAnswer referenziert exam_question_id 42 — nicht in Prüfung 7»
+    — which named rows of our own schema and told a teacher nothing they
+    could act on. The list now goes to the log, and the response carries
+    the count instead (TF-773 PR 2c).
     """
-
-    def __init__(self, message: str, issues: list[str] | None = None) -> None:
-        super().__init__(message)
-        self.issues = issues or []
 
 
 class UnknownDriverError(ImportValidationError):
@@ -190,10 +196,14 @@ class ImportService:
                 .one_or_none()
             )
             if job is None:
-                raise ImportValidationError(f"ImportJob {import_job_id} nicht gefunden")
+                raise ImportValidationError(
+                    "submissions_import_internal_error",
+                    f"ImportJob {import_job_id} nicht gefunden",
+                )
             if job.exam_id != exam.id or job.institution_id != exam.institution_id:
                 raise ImportValidationError(
-                    f"ImportJob {import_job_id} gehört nicht zu Exam {exam.id}"
+                    "submissions_import_internal_error",
+                    f"ImportJob {import_job_id} gehört nicht zu Exam {exam.id}",
                 )
             # Reset for the retry: a previous attempt may have left
             # status/aggregates from a failed run.
@@ -335,16 +345,26 @@ class ImportService:
             return cls.DRIVERS[name]
         except KeyError as exc:
             raise UnknownDriverError(
-                f"Unbekannter Driver '{name}'. Verfügbar: {sorted(cls.DRIVERS)}"
+                "submissions_import_driver_unknown",
+                f"Unbekannter Driver '{name}'. Verfügbar: {sorted(cls.DRIVERS)}",
             ) from exc
 
     @staticmethod
     def _validate_payload(payload: ImportPayload, exam: Exam) -> None:
         """Collect every invalid-reference at once — operators want to
-        fix the CSV in one round, not chase failures one-by-one."""
+        fix the export in one round, not chase failures one-by-one.
+
+        "Collect" now means "log": the per-reference sentences name rows of
+        our own schema, so the response carries their count and the exam,
+        not the list (TF-773 PR 2c).
+        """
         if payload.exam_id != exam.id:
+            # A driver that built the payload for a different exam is a
+            # programming error, not something the teacher chose wrongly —
+            # generic code, real numbers in the log.
             raise ImportValidationError(
-                f"Payload-exam_id {payload.exam_id} != exam.id {exam.id}"
+                "submissions_import_internal_error",
+                f"Payload-exam_id {payload.exam_id} != exam.id {exam.id}",
             )
 
         # Fail loud on an empty source: nothing parsed at all — no attempts AND
@@ -357,7 +377,8 @@ class ImportService:
         # payload.errors and already fails correctly via the row-error path.)
         if not payload.attempts and not payload.errors:
             raise ImportValidationError(
-                "Quelldatei enthält keine Versuche — nichts zu importieren."
+                "submissions_import_no_attempts",
+                "Quelldatei enthält keine Versuche — nichts zu importieren.",
             )
 
         valid_question_ids = {q.id for q in exam.questions}
@@ -365,15 +386,34 @@ class ImportService:
         for attempt_idx, attempt in enumerate(payload.attempts):
             for answer in attempt.answers:
                 if answer.exam_question_id not in valid_question_ids:
+                    # No `attempt.student_external_id` here — for the primary
+                    # driver that value is the student's e-mail address, and
+                    # this sentence goes straight to the application log
+                    # (below). attempt_idx + exam_question_id are enough to
+                    # diagnose the export without putting personal data in
+                    # log storage/forwarding (TF-773 PR 2c review).
                     issues.append(
-                        f"Attempt #{attempt_idx} ({attempt.student_external_id}): "
-                        f"AttemptAnswer referenziert exam_question_id "
-                        f"{answer.exam_question_id} — nicht in Prüfung {exam.id}"
+                        f"Attempt #{attempt_idx}: AttemptAnswer referenziert "
+                        f"exam_question_id {answer.exam_question_id} — "
+                        f"nicht in Prüfung {exam.id}"
                     )
         if issues:
+            # The per-issue sentences name attempts and question rows of our
+            # own schema. They are what an operator needs to diagnose the
+            # export and exactly what a teacher cannot use, so they go to the
+            # log; the response says how many answers missed and which exam
+            # was meant.
+            logger.warning(
+                "Payload passt nicht zur Prüfung %s — %d Treffer: %s",
+                exam.id,
+                len(issues),
+                " | ".join(issues[:20]),
+            )
             raise ImportValidationError(
-                f"{len(issues)} Validierungs-Fehler in Payload",
-                issues=issues,
+                "submissions_import_exam_mismatch",
+                f"{len(issues)} Antworten verweisen auf Fragen ausserhalb "
+                f"von Prüfung {exam.id}",
+                count=len(issues),
             )
 
     def _upsert_students(
@@ -582,18 +622,22 @@ class ImportService:
             if student is None:
                 # Indicates a bug in _upsert_students — surface loudly so
                 # the operator notices rather than letting the row vanish.
+                # No `student_external_id` (the student's e-mail for the
+                # primary driver) in either message: the log line reaches
+                # log storage/forwarding, and this row's `reason` reaches
+                # the client verbatim — `record_idx` identifies the row
+                # without it (TF-773 PR 2c review).
                 logger.error(
-                    "ImportService: student %r not found after upsert "
+                    "ImportService: student not found after upsert "
                     "(attempt #%s) — recording error and continuing",
-                    attempt_record.student_external_id,
                     record_idx,
                 )
                 payload.errors.append(
                     ImportRowError(
                         row_index=record_idx,
                         reason=(
-                            f"Student '{attempt_record.student_external_id}' "
-                            "konnte nicht angelegt/gefunden werden"
+                            f"Student (Attempt #{record_idx}) konnte nicht "
+                            "angelegt/gefunden werden"
                         ),
                     )
                 )
@@ -704,9 +748,11 @@ class ImportService:
         pending_review" — which reads as "awaiting LLM" and would
         silently mask the real failure.
 
-        Returns ``(submission_id, reason, traceback)`` per failure so
-        the import-job error_log carries the full stack — the worker
-        log alone is not visible to the operator triaging via the UI.
+        Returns ``(submission_id, diagnostic, traceback)`` per failure so
+        the import-job error_log carries the full stack for operator/DB
+        triage — ``_finalise_job`` turns this into a generic, translated
+        code for the response; ``diagnostic``/``traceback`` never reach
+        the client (see ``_finalise_job``).
         """
         failures: list[tuple[int, str, str]] = []
         submission_ids = [submission.id for submission in submissions]
@@ -923,9 +969,15 @@ class ImportService:
         rows fixed will round-trip clean). FAILED means nothing useful
         was imported.
 
-        ``grading_failures``: ``(submission_id, reason, traceback)``
-        tuples; the traceback ends up in ``error_log[*].details`` so
-        the UI surfaces the real cause without server-log access.
+        ``grading_failures``: ``(submission_id, diagnostic, traceback)``
+        tuples — same split as ``_fail_job``: a fixed, generic
+        ``submissions_import_internal_error`` code is what
+        ``_import_job_to_out`` translates into the response, while the raw
+        ``diagnostic``/``traceback`` stay under ``details`` for operator/DB
+        triage and are stripped before the response is serialised. Without
+        this, a per-submission grading crash (``AttributeError``,
+        ``TypeError``, …) would put ``str(exc)`` on a teacher's screen the
+        same way an unfixed ``_fail_job`` used to (TF-773 PR 2c review).
         """
         grading_failures = grading_failures or []
         rows_failed = len(payload.errors) + len(grading_failures)
@@ -947,14 +999,16 @@ class ImportService:
         new_errors.extend(
             {
                 "row_index": 0,
-                "reason": reason,
+                "code": "submissions_import_internal_error",
+                "reason": diagnostic,
                 "step": "grading",
                 "details": {
                     "submission_id": sub_id,
+                    "diagnostic": diagnostic,
                     "traceback": tb,
                 },
             }
-            for sub_id, reason, tb in grading_failures
+            for sub_id, diagnostic, tb in grading_failures
         )
         # Always store an explicit list — empty is still meaningful
         # ("never populated" vs "no errors" stays distinguishable).
@@ -980,34 +1034,45 @@ class ImportService:
         """Record a job-level failure with structured diagnostic context.
 
         Captures exception class, step name, and full traceback so the
-        UI can show a meaningful message and the operator can triage
-        without server-log access.
+        operator can triage without server-log access — but, same split as
+        ``_import_error`` for the synchronous endpoints, a ``code`` +
+        ``params`` pair goes on the entry too when available, because this
+        is the async commit path (Celery): ``ImportService.commit`` re-runs
+        ``driver.parse()``/``_validate_payload`` inside the worker, so a
+        transient Moodle error or a validation failure can land here just as
+        easily as in the synchronous preview. ``_import_job_to_out``
+        translates ``code``/``params`` into the response and strips
+        ``reason``/``details.diagnostic``/``details.traceback`` — those stay
+        DB/log-only, never reaching the teacher's screen (TF-773 PR 2c
+        review).
         """
         job.status = ImportJobStatus.FAILED.value
         job.finished_at = datetime.now(timezone.utc)
 
-        reason = f"{type(exc).__name__}: {exc}"
+        if isinstance(exc, ImportDriverError):
+            code = exc.code
+            params = dict(exc.params)
+            diagnostic = exc.log_message
+        else:
+            code = "submissions_import_internal_error"
+            params = {}
+            diagnostic = f"{type(exc).__name__}: {exc}"
+
         details: dict[str, Any] = {
             "row_index": 0,  # 0 = job-level failure (not a row)
-            "reason": reason,
             "step": step,
             "exception_type": type(exc).__name__,
+            "diagnostic": diagnostic,
             "traceback": "".join(
                 traceback.format_exception(type(exc), exc, exc.__traceback__)
             ),
         }
-        # If the exception carried structured per-row issues (validation
-        # collected all problems), surface each one so the UI can show
-        # the full list rather than only the first.
-        if isinstance(exc, ImportValidationError) and exc.issues:
-            details["issues"] = exc.issues
-
         existing = list(job.error_log or [])
         existing.append(
             ImportRowError(
                 row_index=0,
-                reason=reason,
+                reason=diagnostic,
             ).model_dump()
-            | {"step": step, "details": details}
+            | {"code": code, "params": params, "step": step, "details": details}
         )
         job.error_log = existing

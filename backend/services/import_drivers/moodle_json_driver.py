@@ -307,13 +307,17 @@ class MoodleJsonDriver(BaseImportDriver):
     ) -> ImportPayload:
         rows, dropped_non_dict = self._load_rows(source)
         if not rows:
-            raise ImportDriverError("JSON enthält keine Datenzeilen.")
+            raise ImportDriverError(
+                "submissions_import_no_attempts",
+                "JSON enthält keine Datenzeilen.",
+            )
 
         index = self._build_index(exam)
         if not index:
             raise ImportDriverError(
+                "submissions_import_exam_without_questions",
                 "Die Prüfung enthält keine Fragen, denen Antworten "
-                "zugeordnet werden könnten."
+                "zugeordnet werden könnten.",
             )
 
         options_by_eq = {e.eq_id: e.norm_options for e in index}
@@ -475,22 +479,30 @@ class MoodleJsonDriver(BaseImportDriver):
                     text = source.decode("utf-8")
                 except UnicodeDecodeError as exc:
                     raise ImportDriverError(
-                        "JSON-Datei ist nicht UTF-8-kodiert."
+                        "submissions_import_file_not_utf8",
+                        "JSON-Datei ist nicht UTF-8-kodiert.",
                     ) from exc
         else:
             text = source
         if not text.strip():
-            raise ImportDriverError("Die Datei ist leer.")
+            raise ImportDriverError(
+                "submissions_import_file_empty", "Die Datei ist leer."
+            )
         try:
             data = json.loads(text)
         except (json.JSONDecodeError, ValueError) as exc:
-            raise ImportDriverError("Quelle ist kein gültiges JSON.") from exc
+            raise ImportDriverError(
+                "submissions_import_file_not_json",
+                f"Quelle ist kein gültiges JSON: {exc}",
+            ) from exc
 
         if isinstance(data, list) and data and isinstance(data[0], list):
             data = data[0]  # unwrap the plugin's outer [[ ... ]] envelope
         if not isinstance(data, list):
             raise ImportDriverError(
-                "JSON-Wurzel muss eine Liste von Studierenden sein."
+                "submissions_import_json_structure_invalid",
+                "JSON-Wurzel muss eine Liste von Studierenden sein, war "
+                f"{type(data).__name__}.",
             )
         rows = [r for r in data if isinstance(r, dict)]
         return rows, len(data) - len(rows)
@@ -535,8 +547,9 @@ class MoodleJsonDriver(BaseImportDriver):
                 cache[sig] = self._resolve_column_map(frage_texts, index)
                 return
         raise ColumnMappingError(
+            "submissions_import_question_texts_missing",
             "Im JSON-Export fehlen die Fragetexte (Schlüssel 'frageN'); "
-            "ohne sie ist keine inhaltliche Zuordnung möglich."
+            "ohne sie ist keine inhaltliche Zuordnung möglich.",
         )
 
     def _row_column_map(
@@ -598,10 +611,11 @@ class MoodleJsonDriver(BaseImportDriver):
             if duplicates:
                 parts.append("mehrere JSON-Fragen zeigen auf dieselbe Prüfungsfrage")
             raise ColumnMappingError(
+                "submissions_import_question_mapping_failed",
                 "Zuordnung der JSON-Fragen zu den Prüfungsfragen "
                 f"fehlgeschlagen: {'; '.join(parts)}. Bitte prüfen, ob der "
                 "Export zur richtigen Prüfung gehört und die Fragetexte "
-                "unverändert sind."
+                "unverändert sind.",
             )
         return mapping
 

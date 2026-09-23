@@ -82,8 +82,9 @@ class MoodleApiDriver(BaseImportDriver):
     ) -> ImportPayload:
         if db is None:
             raise ImportDriverError(
+                "submissions_import_internal_error",
                 "MoodleApiDriver braucht eine DB-Session, um die "
-                "moodle_connections-Konfiguration zu laden."
+                "moodle_connections-Konfiguration zu laden.",
             )
         params = self._parse_source(source)
         quiz_id = params["quiz_id"]
@@ -93,8 +94,9 @@ class MoodleApiDriver(BaseImportDriver):
             # passed an exam-shaped object that's not actually attached
             # to a tenant; fail loudly.
             raise ImportDriverError(
+                "submissions_import_internal_error",
                 "Exam ohne institution_id übergeben — API-Driver "
-                "benötigt Multi-Tenancy-Kontext."
+                "benötigt Multi-Tenancy-Kontext.",
             )
 
         connection = (
@@ -104,15 +106,17 @@ class MoodleApiDriver(BaseImportDriver):
         )
         if connection is None:
             raise MoodleConnectionMissingError(
+                "submissions_import_moodle_connection_missing",
                 "Keine Moodle-Connection für diese Institution. "
-                "Admin muss zuerst eine Verbindung anlegen."
+                "Admin muss zuerst eine Verbindung anlegen.",
             )
 
         try:
             token = decrypt_secret(connection.token_encrypted)
         except SecretEncryptionError as exc:
             raise MoodleApiAuthError(
-                f"Moodle-Connection-Token konnte nicht entschlüsselt werden: {exc}"
+                "submissions_import_moodle_connection_invalid",
+                f"Moodle-Connection-Token konnte nicht entschlüsselt werden: {exc}",
             ) from exc
 
         client = self._build_client(connection.base_url, token)
@@ -150,18 +154,22 @@ class MoodleApiDriver(BaseImportDriver):
                     )
                 except ImportDriverError:
                     raise
-                except Exception as exc:
+                except Exception:
                     logger.exception(
                         "MoodleApiDriver: Attempt %s konnte nicht verarbeitet werden",
                         attempt.get("id"),
                     )
+                    # The exception type and message are developer
+                    # wording (``KeyError: 'id'``); ``logger.exception`` above
+                    # already carries them with a traceback. This row error is
+                    # read by a teacher, so it names the attempt that dropped
+                    # out and nothing else (TF-773 PR 2c).
                     payload.errors.append(
                         ImportRowError(
                             row_index=attempt_idx,
                             reason=(
-                                f"Moodle-Attempt {attempt.get('id')} "
-                                f"fehlgeschlagen: "
-                                f"{type(exc).__name__}: {exc}"
+                                f"Moodle-Versuch {attempt.get('id')} konnte "
+                                "nicht gelesen werden und wurde übersprungen."
                             ),
                         )
                     )
@@ -193,34 +201,40 @@ class MoodleApiDriver(BaseImportDriver):
             source = source.decode("utf-8")
         if not isinstance(source, str):
             raise ImportDriverError(
+                "submissions_import_internal_error",
                 f"MoodleApiDriver: source-Type {type(source).__name__} "
-                "nicht unterstützt — JSON-String oder Bytes erwartet."
+                "nicht unterstützt — JSON-String oder Bytes erwartet.",
             )
         text = source.strip()
         if not text:
             raise ImportDriverError(
-                "MoodleApiDriver: leerer Source-Wert — {'quiz_id': int} erwartet."
+                "submissions_import_internal_error",
+                "MoodleApiDriver: leerer Source-Wert — {'quiz_id': int} erwartet.",
             )
         try:
             data = json.loads(text)
         except json.JSONDecodeError as exc:
             raise ImportDriverError(
-                f"MoodleApiDriver: source ist kein gültiges JSON — {exc}"
+                "submissions_import_internal_error",
+                f"MoodleApiDriver: source ist kein gültiges JSON — {exc}",
             ) from exc
         if not isinstance(data, dict) or "quiz_id" not in data:
             raise ImportDriverError(
-                "MoodleApiDriver: source-JSON braucht den Key 'quiz_id'."
+                "submissions_import_internal_error",
+                "MoodleApiDriver: source-JSON braucht den Key 'quiz_id'.",
             )
         try:
             quiz_id = int(data["quiz_id"])
         except (TypeError, ValueError) as exc:
             raise ImportDriverError(
+                "submissions_import_quiz_id_invalid",
                 f"MoodleApiDriver: quiz_id muss eine Ganzzahl sein, "
-                f"erhalten: {data['quiz_id']!r}"
+                f"erhalten: {data['quiz_id']!r}",
             ) from exc
         if quiz_id <= 0:
             raise ImportDriverError(
-                f"MoodleApiDriver: quiz_id muss > 0 sein, erhalten: {quiz_id}"
+                "submissions_import_quiz_id_invalid",
+                f"MoodleApiDriver: quiz_id muss > 0 sein, erhalten: {quiz_id}",
             )
         return {"quiz_id": quiz_id}
 
@@ -272,11 +286,14 @@ class MoodleApiDriver(BaseImportDriver):
             )
         except httpx.HTTPError as exc:
             raise ImportDriverError(
-                f"Moodle-API erreichbarkeitsfehler ({function}): {exc}"
+                "submissions_import_moodle_unreachable",
+                f"Moodle-API erreichbarkeitsfehler ({function}): {exc}",
             ) from exc
         if response.status_code >= 500:
             raise ImportDriverError(
-                f"Moodle-API HTTP {response.status_code} bei {function}"
+                "submissions_import_moodle_server_error",
+                f"Moodle-API HTTP {response.status_code} bei {function}",
+                status=response.status_code,
             )
         if 400 <= response.status_code < 500:
             # 401/403/404/429 hit before we get JSON. Surface the real
@@ -285,18 +302,21 @@ class MoodleApiDriver(BaseImportDriver):
             # sees a misleading "antwortete nicht mit JSON" message.
             if response.status_code == 429:
                 raise ImportDriverError(
+                    "submissions_import_moodle_rate_limited",
                     f"Moodle-API rate-limited ({function}): HTTP 429 "
-                    "(Retry-After ignoriert — bitte später erneut versuchen)."
+                    "(Retry-After ignoriert — bitte später erneut versuchen).",
                 )
             raise MoodleApiAuthError(
+                "submissions_import_moodle_auth_failed",
                 f"Moodle-API HTTP {response.status_code} bei {function} "
-                "(Token-Berechtigung oder Endpoint prüfen)."
+                "(Token-Berechtigung oder Endpoint prüfen).",
             )
         try:
             data = response.json()
         except json.JSONDecodeError as exc:
             raise MoodleApiSchemaError(
-                f"Moodle-API antwortete nicht mit JSON ({function})"
+                "submissions_import_moodle_unexpected_response",
+                f"Moodle-API antwortete nicht mit JSON ({function})",
             ) from exc
 
         if isinstance(data, dict) and "exception" in data:
@@ -308,9 +328,16 @@ class MoodleApiDriver(BaseImportDriver):
                 "webservice_access_exception",
             ):
                 raise MoodleApiAuthError(
-                    f"Moodle-Auth fehlgeschlagen ({errorcode}): {message}"
+                    "submissions_import_moodle_auth_failed",
+                    f"Moodle-Auth fehlgeschlagen ({errorcode}): {message}",
                 )
-            raise ImportDriverError(f"Moodle-API meldet {errorcode}: {message}")
+            # Moodle writes ``message`` itself, in its own language and its
+            # own wording. Echoing it dropped a foreign sentence into a German
+            # UI and told the teacher nothing actionable -- it goes to the log.
+            raise ImportDriverError(
+                "submissions_import_moodle_unexpected_response",
+                f"Moodle-API meldet {errorcode}: {message}",
+            )
         return data
 
     def _fetch_quiz_meta(self, client: httpx.Client, quiz_id: int) -> dict[str, Any]:
@@ -324,7 +351,8 @@ class MoodleApiDriver(BaseImportDriver):
         data = self._call(client, "mod_quiz_get_quizzes_by_courses")
         if not isinstance(data, dict):
             raise MoodleApiSchemaError(
-                "mod_quiz_get_quizzes_by_courses hat kein Objekt geliefert"
+                "submissions_import_moodle_unexpected_response",
+                "mod_quiz_get_quizzes_by_courses hat kein Objekt geliefert",
             )
         for quiz in data.get("quizzes", []):
             try:
@@ -333,8 +361,10 @@ class MoodleApiDriver(BaseImportDriver):
             except (TypeError, ValueError):
                 continue
         raise ImportDriverError(
+            "submissions_import_quiz_not_found",
             f"Quiz {quiz_id} nicht in der Token-Sicht gefunden — "
-            "Token-Berechtigung oder Course-Membership prüfen."
+            "Token-Berechtigung oder Course-Membership prüfen.",
+            quiz_id=quiz_id,
         )
 
     def _fetch_attempts(
@@ -358,11 +388,15 @@ class MoodleApiDriver(BaseImportDriver):
         )
         if not isinstance(data, dict) or "attempts" not in data:
             raise MoodleApiSchemaError(
-                "mod_quiz_get_user_attempts antwortete ohne 'attempts'-Liste"
+                "submissions_import_moodle_unexpected_response",
+                "mod_quiz_get_user_attempts antwortete ohne 'attempts'-Liste",
             )
         attempts = data["attempts"]
         if not isinstance(attempts, list):
-            raise MoodleApiSchemaError("'attempts' ist keine Liste")
+            raise MoodleApiSchemaError(
+                "submissions_import_moodle_unexpected_response",
+                "'attempts' ist keine Liste",
+            )
         return attempts
 
     def _fetch_attempt_review(
@@ -372,7 +406,8 @@ class MoodleApiDriver(BaseImportDriver):
         data = self._call(client, "mod_quiz_get_attempt_review", attemptid=attempt_id)
         if not isinstance(data, dict):
             raise MoodleApiSchemaError(
-                "mod_quiz_get_attempt_review hat kein Objekt geliefert"
+                "submissions_import_moodle_unexpected_response",
+                "mod_quiz_get_attempt_review hat kein Objekt geliefert",
             )
         return data
 
@@ -461,8 +496,9 @@ class MoodleApiDriver(BaseImportDriver):
         external_id = self._extract_user_external_id(attempt)
         if not external_id:
             raise ImportDriverError(
+                "submissions_import_attempt_without_user",
                 f"Moodle-Attempt {attempt_id} ohne identifizierbaren "
-                "User (weder userid noch email gesetzt)."
+                "User (weder userid noch email gesetzt).",
             )
 
         if external_id not in students_by_id:

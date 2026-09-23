@@ -69,7 +69,11 @@ RESERVED_ERROR_CODES = (
 #: sites already depend on. Caught eagerly so the failure is a clear
 #: ``TypeError`` at the call site instead of a cryptic "t() got multiple
 #: values for argument 'locale'" several frames down.
-_RESERVED_INTERPOLATION_NAMES = frozenset({"key", "locale"})
+#:
+#: Public since TF-773 PR 2c: the import drivers put their params on an
+#: exception far from any ``api_error()`` call, and need the same guard at
+#: construction time, where the mistake is still cheap to attribute.
+RESERVED_INTERPOLATION_NAMES = frozenset({"key", "locale"})
 
 
 class AppHTTPException(HTTPException):
@@ -163,7 +167,7 @@ def api_error(
     build ``AppHTTPException`` directly instead — attempting it here raises a
     ``TypeError`` immediately rather than failing deep inside ``t()``.
     """
-    collision = _RESERVED_INTERPOLATION_NAMES.intersection(params)
+    collision = RESERVED_INTERPOLATION_NAMES.intersection(params)
     if collision:
         raise TypeError(
             "api_error() interpolation params must not use the reserved "

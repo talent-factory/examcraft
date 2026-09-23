@@ -4,13 +4,17 @@
  *
  * No service is mocked. `fetch` answers; the real `SubmissionsService` →
  * `ensureOk` → shared body reader builds the `ApiError`; `ImportDialog`
- * renders it. This is the path TF-773 PR 2c's import codes will take, so it
- * is pinned before they exist: today the import endpoints send no code of
- * their own, but the reserved `validation_error` from the framework handler
- * reaches them already.
+ * renders it. The file was written before TF-773 PR 2c to pin that path; the
+ * second block below is that PR arriving, with the import codes the endpoints
+ * now really send.
  *
  * `detail` differs from every expected sentence, so rendering it — the
  * pre-PR-7 behaviour — fails each case.
+ *
+ * Why an end-to-end test and not an assertion on the code: a backend code that
+ * is not listed in `errors/codes/submissions.ts` is dropped by `selectCode`
+ * and silently replaced by the operation fallback. Nothing in the backend, and
+ * no type, notices. Only rendering the sentence proves the code arrived.
  */
 
 import React from 'react';
@@ -93,13 +97,80 @@ describe('ImportDialog: failed preview, end to end', () => {
   });
 
   it('renders the operation fallback for an uncoded service text', async () => {
-    // Today's import failures: hand-written German from submissions.py, no
-    // code. TF-773 PR 2c replaces these with codes.
+    // Still reachable: a 500 from the unhandled-exception handler, or any
+    // endpoint on this router that PR 2c did not convert.
     routeFetch(respond(400, { detail: RAW }));
 
     const alert = await runPreview();
 
     expect(alert).toHaveTextContent('Vorschau fehlgeschlagen.');
     expect(alert).not.toHaveTextContent(RAW);
+  });
+});
+
+describe('ImportDialog: the import codes from TF-773 PR 2c', () => {
+  it('tells an empty file apart from a broken one', async () => {
+    routeFetch(respond(400, { detail: RAW, error_code: 'submissions_import_file_empty' }));
+
+    const alert = await runPreview();
+
+    expect(alert).toHaveTextContent('Die Datei ist leer.');
+    expect(alert).not.toHaveTextContent('Vorschau fehlgeschlagen.');
+    expect(alert).not.toHaveTextContent(RAW);
+  });
+
+  it('names the JSON syntax error as its own reason', async () => {
+    routeFetch(
+      respond(400, { detail: RAW, error_code: 'submissions_import_file_not_json' }),
+    );
+
+    const alert = await runPreview();
+
+    expect(alert).toHaveTextContent('Die Datei ist kein gültiges JSON.');
+    expect(alert).not.toHaveTextContent(RAW);
+  });
+
+  it('interpolates the quiz id the teacher typed', async () => {
+    routeFetch(
+      respond(400, {
+        detail: RAW,
+        error_code: 'submissions_import_quiz_not_found',
+        error_params: { quiz_id: 4242 },
+      }),
+    );
+
+    const alert = await runPreview();
+
+    expect(alert).toHaveTextContent('Das Moodle-Quiz 4242 wurde nicht gefunden.');
+    expect(alert).not.toHaveTextContent('{{quiz_id}}');
+  });
+
+  it('interpolates the count of answers that miss the exam', async () => {
+    routeFetch(
+      respond(422, {
+        detail: RAW,
+        error_code: 'submissions_import_exam_mismatch',
+        error_params: { count: 3 },
+      }),
+    );
+
+    const alert = await runPreview();
+
+    expect(alert).toHaveTextContent('3 Antworten gehören nicht zu dieser Prüfung.');
+    expect(alert).not.toHaveTextContent('{{count}}');
+  });
+
+  it('keeps developer wording off the screen for an internal failure', async () => {
+    routeFetch(
+      respond(400, {
+        detail: 'MoodleApiDriver braucht eine DB-Session',
+        error_code: 'submissions_import_internal_error',
+      }),
+    );
+
+    const alert = await runPreview();
+
+    expect(alert).toHaveTextContent('Der Import ist an einem internen Fehler gescheitert.');
+    expect(alert).not.toHaveTextContent('MoodleApiDriver');
   });
 });

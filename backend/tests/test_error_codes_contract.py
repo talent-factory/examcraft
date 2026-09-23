@@ -193,6 +193,7 @@ def test_keine_dynamischen_codes_ohne_konstante():
     ERLAUBT = {
         "core/backend/api/admin.py",  # TransferError.code
         "core/backend/utils/document_visibility.py",  # detail_key-Parameter
+        "core/backend/api/submissions.py",  # ImportDriverError.code
         "premium/backend/api/v1/wizard.py",  # WizardServiceError.code
     }
     unerwartet = [d for d in DYNAMIC if d.rsplit(":", 1)[0] not in ERLAUBT]
@@ -318,6 +319,168 @@ def test_wizard_service_error_liefert_nur_echte_schluessel():
     assert not fehlend, (
         f"WizardServiceError-Code(s) ohne Schlüssel in t.{_REFERENCE_LANG}.json: "
         f"{fehlend}"
+    )
+
+
+IMPORT_MODULES = (
+    "core/backend/services/import_service.py",
+    "core/backend/services/import_drivers/base.py",
+    "core/backend/services/import_drivers/moodle_json_driver.py",
+    "core/backend/services/import_drivers/moodle_api_driver.py",
+)
+
+
+def _import_error_classes(trees: dict[str, ast.Module]) -> set[str]:
+    """Every exception class in the import modules that carries a code.
+
+    Derived from the sources rather than listed by hand: a new
+    ``class MoodleQuotaError(ImportDriverError)`` inherits the two-argument
+    constructor and therefore the contract, and a hand-written list would not
+    notice it. Iterated to a fixed point because the classes form a chain
+    (``ColumnMappingError`` -> ``ImportDriverError``, ``UnknownDriverError``
+    -> ``ImportValidationError`` -> ``ImportDriverError``).
+    """
+    classes = {"ImportDriverError"}
+    while True:
+        grown = set(classes)
+        for tree in trees.values():
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and any(
+                    isinstance(base, ast.Name) and base.id in classes
+                    for base in node.bases
+                ):
+                    grown.add(node.name)
+        if grown == classes:
+            return classes
+        classes = grown
+
+
+def test_import_fehlercodes_sind_echte_schluessel():
+    """``api/submissions.py`` passes ``exc.code`` to ``api_error()``.
+
+    The entry in ``ERLAUBT`` above only records that the site exists. This is
+    the proof the docstring there demands: the variable is filled exclusively
+    by the import exceptions, whose first constructor argument is a literal
+    everywhere, and every one of those literals must resolve in the locales.
+    Same shape as the ``TransferError`` proof above, for the same reason —
+    a code invented at a throw site would otherwise reach a teacher as the
+    raw key.
+    """
+    keys = _locale_keys(_REFERENCE_LANG)
+
+    trees = {
+        rel: ast.parse((REPO_ROOT / rel).read_text(encoding="utf-8"))
+        for rel in IMPORT_MODULES
+    }
+    error_classes = _import_error_classes(trees)
+    assert len(error_classes) > 1, (
+        "Nur ImportDriverError gefunden — die Subklassen wurden umbenannt "
+        "oder verschoben, und der Scan unten prüft dann fast nichts."
+    )
+
+    codes: dict[str, list[str]] = {}
+    dynamisch: list[str] = []
+    for rel, tree in trees.items():
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if not (isinstance(node.func, ast.Name) and node.func.id in error_classes):
+                continue
+            arg = node.args[0] if node.args else None
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                codes.setdefault(arg.value, []).append(f"{rel}:{node.lineno}")
+            else:
+                dynamisch.append(f"{rel}:{node.lineno}")
+
+    assert not dynamisch, (
+        "Import-Exception ohne konstanten Code an:\n  "
+        + "\n  ".join(dynamisch)
+        + "\nDamit ist der Wert für diesen Test unsichtbar — Konstante "
+        "verwenden."
+    )
+    assert len(codes) >= 10, (
+        f"Nur {len(codes)} Import-Codes gefunden. PR 2c hat die Wurfstellen "
+        "bewusst auf unterscheidbare Codes aufgeteilt; ein Zusammenfallen auf "
+        "wenige Sammelcodes nimmt der Lehrperson genau die Unterscheidung "
+        "wieder weg, für die dieser PR gemacht wurde."
+    )
+    fehlend = {c: sites for c, sites in sorted(codes.items()) if c not in keys}
+    assert not fehlend, (
+        f"Import-Code(s) ohne Schlüssel in t.{_REFERENCE_LANG}.json:\n"
+        + "\n".join(f"  {c}  ({', '.join(s[:3])})" for c, s in fehlend.items())
+    )
+
+
+FRONTEND_CODES_FILE = "core/frontend/src/errors/codes/submissions.ts"
+
+
+def test_import_codes_sind_im_frontend_registriert():
+    """A backend code the frontend does not list is invisible to the user.
+
+    ``errors/codes/*.ts`` is an accept-list: ``selectCode()`` drops an
+    ``error_code`` that is not in it and falls back to the caller's generic
+    operation sentence. Nothing fails — not the request, not a type, not any
+    other test in this file. The user simply reads «Vorschau fehlgeschlagen.»
+    where the backend had something specific to say, and the only trace is a
+    ``console.warn`` in a browser nobody is watching.
+
+    So the two sides are tied together here, for the import prefix TF-773
+    PR 2c owns. Deliberately not for every code in the repo: several backend
+    codes are unreachable from any call site and belong in no accept-list
+    (``codes/submissions.ts`` documents ``submissions_grade_export_internal_error``
+    as one), and deciding that per code is not this test's job.
+    """
+    trees = {
+        rel: ast.parse((REPO_ROOT / rel).read_text(encoding="utf-8"))
+        for rel in IMPORT_MODULES
+    }
+    error_classes = _import_error_classes(trees)
+    raised = {
+        node.args[0].value
+        for tree in trees.values()
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in error_classes
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+    }
+    # The endpoint raises this one itself (broker outage), outside the driver
+    # exceptions the scan above sees.
+    raised.add("submissions_import_enqueue_failed")
+
+    registered_source = (REPO_ROOT / FRONTEND_CODES_FILE).read_text(encoding="utf-8")
+    registered = set(re.findall(r"'(submissions_[a-z0-9_]+)'", registered_source))
+    assert len(registered) > 5, (
+        f"{FRONTEND_CODES_FILE} scheint leer oder umgebaut — der Scan findet "
+        f"nur {len(registered)} Codes."
+    )
+
+    # Raised by the service, but a guard in front of it answers first — no
+    # endpoint can produce them, so the registry must not list them either
+    # (AppError.ts: "a code belongs here only if some endpoint or call site can
+    # actually produce it"). Shared with the test that pins the two guards, so
+    # the exemption and its proof cannot drift apart.
+    from tests.test_submissions_import_error_codes import HTTP_UNERREICHBAR
+
+    unerreichbar = set(HTTP_UNERREICHBAR)
+    assert unerreichbar <= raised, (
+        f"Ausnahme für Codes, die niemand mehr wirft: {sorted(unerreichbar - raised)}"
+    )
+    zu_viel = sorted(unerreichbar & registered)
+    assert not zu_viel, (
+        f"Über HTTP unerreichbare Code(s) in {FRONTEND_CODES_FILE} registriert: "
+        f"{zu_viel}. Entweder den Wächter davor entfernen (dann aus "
+        "HTTP_UNERREICHBAR nehmen) oder die Registrierung zurücknehmen."
+    )
+
+    fehlend = sorted((raised - unerreichbar) - registered)
+    assert not fehlend, (
+        f"Import-Code(s) nicht in {FRONTEND_CODES_FILE} registriert:\n  "
+        + "\n  ".join(fehlend)
+        + "\nDas Frontend verwirft sie still und zeigt den Sammelsatz der "
+        "Operation. Eintragen und in allen vier core/frontend/src/locales "
+        "übersetzen."
     )
 
 

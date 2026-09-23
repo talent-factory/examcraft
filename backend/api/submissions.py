@@ -40,6 +40,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
+from errors import AppHTTPException, api_error
+from services.translation_service import t as translate
 from enums import (
     AttemptSource,
     DriverName,
@@ -64,6 +66,7 @@ from services.results_deletion_service import (
     DeletionSummary,
     ResultsDeletionService,
 )
+from services.translation_service import get_request_locale
 from tasks.import_submissions_task import Base64Str, import_submissions
 from utils.auth_utils import require_permission
 
@@ -287,31 +290,86 @@ def _load_exam_for_user(*, db: Session, user: User, exam_id: int) -> Exam:
     return exam
 
 
-async def _read_upload(file: UploadFile) -> bytes:
+def _import_error(
+    exc: ImportDriverError, *, status_code: int, locale: str
+) -> AppHTTPException:
+    """Turn a coded import failure into the ADR 0005 response envelope.
+
+    The exception's own sentence is the *diagnostic* one: it names the
+    Moodle web-service function, the offending quiz id, the driver class,
+    the count of answers that missed. It goes to the log. What the caller
+    gets back is the translated sentence for ``exc.code`` plus the
+    parameters that sentence actually interpolates — never ``str(exc)``,
+    which is how developer wording and internal ids used to reach a
+    teacher's screen (TF-773 PR 2c).
+
+    ``status_code`` comes from the caller rather than the exception,
+    keeping the existing mapping intact: driver errors stay 400,
+    validation errors stay 422. One code appears under both —
+    ``submissions_import_no_attempts``, raised by the JSON driver for an
+    empty export and by the payload validation for a Moodle quiz nobody
+    sat — because it is the same fact for the teacher and deserves the
+    same sentence.
+    """
+    logger.warning(
+        "Import abgebrochen (%s, HTTP %s): %s",
+        exc.code,
+        status_code,
+        exc.log_message,
+    )
+    return api_error(status_code, exc.code, locale, **exc.params)
+
+
+async def _read_upload(file: UploadFile, *, locale: str) -> bytes:
     """Read upload with a hard size cap to prevent worker OOM.
 
     FastAPI/Starlette sets ``UploadFile.size`` from the Content-Length
     when present; we still cap the actual read in case the client
     streams without declaring size.
+
+    Both rejections are the same fact for the teacher — the file is over
+    the limit — so they share one code. The declared size and the read
+    size differ only in how the client sent it, which is a log detail.
+    The limit itself is the parameter, because it is the number they act
+    on (TF-773 PR 2c).
     """
+    max_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
     if file.size is not None and file.size > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"Datei zu gross ({file.size} Bytes). Maximum: "
-                f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
-            ),
+        logger.warning(
+            "Upload abgelehnt: Content-Length %s Bytes über dem Limit von %s MB",
+            file.size,
+            max_mb,
         )
+        raise api_error(413, "submissions_import_file_too_large", locale, max_mb=max_mb)
     contents = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(contents) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=(
-                f"Datei überschreitet das Maximum von "
-                f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
-            ),
+        logger.warning(
+            "Upload abgelehnt: %s Bytes gelesen, Limit %s MB (ohne Content-Length)",
+            len(contents),
+            max_mb,
         )
+        raise api_error(413, "submissions_import_file_too_large", locale, max_mb=max_mb)
     return contents
+
+
+def _reject_driver_without_upload_body(driver_name: str, *, locale: str) -> None:
+    """Reject ``moodle_api`` on the multipart file-upload endpoints.
+
+    ``moodle_api`` has no file to parse — it fetches from Moodle via web
+    service using a Pydantic-validated ``quiz_id`` (``ApiImportIn``, see
+    ``/import/api-preview``/``/import/api-commit``). Without this guard, a
+    hand-crafted request to the upload endpoints could reach
+    ``MoodleApiDriver.parse()`` with a ``quiz_id`` that skipped the ``gt=0``
+    Pydantic check, producing ``submissions_import_quiz_id_invalid`` — a code
+    the frontend registry deliberately does not carry because
+    ``test_submissions_import_error_codes.HTTP_UNERREICHBAR`` documents that
+    exact path as unreachable (TF-773 PR 2c review). Arbitrary unregistered
+    driver names are intentionally left alone here — they still fall through
+    to the tier gate below, which is what
+    ``test_unbekannter_driver_scheitert_an_der_tier_sperre`` pins.
+    """
+    if driver_name == DriverName.MOODLE_API.value:
+        raise api_error(422, "submissions_import_driver_unknown", locale)
 
 
 def _import_payload_to_preview(payload, *, max_rows: int = 50) -> ImportPreviewOut:
@@ -353,6 +411,7 @@ def _import_payload_to_preview(payload, *, max_rows: int = 50) -> ImportPreviewO
 def _enqueue_import(
     *,
     db: Session,
+    locale: str,
     exam: Exam,
     driver_name: str,
     source_bytes: bytes,
@@ -367,9 +426,12 @@ def _enqueue_import(
     exact job row via ``import_job_id``, and the raw upload bytes are passed
     base64-encoded so the driver's own encoding detection still runs.
 
-    On broker failure the job is marked ``failed`` in place and a 503 is
-    raised, so the client gets a terminal, pollable state instead of a job
-    stuck forever in ``queued``.
+    On broker failure the job row is marked ``failed`` in place (visible via
+    ``GET /import-jobs``/``GET /import-jobs/{id}`` once the caller lists or
+    already knows the id) instead of being left stuck in ``queued`` forever;
+    the 503 raised here carries only the coded error, not the job id itself
+    — see the comment further down on why the id no longer rides along in
+    the response body.
     """
     job = ImportService(db).create_queued_job(
         exam=exam,
@@ -402,6 +464,7 @@ def _enqueue_import(
         job.error_log = [
             {
                 "row_index": -1,
+                "code": "submissions_import_enqueue_failed",
                 "reason": (
                     "Import konnte nicht gestartet werden — der Hintergrund-"
                     "Dienst war nicht erreichbar. Bitte erneut versuchen."
@@ -410,9 +473,10 @@ def _enqueue_import(
         ]
         # Persisting the terminal state is best-effort: if the DB is *also*
         # unreachable (a correlated broker+DB outage) the commit raises too.
-        # Swallow that here so the original broker failure still surfaces as a
-        # 503 with a pollable job id, instead of an unhandled 500 that buries
-        # the broker cause. The periodic reaper age-fails the row either way.
+        # Swallow that here so the original broker failure still surfaces as
+        # the coded 503 below, instead of an unhandled 500 that buries the
+        # broker cause. The periodic reaper age-fails the row either way, and
+        # the id itself is only in the log now — see the comment further down.
         try:
             db.commit()
             db.refresh(job)
@@ -426,30 +490,68 @@ def _enqueue_import(
                 logger.warning(
                     "Rollback ebenfalls fehlgeschlagen für Import-Job %s", job_id
                 )
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "message": "Import konnte nicht gestartet werden — bitte erneut versuchen.",
-                "import_job_id": job_id,
-            },
-        ) from exc
+        # The job id used to ride along in a ``detail`` dict, which ADR 0005
+        # says ``detail`` never is — and it is a support detail, not something
+        # a teacher can act on. It is logged above (and again here, because
+        # the persist may have failed in between); the response carries the
+        # code (TF-773 PR 2c).
+        logger.warning(
+            "Import-Job %s nicht eingereiht — Antwort 503 mit %s",
+            job_id,
+            "submissions_import_enqueue_failed",
+        )
+        raise api_error(503, "submissions_import_enqueue_failed", locale) from exc
     return job
 
 
-def _import_job_to_out(job: ImportJob) -> ImportJobOut:
+def _import_job_to_out(job: ImportJob, *, locale: str) -> ImportJobOut:
+    """Map the persisted ``error_log`` to the response, translating as needed.
+
+    A job-level failure recorded by ``ImportService._fail_job``, and a
+    per-submission grading crash recorded by ``_finalise_job``, both carry a
+    ``code``/``params`` pair (same split as ``_import_error``) because the
+    async commit path can fail with the very same coded exceptions the
+    synchronous preview does — so it is translated here exactly like
+    ``api_error()`` translates them for the synchronous response, instead of
+    ever putting the stored diagnostic sentence on the wire. Entries without
+    a ``code`` are the row-level ``payload.errors`` a driver writes as a
+    fixed, safe German sentence — with one known pre-existing exception,
+    ``_persist_attempts``'s "unexpected IntegrityError" row error, which puts
+    a raw constraint/exception-class name in ``reason`` (tracked separately,
+    out of this review's scope). ``details.diagnostic``/``details.traceback``/
+    ``details.exception_type`` are operator/DB-only and are stripped here
+    regardless of origin (TF-773 PR 2c review).
+    """
     raw_log = job.error_log or []
-    structured = [
-        ImportRowErrorOut(
-            row_index=int(entry.get("row_index", 0) or 0),
-            reason=str(entry.get("reason") or ""),
-            step=entry.get("step"),
-            details=entry.get("details")
-            if isinstance(entry.get("details"), dict)
-            else None,
+    structured = []
+    for entry in raw_log:
+        if not isinstance(entry, dict):
+            continue
+        code = entry.get("code")
+        params = entry.get("params")
+        reason = (
+            translate(code, locale, **(params if isinstance(params, dict) else {}))
+            if code
+            else str(entry.get("reason") or "")
         )
-        for entry in raw_log
-        if isinstance(entry, dict)
-    ]
+        raw_details = entry.get("details")
+        details = (
+            {
+                k: v
+                for k, v in raw_details.items()
+                if k not in ("diagnostic", "traceback", "exception_type")
+            }
+            if isinstance(raw_details, dict)
+            else None
+        )
+        structured.append(
+            ImportRowErrorOut(
+                row_index=int(entry.get("row_index", 0) or 0),
+                reason=reason,
+                step=entry.get("step"),
+                details=details or None,
+            )
+        )
     return ImportJobOut(
         id=job.id,
         exam_id=job.exam_id,
@@ -473,6 +575,7 @@ def _import_job_to_out(job: ImportJob) -> ImportJobOut:
 
 @router.post("/import/preview", response_model=ImportPreviewOut)
 async def import_preview(
+    http_request: Request,
     exam_id: int = Form(...),
     driver_name: str = Form(DriverName.MOODLE_JSON.value),
     file: UploadFile = File(...),
@@ -485,11 +588,13 @@ async def import_preview(
     column mapping, warnings). Only after teacher confirmation does
     ``/import/commit`` run.
     """
+    locale = get_request_locale(http_request, current_user)
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    _reject_driver_without_upload_body(driver_name, locale=locale)
     # Tier gate before the expensive parsing — Free/Starter may not use
     # an API driver, otherwise the preview would burn the token.
     assert_driver_allowed(user=current_user, driver_name=driver_name)
-    contents = await _read_upload(file)
+    contents = await _read_upload(file, locale=locale)
 
     try:
         payload = await run_in_threadpool(
@@ -498,27 +603,26 @@ async def import_preview(
             driver_name=driver_name,
             source=contents,
         )
-    except ImportDriverError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": str(exc), "issues": exc.issues},
-        ) from exc
+        raise _import_error(exc, status_code=422, locale=locale) from exc
+    except ImportDriverError as exc:
+        raise _import_error(exc, status_code=400, locale=locale) from exc
     except Exception:
         logger.exception(
             "import_preview unerwartet fehlgeschlagen (exam_id=%s)", exam_id
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Import-Vorschau fehlgeschlagen — siehe Server-Logs.",
-        )
+        # «siehe Server-Logs» is an instruction to an operator that used to be
+        # printed on a teacher's screen. The logger.exception above keeps the
+        # cause; the response says what every other programming error here
+        # says (TF-773 PR 2c).
+        raise api_error(500, "submissions_import_internal_error", locale)
 
     return _import_payload_to_preview(payload)
 
 
 @router.post("/import/commit", response_model=ImportJobOut, status_code=202)
 async def import_commit(
+    http_request: Request,
     exam_id: int = Form(...),
     driver_name: str = Form(DriverName.MOODLE_JSON.value),
     file: UploadFile = File(...),
@@ -534,12 +638,14 @@ async def import_commit(
     ``GET /import-jobs/{id}``, so the HTTP request can never hang for minutes
     on grading.
     """
+    locale = get_request_locale(http_request, current_user)
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    _reject_driver_without_upload_body(driver_name, locale=locale)
     assert_driver_allowed(user=current_user, driver_name=driver_name)
     # The monthly limit only applies to a new exam, not to re-importing
     # the same one — the helper logic takes care of that.
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
-    contents = await _read_upload(file)
+    contents = await _read_upload(file, locale=locale)
 
     # Synchronous validation (parse only — no persist, no grading, so it stays
     # fast). Malformed CSVs surface as 4xx here, *before* anything is enqueued.
@@ -553,13 +659,10 @@ async def import_commit(
             driver_name=driver_name,
             source=contents,
         )
-    except ImportDriverError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": str(exc), "issues": exc.issues},
-        ) from exc
+        raise _import_error(exc, status_code=422, locale=locale) from exc
+    except ImportDriverError as exc:
+        raise _import_error(exc, status_code=400, locale=locale) from exc
 
     assert_submission_quota_for_exam(
         db=db,
@@ -570,6 +673,7 @@ async def import_commit(
 
     job = _enqueue_import(
         db=db,
+        locale=locale,
         exam=exam,
         driver_name=driver_name,
         source_bytes=contents,
@@ -580,16 +684,18 @@ async def import_commit(
             "size_bytes": len(contents),
         },
     )
-    return _import_job_to_out(job)
+    return _import_job_to_out(job, locale=locale)
 
 
 @router.get("/import-jobs/{job_id}", response_model=ImportJobOut)
 async def get_import_job(
     job_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> ImportJobOut:
     """Polling endpoint for import job status."""
+    locale = get_request_locale(http_request, current_user)
     job = (
         db.query(ImportJob)
         .filter(
@@ -600,11 +706,12 @@ async def get_import_job(
     )
     if job is None:
         raise HTTPException(status_code=404, detail="Import-Job nicht gefunden")
-    return _import_job_to_out(job)
+    return _import_job_to_out(job, locale=locale)
 
 
 @router.get("/import-jobs", response_model=ImportJobListOut)
 async def list_import_jobs(
+    http_request: Request,
     exam_id: int = Query(..., description="Exam whose import jobs are being listed"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
@@ -617,6 +724,7 @@ async def list_import_jobs(
     endpoint to show running/finished imports with live progress (n/total)
     — the import no longer needs a modal held open for this.
     """
+    locale = get_request_locale(http_request, current_user)
     base = db.query(ImportJob).filter(
         ImportJob.exam_id == exam_id,
         ImportJob.institution_id == current_user.institution_id,
@@ -624,7 +732,7 @@ async def list_import_jobs(
     total = base.count()
     jobs = base.order_by(ImportJob.created_at.desc()).limit(limit).offset(offset).all()
     return ImportJobListOut(
-        items=[_import_job_to_out(job) for job in jobs],
+        items=[_import_job_to_out(job, locale=locale) for job in jobs],
         total=total,
     )
 
@@ -877,6 +985,7 @@ class ApiImportIn(BaseModel):
 @router.post("/import/api-preview", response_model=ImportPreviewOut)
 async def import_api_preview(
     body: ApiImportIn,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportPreviewOut:
@@ -888,6 +997,7 @@ async def import_api_preview(
     """
     import json as _json
 
+    locale = get_request_locale(http_request, current_user)
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
     # Tier gate before any web-service calls — Free/Starter may not use
     # the API at all.
@@ -900,23 +1010,17 @@ async def import_api_preview(
             driver_name=DriverName.MOODLE_API.value,
             source=source,
         )
-    except ImportDriverError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": str(exc), "issues": exc.issues},
-        ) from exc
+        raise _import_error(exc, status_code=422, locale=locale) from exc
+    except ImportDriverError as exc:
+        raise _import_error(exc, status_code=400, locale=locale) from exc
     except Exception:
         logger.exception(
             "import_api_preview unerwartet fehlgeschlagen (exam_id=%s, quiz_id=%s)",
             body.exam_id,
             body.quiz_id,
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Moodle-API-Vorschau fehlgeschlagen — siehe Server-Logs.",
-        )
+        raise api_error(500, "submissions_import_internal_error", locale)
 
     return _import_payload_to_preview(payload)
 
@@ -924,6 +1028,7 @@ async def import_api_preview(
 @router.post("/import/api-commit", response_model=ImportJobOut, status_code=202)
 async def import_api_commit(
     body: ApiImportIn,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:import")),
     db: Session = Depends(get_db),
 ) -> ImportJobOut:
@@ -937,6 +1042,7 @@ async def import_api_commit(
     """
     import json as _json
 
+    locale = get_request_locale(http_request, current_user)
     exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
     assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
@@ -951,23 +1057,21 @@ async def import_api_commit(
             driver_name=DriverName.MOODLE_API.value,
             source=source_bytes,
         )
-    except ImportDriverError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ImportValidationError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": str(exc), "issues": exc.issues},
-        ) from exc
+        raise _import_error(exc, status_code=422, locale=locale) from exc
+    except ImportDriverError as exc:
+        raise _import_error(exc, status_code=400, locale=locale) from exc
 
     job = _enqueue_import(
         db=db,
+        locale=locale,
         exam=exam,
         driver_name=DriverName.MOODLE_API.value,
         source_bytes=source_bytes,
         triggered_by=current_user.id,
         source_metadata={"quiz_id": body.quiz_id},
     )
-    return _import_job_to_out(job)
+    return _import_job_to_out(job, locale=locale)
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ sequence is verified without network access.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 
 import httpx
@@ -508,17 +509,25 @@ def test_driver_records_per_attempt_failure(test_db: Session) -> None:
             )
 
 
-def test_driver_continues_on_attempt_review_exception(test_db: Session) -> None:
-    """Mid-loop unknown exception is recorded as a row error."""
+def test_driver_tolerates_malformed_slot_in_attempt_review(test_db: Session) -> None:
+    """A non-numeric ``slot`` degrades gracefully — not an exception path.
+
+    Renamed from ``test_driver_continues_on_attempt_review_exception``
+    (TF-773 PR 2c review): this "bad" review parses without raising —
+    ``slot`` becomes ``None``, the answer is dropped via the existing
+    "no mapping" branch — so it never reaches ``parse()``'s
+    ``except Exception:`` row-error branch at all. That branch has its own
+    coverage in ``test_driver_records_row_error_on_unexpected_attempt_exception``
+    below, which forces a real exception (``KeyError``).
+    """
     inst = _make_institution(test_db, slug="tf336-api-recovery")
     exam, _eq1, _eq2 = _setup_exam_with_two_questions(test_db, inst.id)
     _setup_connection(test_db, inst.id)
     test_db.commit()
 
-    # Two attempts, the first one's attempt_review returns garbage that
-    # makes _process_attempt blow up on response parsing; the second
-    # one's review is well-formed — final payload should have one
-    # row_error and one persisted attempt.
+    # Two attempts, the first one's attempt_review has a non-numeric slot
+    # that _resolve_question_id cannot map — the answer is dropped with a
+    # warning, but the attempt itself is still recorded successfully.
     bad_review = {"questions": [{"slot": "not-an-int", "responsesummary": None}]}
     good_review = _attempt_review(slot1_answer="Bern", slot2_answer="wahr", mark=4.0)
     attempts_with_two = {
@@ -565,3 +574,84 @@ def test_driver_continues_on_attempt_review_exception(test_db: Session) -> None:
         )
     assert {s.external_id for s in payload.students} == {"1001", "1002"}
     assert len(payload.attempts) == 2
+
+
+def test_driver_records_row_error_on_unexpected_attempt_exception(
+    test_db: Session, caplog
+) -> None:
+    """A raw (non-``ImportDriverError``) exception mid-attempt becomes a
+    generic row error — never the exception's own text — and the import
+    continues with the remaining attempts (TF-773 PR 2c review).
+
+    Triggered via an attempt dict without ``"id"``: ``_process_attempt``'s
+    first line is ``int(attempt["id"])``, a plain ``KeyError`` that only
+    ``parse()``'s ``except Exception:`` branch (not any
+    ``ImportDriverError`` handling) can catch — unlike
+    ``test_driver_tolerates_malformed_slot_in_attempt_review`` above, whose
+    "bad" input degrades gracefully without raising at all.
+    """
+    inst = _make_institution(test_db, slug="tf336-api-row-exc")
+    exam, _eq1, _eq2 = _setup_exam_with_two_questions(test_db, inst.id)
+    _setup_connection(test_db, inst.id)
+    test_db.commit()
+
+    good_review = _attempt_review(slot1_answer="Bern", slot2_answer="wahr", mark=4.0)
+    attempts_one_missing_id = {
+        "attempts": [
+            {
+                # No "id" — int(attempt["id"]) raises KeyError before any
+                # ImportDriverError-aware code runs.
+                "userid": 1001,
+                "useremail": "a@example.org",
+                "fullname": "A",
+                "attempt": 1,
+                "timestart": 1747299600,
+                "timefinish": 1747301400,
+                "state": "finished",
+            },
+            {
+                "id": 502,
+                "userid": 1002,
+                "useremail": "b@example.org",
+                "fullname": "B",
+                "attempt": 1,
+                "timestart": 1747299600,
+                "timefinish": 1747301400,
+                "state": "finished",
+            },
+        ]
+    }
+    endpoint = "https://moodle.example.org/webservice/rest/server.php"
+    responses = [
+        _quizzes_response(42),
+        attempts_one_missing_id,
+        good_review,
+    ]
+    with respx.mock() as mock:
+        mock.post(endpoint).mock(
+            side_effect=lambda req: httpx.Response(200, json=responses.pop(0))
+        )
+        with caplog.at_level(logging.ERROR):
+            payload = MoodleApiDriver().parse(
+                json.dumps({"quiz_id": 42}).encode("utf-8"),
+                exam=exam,
+                db=test_db,
+            )
+
+    # The second, well-formed attempt still made it through.
+    assert {s.external_id for s in payload.students} == {"1002"}
+    assert len(payload.attempts) == 1
+
+    assert len(payload.errors) == 1
+    row_error = payload.errors[0]
+    assert row_error.row_index == 1  # first attempt in the loop (1-based)
+    # Generic sentence only — the KeyError's own text must not leak into
+    # what a teacher reads.
+    assert "KeyError" not in row_error.reason
+    assert "'id'" not in row_error.reason
+    assert "konnte nicht gelesen werden und wurde übersprungen" in row_error.reason
+
+    # The real cause is still logged with a traceback for operators.
+    assert any(
+        "konnte nicht verarbeitet werden" in record.message for record in caplog.records
+    )

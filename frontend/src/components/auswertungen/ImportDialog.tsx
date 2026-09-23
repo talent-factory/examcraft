@@ -157,7 +157,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   );
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [errorIssues, setErrorIssues] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<ImportJob | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -213,7 +212,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setQuizIdRaw('');
     setPreview(null);
     setError(null);
-    setErrorIssues([]);
     setJob(null);
   };
 
@@ -235,27 +233,33 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           actualMb: (next.size / (1024 * 1024)).toFixed(1),
         }),
       );
-      setErrorIssues([]);
       return;
     }
     setFile(next);
     setError(null);
-    setErrorIssues([]);
   };
 
   // `message` is the caller's translateError(...) result, written out at the
   // call site so the fallback key stays a literal the i18n guard can see.
+  //
+  // It used to also render `ApiError.issues`, the per-row list the 422 carried
+  // in `detail.issues`. TF-773 PR 2c ended that: the entries were built from
+  // `exam_question_id` values of our own schema, and the whole failure is now
+  // one coded sentence with the count in it. No import endpoint sends an
+  // `issues` array any more, so that list is gone — not just unrendered.
+  // `submissionsService.ApiError.issues` stays as a generic optional field on
+  // the shared `ApiError` shape (unrelated to the separate `ApiError` class
+  // in `activityService.ts`) — dead for this dialog specifically, kept only
+  // because other `ApiError` consumers still declare it.
   const handleApiError = (err: unknown, message: string) => {
     // The 402 carries its code nested in `detail`, not as the ADR 0005
     // sibling field, so `appErrorFromApiError` cannot see it.
     setError(isQuotaError(err) ? translateQuotaError(err, t) : message);
-    setErrorIssues(err instanceof ApiError ? err.issues : []);
   };
 
   const runPreview = async () => {
     setBusy(true);
     setError(null);
-    setErrorIssues([]);
     abortRef.current = new AbortController();
     try {
       let result: ImportPreview;
@@ -325,7 +329,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setBusy(true);
     setStep('submitting');
     setError(null);
-    setErrorIssues([]);
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -507,23 +510,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} data-testid="import-error">
             <AlertTitle>{error}</AlertTitle>
-            {errorIssues.length > 0 && (
-              <ul
-                style={{ margin: 0, paddingLeft: 20 }}
-                data-testid="import-error-issues"
-              >
-                {errorIssues.slice(0, MAX_VISIBLE_ERRORS).map((iss) => (
-                  <li key={iss}>{iss}</li>
-                ))}
-                {errorIssues.length > MAX_VISIBLE_ERRORS && (
-                  <li>
-                    {t('auswertungen.importDialog.errorListTruncated', {
-                      count: errorIssues.length - MAX_VISIBLE_ERRORS,
-                    })}
-                  </li>
-                )}
-              </ul>
-            )}
           </Alert>
         )}
 

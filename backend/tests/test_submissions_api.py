@@ -244,7 +244,7 @@ def test_preview_rejects_empty_csv(test_db: Session) -> None:
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 400
-    assert "leer" in response.json()["detail"].lower()
+    assert response.json()["error_code"] == "submissions_import_file_empty"
 
 
 def test_preview_rejects_json_without_question_texts(test_db: Session) -> None:
@@ -269,7 +269,7 @@ def test_preview_rejects_json_without_question_texts(test_db: Session) -> None:
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 400
-    assert "fragetexte" in response.json()["detail"].lower()
+    assert response.json()["error_code"] == "submissions_import_question_texts_missing"
 
 
 # ---------------------------------------------------------------------------
@@ -764,14 +764,16 @@ def test_extra_unknown_keys_are_ignored_not_validation_error(
     assert response.json()["warnings"] == []
 
 
-def test_validation_error_surfaces_structured_issues_via_422(
+def test_validation_error_surfaces_code_and_count_via_422(
     test_db: Session,
 ) -> None:
-    """422 from ImportValidationError must include the per-issue list.
+    """422 from ImportValidationError carries the code, not a list of rows.
 
-    Triggers ImportValidationError directly (the only way without
-    bypassing the driver's question-id filter) and asserts FastAPI
-    emits ``detail.message`` + ``detail.issues``.
+    Until TF-773 PR 2c the response was ``detail: {message, issues}`` with one
+    sentence per offending answer, each naming an ``exam_question_id``. The
+    nested ``detail`` also broke the ADR 0005 promise that ``detail`` is a
+    string. Both are gone: ``detail`` is the translated sentence, the machine-
+    readable part sits next to it, and the row detail is in the log.
     """
     from unittest.mock import patch
 
@@ -783,10 +785,12 @@ def test_validation_error_surfaces_structured_issues_via_422(
     test_db.commit()
     client = _client(test_db, user)
 
-    issues = [f"Attempt #{i}: ungültige exam_question_id {99 + i}" for i in range(3)]
-
     def _raise(self, payload, exam):
-        raise ImportValidationError("3 Validierungs-Fehler", issues=issues)
+        raise ImportValidationError(
+            "submissions_import_exam_mismatch",
+            "3 Antworten verweisen auf Fragen ausserhalb von Prüfung 7",
+            count=3,
+        )
 
     with patch.object(ImportService, "_validate_payload", _raise):
         response = client.post(
@@ -802,9 +806,10 @@ def test_validation_error_surfaces_structured_issues_via_422(
         )
 
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert "3 Validierungs-Fehler" in detail["message"]
-    assert detail["issues"] == issues
+    body = response.json()
+    assert isinstance(body["detail"], str)
+    assert body["error_code"] == "submissions_import_exam_mismatch"
+    assert body["error_params"] == {"count": 3}
 
 
 # ---------------------------------------------------------------------------
@@ -896,12 +901,25 @@ def test_broker_failure_marks_job_failed_and_returns_503(test_db: Session) -> No
         )
 
     assert response.status_code == 503
-    detail = response.json()["detail"]
-    assert isinstance(detail, dict)
-    assert detail["import_job_id"] is not None
+    body = response.json()
+    # TF-773 PR 2c: `detail` is the translated sentence, the machine-readable
+    # part its sibling. The job id this used to carry moved to the log — see
+    # test_submissions_import_error_codes.py for that assertion.
+    assert isinstance(body["detail"], str)
+    assert body["error_code"] == "submissions_import_enqueue_failed"
 
-    # Polling the job must work and show a terminal, failed state.
-    poll = client.get(f"/api/v1/submissions/import-jobs/{detail['import_job_id']}")
+    # Polling the job must still work and show a terminal, failed state. The
+    # id no longer comes back in the response, so it is read from the DB —
+    # which is also the honest check: the row is what the reaper and the
+    # support case work from.
+    failed_job = (
+        test_db.query(ImportJob)
+        .filter(ImportJob.exam_id == exam.id)
+        .order_by(ImportJob.id.desc())
+        .first()
+    )
+    assert failed_job is not None
+    poll = client.get(f"/api/v1/submissions/import-jobs/{failed_job.id}")
     assert poll.status_code == 200
     job_body = poll.json()
     assert job_body["status"] == "failed"
@@ -911,8 +929,10 @@ def test_broker_failure_marks_job_failed_and_returns_503(test_db: Session) -> No
 def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
     """H2: on a correlated broker+DB outage the failure-state commit itself
     raises. ``_enqueue_import`` must swallow that, attempt a rollback, and
-    still raise the 503 with the pollable job id — never let the commit
-    error escape as an unhandled 500 that buries the broker cause."""
+    still raise the coded 503 — never let the commit error escape as an
+    unhandled 500 that buries the broker cause. (The job id moved from the
+    response to the log in TF-773 PR 2c; the point of the test is the
+    swallowed commit failure, not where the id is printed.)"""
     from api.submissions import _enqueue_import
 
     db = MagicMock()
@@ -934,6 +954,7 @@ def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
         with pytest.raises(HTTPException) as excinfo:
             _enqueue_import(
                 db=db,
+                locale="de",
                 exam=MagicMock(),
                 driver_name="moodle_json",
                 source_bytes=b"x;y\n1;2\n",
@@ -943,7 +964,7 @@ def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
 
     exc = excinfo.value
     assert exc.status_code == 503
-    assert exc.detail["import_job_id"] == 4242
+    assert exc.error_code == "submissions_import_enqueue_failed"
     db.rollback.assert_called_once()
 
 
@@ -1005,11 +1026,125 @@ def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     assert isinstance(entry["reason"], str)
 
 
-def test_preview_returns_422_with_issues_when_validation_fails(
+def test_grading_crash_never_reaches_the_polling_response(
     test_db: Session, monkeypatch
 ) -> None:
-    """422 detail must include both ``message`` and ``issues`` so the UI
-    can render every offending row at once."""
+    """A per-submission grading crash must not put ``str(exc)`` on the wire.
+
+    ``_grade_touched_submissions`` catches whatever ``grade_submission``
+    raises and used to store it verbatim as ``error_log[*].reason`` —
+    exactly the raw-exception-on-a-teacher's-screen class of bug this PR
+    closed for the job-level ``_fail_job`` path. This pins the analogous fix
+    for the per-submission grading path: the polling response gets the
+    generic, translated ``submissions_import_internal_error`` sentence, the
+    exception's own text (``RuntimeError: …``) and its traceback stay in
+    ``job.error_log`` for operator/DB triage but never reach
+    ``GET /import-jobs/{id}`` (TF-773 PR 2c review).
+    """
+
+    def _boom(_self, _submission_id, **_kwargs):
+        raise RuntimeError("simulated grading crash — table submissions_x")
+
+    monkeypatch.setattr(
+        "services.grading_service.GradingService.grade_submission", _boom
+    )
+
+    inst = _make_institution(test_db, slug="grading-crash-wire")
+    user = _make_user(test_db, inst.id, email="grading-crash@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+
+    client = _client(test_db, user)
+    job = _seed_import(test_db, exam)
+    assert job.status in ("partial", "failed")
+
+    # The raw diagnostic is still readable at the DB/service level (operator
+    # triage via direct DB access) — only the API response is redacted.
+    grading_entries = [e for e in job.error_log if e.get("step") == "grading"]
+    assert grading_entries
+    assert all("RuntimeError" in e["reason"] for e in grading_entries)
+
+    resp = client.get(f"/api/v1/submissions/import-jobs/{job.id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    serialised = json.dumps(body, ensure_ascii=False)
+    assert "RuntimeError" not in serialised
+    assert "submissions_x" not in serialised
+    assert "Traceback" not in serialised
+
+    wire_grading_entries = [e for e in body["error_log"] if e.get("step") == "grading"]
+    assert wire_grading_entries
+    for entry in wire_grading_entries:
+        assert entry["reason"] == (
+            "Der Import ist an einem internen Fehler gescheitert. "
+            "Bitte versuche es erneut oder wende dich an den Support."
+        )
+        assert entry["details"] is None or "traceback" not in entry["details"]
+        assert entry["details"] is None or "diagnostic" not in entry["details"]
+
+
+def test_job_level_failure_never_reaches_the_polling_response(test_db: Session) -> None:
+    """A job-level failure (``ImportService._fail_job``, triggered here by a
+    driver hard-fail mid-``commit()``) must not put ``str(exc)`` or a
+    traceback on the wire — the polling response gets the translated
+    sentence for ``exc.code`` instead (TF-773 PR 2c review)."""
+    from services.import_drivers import ImportDriverError
+    from services.import_service import ImportService
+
+    inst = _make_institution(test_db, slug="job-fail-wire")
+    user = _make_user(test_db, inst.id, email="job-fail@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+
+    with pytest.raises(ImportDriverError):
+        ImportService(test_db).commit(
+            exam=exam,
+            driver_name="moodle_json",
+            source="not valid json {".encode("utf-8"),
+            triggered_by=None,
+        )
+
+    job = (
+        test_db.query(ImportJob)
+        .filter(ImportJob.exam_id == exam.id)
+        .order_by(ImportJob.id.desc())
+        .first()
+    )
+    assert job is not None
+    assert job.status == "failed"
+
+    client = _client(test_db, user)
+    resp = client.get(f"/api/v1/submissions/import-jobs/{job.id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    serialised = json.dumps(body, ensure_ascii=False)
+    assert "ImportDriverError" not in serialised
+    assert "Traceback" not in serialised
+    # exc.log_message ("Quelle ist kein gültiges JSON: <json.JSONDecodeError
+    # text>") is log-only; only its distinct "Expecting value" tail — the
+    # raw stdlib parser message — proves it, since the safe translated
+    # sentence legitimately shares the words "kein gültiges JSON".
+    assert "Expecting value" not in serialised
+
+    entry = body["error_log"][0]
+    assert entry["reason"] == (
+        "Die Datei ist kein gültiges JSON. Bitte prüfe, ob du den "
+        "JSON-Export aus Moodle gewählt hast."
+    )
+    assert entry["details"] is None or "traceback" not in entry["details"]
+    assert entry["details"] is None or "diagnostic" not in entry["details"]
+
+
+def test_preview_422_renders_the_translated_sentence_not_the_service_text(
+    test_db: Session, monkeypatch
+) -> None:
+    """The 422 body is the locale sentence for the code, never ``str(exc)``.
+
+    The exception's own text names the exam row and the count of offending
+    answers -- useful in a log, developer wording on a screen. What comes back
+    is the German sentence for ``submissions_import_exam_mismatch`` with the
+    count interpolated (TF-773 PR 2c).
+    """
     from services.import_service import ImportService, ImportValidationError
 
     inst = _make_institution(test_db, slug="preview-422")
@@ -1019,12 +1154,9 @@ def test_preview_returns_422_with_issues_when_validation_fails(
 
     def raise_validation(*args, **kwargs):
         raise ImportValidationError(
-            "3 Validierungs-Fehler in Payload",
-            issues=[
-                "Attempt #0 (anna@test.ch): Frage 99 nicht in Prüfung",
-                "Attempt #1 (bruno@test.ch): Frage 99 nicht in Prüfung",
-                "Attempt #2 (carla@test.ch): Frage 88 nicht in Prüfung",
-            ],
+            "submissions_import_exam_mismatch",
+            "3 Antworten verweisen auf Fragen ausserhalb von Prüfung 42",
+            count=3,
         )
 
     monkeypatch.setattr(ImportService, "preview", raise_validation)
@@ -1042,10 +1174,13 @@ def test_preview_returns_422_with_issues_when_validation_fails(
         data={"exam_id": str(exam.id)},
     )
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert detail["message"] == "3 Validierungs-Fehler in Payload"
-    assert len(detail["issues"]) == 3
-    assert all("nicht in Prüfung" in issue for issue in detail["issues"])
+    body = response.json()
+    assert body["detail"] == (
+        "3 Antworten gehören nicht zu dieser Prüfung. Bitte prüfe, ob du den "
+        "richtigen Export gewählt hast."
+    )
+    assert "Prüfung 42" not in body["detail"]
+    assert body["error_code"] == "submissions_import_exam_mismatch"
 
 
 def test_preview_returns_500_when_pipeline_crashes_unexpectedly(
