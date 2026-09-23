@@ -53,7 +53,14 @@ except ImportError:
     SPECULA_CLIENT_AVAILABLE = False
     SpeculaLogHandler = init_tracing = instrument_fastapi_app = scrub_pii = None
 
-SERVICE_NAME_API = "examcraft-backend"
+
+# TF-871: must match the Fly app name exactly (examcraft-api / examcraft-celery)
+# -- the specula otel-collector's trigger-rule matching
+# (transform/trigger_tag in otel-collector/custom.config.yaml) keys off
+# resource.attributes["service.name"], and a mismatch here silently drops
+# every examcraft-unhandled-exception/examcraft-frontend-error event before
+# it ever reaches specula-notifier (was "examcraft-backend" and never fired).
+SERVICE_NAME_API = "examcraft-api"
 SERVICE_NAME_WORKER = "examcraft-celery"
 
 # TF-758 carryover, kept explicit for readability/self-documentation: these
