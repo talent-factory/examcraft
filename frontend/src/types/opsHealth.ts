@@ -23,14 +23,15 @@ export type OpsMetricLabel =
   | 'online_workers'
   | 'error';
 
-export interface OpsHealthSentry {
+export interface OpsHealthSpecula {
   configured: boolean;
-  // Backend-only in practice: only `get_backend_health()` in
-  // `ops_health_service.py` populates this when `configured` is `true`
-  // (`null` when the Sentry API call failed). `get_frontend_health()` always
-  // returns just `{ configured }` for the `frontend` component's `sentry`
-  // object — this field is `undefined` there regardless of `configured`,
-  // since the frontend's own Sentry error-rate integration is still a stub.
+  // Both `get_backend_health()` and `get_frontend_health()` in
+  // `ops_health_service.py` populate this when `configured` is `true` (TF-918
+  // — replaces the retired Sentry-API integration). `null` when the
+  // ClickHouse query failed. Backend and frontend errors are both logged
+  // through the `examcraft-api` process and told apart server-side via the
+  // `specula.signal_type` log attribute, so both cards get a real,
+  // independent count.
   error_count_5m?: number | null;
 }
 
@@ -53,7 +54,7 @@ export interface OpsComponentHealth {
   // present its value is `null` rather than omitted (Pydantic serializes
   // `Optional[dict] = None` as `null`, not as an absent field) — `frontend`
   // and `backend` always send a real object.
-  sentry?: OpsHealthSentry | null;
+  specula?: OpsHealthSpecula | null;
 }
 
 export interface OpsHealthSnapshot {

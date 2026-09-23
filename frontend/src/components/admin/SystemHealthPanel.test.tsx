@@ -22,9 +22,9 @@ const baseSnapshot: OpsHealthSnapshot = {
       metric_value: '1/1',
       timestamp: '2026-09-05T08:00:00+00:00',
       detail: null,
-      deep_link: 'https://talent-factory.sentry.io/projects/examcraft-frontend/',
+      deep_link: 'https://specula-hyperdx.fly.dev/search?where=ServiceName%3A%22examcraft-api%22&whereLanguage=lucene',
       cli_hint: null,
-      sentry: { configured: false },
+      specula: { configured: false },
     },
     backend: {
       status: 'green',
@@ -34,7 +34,7 @@ const baseSnapshot: OpsHealthSnapshot = {
       detail: null,
       deep_link: null,
       cli_hint: null,
-      sentry: { configured: false },
+      specula: { configured: false },
     },
     db: {
       status: 'yellow',

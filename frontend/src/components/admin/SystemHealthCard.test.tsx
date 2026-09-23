@@ -48,58 +48,61 @@ describe('SystemHealthCard', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
-  // TF-788: get_backend_health() adds sentry.error_count_5m, but until now no
-  // component rendered it — a wasted Sentry API call on every 10s poll (see
-  // PR #248 review). Only the backend card, and only once configured with an
-  // actual count, should show it.
-  describe('Sentry error count (backend only)', () => {
-    it('renders the Sentry error count for the backend card when configured', () => {
+  // TF-918: get_backend_health()/get_frontend_health() both populate
+  // specula.error_count_5m (replaces the retired Sentry-API integration,
+  // TF-788) — both cards, and only once configured with an actual count,
+  // should show it.
+  describe('Specula error count (backend + frontend)', () => {
+    it.each(['backend', 'frontend'] as const)(
+      'renders the Specula error count for the %s card when configured',
+      (componentKey) => {
+        render(
+          <SystemHealthCard
+            componentKey={componentKey}
+            health={{ ...baseHealth, specula: { configured: true, error_count_5m: 3 } }}
+          />
+        );
+
+        expect(screen.getByText('pages.admin.systemHealth.speculaErrorCount')).toBeInTheDocument();
+      }
+    );
+
+    it('does not render the caption when Specula is not configured', () => {
       render(
         <SystemHealthCard
           componentKey="backend"
-          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: 3 } }}
-        />
-      );
-
-      expect(screen.getByText('pages.admin.systemHealth.sentryErrorCount')).toBeInTheDocument();
-    });
-
-    it('does not render the caption when Sentry is not configured', () => {
-      render(
-        <SystemHealthCard
-          componentKey="backend"
-          health={{ ...baseHealth, sentry: { configured: false } }}
+          health={{ ...baseHealth, specula: { configured: false } }}
         />
       );
 
       expect(
-        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+        screen.queryByText('pages.admin.systemHealth.speculaErrorCount')
       ).not.toBeInTheDocument();
     });
 
-    it('does not render the caption when error_count_5m is null (Sentry call failed)', () => {
+    it('does not render the caption when error_count_5m is null (ClickHouse query failed)', () => {
       render(
         <SystemHealthCard
           componentKey="backend"
-          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: null } }}
+          health={{ ...baseHealth, specula: { configured: true, error_count_5m: null } }}
         />
       );
 
       expect(
-        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+        screen.queryByText('pages.admin.systemHealth.speculaErrorCount')
       ).not.toBeInTheDocument();
     });
 
-    it('does not render the caption for non-backend components even if sentry is present', () => {
+    it('does not render the caption for components without a specula card even if specula is present', () => {
       render(
         <SystemHealthCard
-          componentKey="frontend"
-          health={{ ...baseHealth, sentry: { configured: true, error_count_5m: 3 } }}
+          componentKey="rabbitmq"
+          health={{ ...baseHealth, specula: { configured: true, error_count_5m: 3 } }}
         />
       );
 
       expect(
-        screen.queryByText('pages.admin.systemHealth.sentryErrorCount')
+        screen.queryByText('pages.admin.systemHealth.speculaErrorCount')
       ).not.toBeInTheDocument();
     });
   });

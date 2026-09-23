@@ -18,7 +18,7 @@ const STATUS_COLOR: Record<OpsComponentHealth['status'], 'success' | 'warning' |
 /**
  * One Ops-Dashboard card (TF-786): traffic-light status + headline metric +
  * either an optional deep-link to the component's specialist tool
- * (Flower/Sentry, and RabbitMQ in local dev — TF-800) or, where no working
+ * (Flower/Specula, and RabbitMQ in local dev — TF-800) or, where no working
  * deep-link exists (RabbitMQ in prod — TF-817, no public IP), a copyable
  * CLI-fallback command. Never renders a history — the epic scoped that out
  * of v1.
@@ -73,12 +73,12 @@ const SystemHealthCard: React.FC<SystemHealthCardProps> = ({ componentKey, healt
             {health.detail}
           </Typography>
         )}
-        {componentKey === 'backend' &&
-          health.sentry?.configured &&
-          health.sentry.error_count_5m != null && (
+        {(componentKey === 'backend' || componentKey === 'frontend') &&
+          health.specula?.configured &&
+          health.specula.error_count_5m != null && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              {t('pages.admin.systemHealth.sentryErrorCount', {
-                count: health.sentry.error_count_5m,
+              {t('pages.admin.systemHealth.speculaErrorCount', {
+                count: health.specula.error_count_5m,
               })}
             </Typography>
           )}
