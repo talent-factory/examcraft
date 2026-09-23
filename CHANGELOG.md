@@ -9,6 +9,48 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-09-23
+
+### Added
+
+- **Portfolio-Assessment Epic 1: Datenmodell + Template-Verwaltung
+  (TF-905/TF-906, #311):** Grundlage für mehrphasige
+  Projektarbeit-Bewertung — Design-Spec um Epic-2-Entscheidungen
+  ergänzt.
+- **Ops-Dashboard Health-Panel von Sentry-API auf Specula/ClickHouse
+  umgestellt (TF-918).**
+- **SuperAdmin-Endpoint für Prod-Smoke-Test von unbehandelten Exceptions
+  (TF-871 Nachzug):** Analog zum bestehenden Worker-Error-Trigger, da
+  der Dev-only-Endpoint in Prod 403 liefert.
+
+### Changed
+
+- **Import-Endpunkte weitere Etappe auf maschinenlesbare Fehlercodes
+  (TF-773 PR 2c, #291):** 23 unterscheidbare Fehlercodes.
+- **Doku-Nachzug Sentry→Specula-Cutover (TF-872/TF-873, #306):**
+  `SPECULA.md`/`FLY_IO_DEPLOYMENT.md` sowie die Compliance-Doku
+  (TOM/Datenschutzerklärung) auf Specula aktualisiert, Sentry als
+  Subprozessor entfernt.
+
+### Fixed
+
+- **Specula-Observability-Hardening Nachzug (TF-871/TF-915/TF-916):**
+  Die drei Prod-Trigger-Regeln (unhandled exception, Celery-Task-
+  Fehler, Frontend-Fehler) feuerten trotz TF-847-Migration nie —
+  `OTEL_EXPORTER_ENDPOINT` fehlte in `fly.toml`/`fly.celery.toml`, und
+  `SERVICE_NAME_API` matchte als `"examcraft-backend"` nie die
+  Collector-Regel `"examcraft-api"`. Zusätzlich taggen der globale
+  Exception-Handler und ein neuer Celery-`task_failure`-Signal-Handler
+  jetzt `specula_signal_type`, `SpeculaLogHandler` wird nach Celerys
+  Root-Logger-Hijack neu angehängt, und `specula-client-python` wurde
+  von v0.1.0 (nie über den Pin hinaus deployt) auf v0.1.4 angehoben,
+  damit die TF-895-Sicherheitsfixes und der TF-916-Fork-Safety-Fix
+  tatsächlich in Prod laufen.
+- **`REACT_APP_ENVIRONMENT` im Prod-Build gesetzt (TF-871).**
+- **Rekursionslimit für Tests erneut angehoben — 8000 reichte nicht
+  mehr (TF-902, #308).**
+- **i18n: `QuestionReviewCard`-Bloom-Stufen übersetzt (TF-904, #307).**
+
 ## [1.12.0] - 2026-09-22
 
 ### Added
