@@ -67,7 +67,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN --mount=type=secret,id=GITHUB_TOKEN \
     if [ -s /run/secrets/GITHUB_TOKEN ]; then \
         GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
-        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@v0.1.0"; \
+        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@v0.1.4"; \
     fi
 
 # Install additional dependencies from pyproject.toml (qdrant-client, sentence-transformers, etc.)

@@ -92,7 +92,7 @@ itsdangerous==2.1.2                 # Secure Token Generation for OAuth State
 # working image, not a broken one.
 #
 # Local dev / `uv run pytest` outside Docker: install it manually once via
-# `pip install "specula-client[fastapi,celery] @ git+ssh://git@github.com/talent-factory/specula-client-python.git@v0.1.0"`
+# `pip install "specula-client[fastapi,celery] @ git+ssh://git@github.com/talent-factory/specula-client-python.git@v0.1.4"`
 # (requires GitHub SSH access to the private repo) if you want real
 # tracing/log-forwarding locally -- everything else works without it.
 
