@@ -248,3 +248,110 @@ def test_portfolio_ingestion_task_is_registered_and_routed_in_running_app():
     if task_name not in celery_app.conf.task_routes:
         pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
     assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
+
+
+def test_premium_portfolio_watchdog_registration_empty_in_core_mode():
+    from celery_app import _resolve_premium_portfolio_watchdog_registration
+
+    beat, routes = _resolve_premium_portfolio_watchdog_registration("core")
+    assert beat == {}
+    assert routes == {}
+
+
+def test_premium_portfolio_watchdog_registration_reflects_actual_importability_in_full_mode():
+    """Mirrors
+    ``test_premium_ops_alert_registration_reflects_actual_importability_in_full_mode``:
+    in 'full' mode, the resolver populates the beat/route entries ONLY if
+    ``premium.tasks.portfolio_watchdog_tasks`` is actually importable in
+    this test environment."""
+    from celery_app import _resolve_premium_portfolio_watchdog_registration
+
+    try:
+        import premium.tasks.portfolio_watchdog_tasks  # noqa: F401
+
+        premium_importable = True
+    except ImportError:
+        premium_importable = False
+
+    beat, routes = _resolve_premium_portfolio_watchdog_registration("full")
+
+    if not premium_importable:
+        assert beat == {}
+        assert routes == {}
+        return
+
+    task_name = (
+        "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_ingestion_jobs"
+    )
+    assert (
+        beat["reap-stuck-portfolio-ingestion-jobs-every-5-minutes"]["task"] == task_name
+    )
+    assert routes[task_name] == {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    }
+
+
+def test_premium_portfolio_watchdog_registration_import_error_deterministically_degrades(
+    monkeypatch,
+):
+    """Mirrors
+    ``test_premium_ops_alert_registration_import_error_deterministically_degrades``."""
+    from celery_app import _resolve_premium_portfolio_watchdog_registration
+
+    real_import = builtins.__import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "premium.tasks.portfolio_watchdog_tasks":
+            raise ImportError(
+                "No module named 'premium.tasks.portfolio_watchdog_tasks'"
+            )
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    beat, routes = _resolve_premium_portfolio_watchdog_registration("full")
+
+    assert beat == {}
+    assert routes == {}
+
+
+def test_premium_portfolio_watchdog_registration_non_import_error_degrades_gracefully(
+    monkeypatch,
+):
+    """Mirrors
+    ``test_premium_ops_alert_registration_non_import_error_degrades_gracefully``
+    — a non-``ImportError`` bug on import must not propagate and crash
+    ``celery_app`` (and with it ``main.py``, which also imports it)."""
+    from celery_app import _resolve_premium_portfolio_watchdog_registration
+
+    real_import = builtins.__import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "premium.tasks.portfolio_watchdog_tasks":
+            raise AttributeError("boom: simulierter Bug beim Import")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    beat, routes = _resolve_premium_portfolio_watchdog_registration("full")
+
+    assert beat == {}
+    assert routes == {}
+
+
+def test_portfolio_watchdog_task_is_registered_and_routed_in_running_app():
+    """Läuft die Suite im Full-Modus, muss der echte, bereits konstruierte
+    celery_app diesen Task routen — nicht nur die reine Resolver-Funktion
+    oben. Mirrors ``test_ops_alert_task_is_registered_and_routed_in_running_app``."""
+    from celery_app import celery_app
+
+    task_name = (
+        "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_ingestion_jobs"
+    )
+    if task_name not in celery_app.conf.task_routes:
+        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+    assert (
+        "reap-stuck-portfolio-ingestion-jobs-every-5-minutes"
+        in celery_app.conf.beat_schedule
+    )
