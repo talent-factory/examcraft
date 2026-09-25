@@ -340,6 +340,13 @@ def _build_tom() -> ComplianceDocument:
                 "6). Der Einsatz von Subprozessoren ist vertraglich an die "
                 "gleichen datenschutzrechtlichen Pflichten gebunden und in "
                 "der Subprozessoren-Liste dokumentiert.",
+                "Ausgenommen von diesem AVV/TOM-Paket sind optionale "
+                "Drittdienste, die eine Nutzerin oder ein Nutzer selbst mit "
+                "dem eigenen Konto verknüpft (z. B. eine GitHub-Repository-"
+                "Anbindung bei der Portfolio-Bewertung) — hierfür besteht "
+                "keine Auftragsverarbeitung durch Talent Factory; siehe die "
+                'öffentliche Datenschutzerklärung, Abschnitt "Vom Nutzer '
+                'selbst verknüpfte Drittdienste".',
             ),
         ),
     )

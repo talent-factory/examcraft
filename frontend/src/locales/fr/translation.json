@@ -592,6 +592,16 @@
           }
         ]
       },
+      "userLinkedThirdParties": {
+        "title": "Services tiers que vous reliez vous-même",
+        "intro": "Certaines fonctionnalités d'ExamCraft AI sont facultatives et nécessitent que vous reliiez vous-même un service externe avec votre propre compte. Cette connexion se fait de votre propre initiative ; nous ne sélectionnons ni ne mandatons ce service et ne sommes donc pas considérés comme son responsable de traitement au sens de l'art. 28 RGPD. Le traitement effectué par le fournisseur tiers lui-même est régi par sa propre politique de confidentialité.",
+        "items": [
+          {
+            "name": "GitHub",
+            "description": "Pour la fonctionnalité facultative d'évaluation de portfolio, les enseignant·e·s peuvent relier un dépôt GitHub à une évaluation de portfolio afin de récupérer directement la partie code d'un travail d'étudiant·e, plutôt que de le téléverser sous forme de fichier ZIP. Le dépôt appartient à l'étudiant·e ; l'enseignant·e a besoin de son propre jeton d'accès GitHub personnel, qu'il/elle génère lui/elle-même sur GitHub et enregistre dans son compte ExamCraft (stocké chiffré). Lors de la connexion, ExamCraft AI récupère en lecture les métadonnées et le contenu du dépôt via l'API GitHub. Fournisseur : GitHub, Inc. (Microsoft Corporation), États-Unis. Ne sélectionnant ni ne mandatant ce service, aucun contrat de sous-traitance n'existe avec GitHub ; le transfert de données vers les États-Unis se fait à l'initiative de l'enseignant·e, dans le cadre des propres mécanismes de protection et de transfert de données de GitHub. Si le contenu du dépôt contient des données personnelles (par ex. dans les messages de commit ou les noms de fichiers), celles-ci ne sont pas filtrées. Le jeton d'accès peut être révoqué à tout moment directement depuis votre propre compte GitHub, ce qui met fin immédiatement à l'accès d'ExamCraft."
+          }
+        ]
+      },
       "ai": {
         "title": "Transmission de contenus à des modèles d'IA",
         "humanInTheLoop": "ExamCraft AI suit une approche human-in-the-loop : l'IA génère des suggestions de questions d'examen et de notation, qui doivent être examinées et approuvées par un enseignant avant de quitter le système. Les données personnelles des élèves sont minimisées avant le traitement par IA dans la mesure du possible.",

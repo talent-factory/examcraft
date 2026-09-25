@@ -91,6 +91,24 @@ export const PrivacyPage: React.FC = () => {
         </p>
       </section>
 
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-3">
+          {t('legal.privacy.userLinkedThirdParties.title')}
+        </h2>
+        <p className="mb-4">{t('legal.privacy.userLinkedThirdParties.intro')}</p>
+        <ul className="list-disc pl-5 space-y-2">
+          {(
+            t('legal.privacy.userLinkedThirdParties.items', {
+              returnObjects: true,
+            }) as Array<{ name: string; description: string }>
+          ).map((item) => (
+            <li key={item.name}>
+              <strong>{item.name}</strong> — {item.description}
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="mb-8" id="ai-data-flows" data-testid="ai-data-flows-section">
         <h2 className="text-xl font-semibold text-gray-900 mb-3">
           {t('legal.privacy.ai.title')}

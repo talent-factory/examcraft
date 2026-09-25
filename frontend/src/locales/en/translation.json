@@ -592,6 +592,16 @@
           }
         ]
       },
+      "userLinkedThirdParties": {
+        "title": "Third-party services you link yourself",
+        "intro": "Certain ExamCraft AI features are optional and require you to link an external service using your own account. This connection happens on your own initiative; we do not select or commission the service in question and are therefore not considered its controller under Art. 28 GDPR. Processing by the third-party provider itself is governed by that provider's own privacy policy.",
+        "items": [
+          {
+            "name": "GitHub",
+            "description": "For the optional portfolio assessment feature, teachers can link a GitHub repository to a portfolio assessment to retrieve the code portion of a student's work directly, instead of uploading it as a ZIP file. The repository belongs to the student; the teacher needs their own personal GitHub access token, which they generate themselves on GitHub and store in their ExamCraft account (stored encrypted there). When linking, ExamCraft AI reads repository metadata and repository content via the GitHub API. Provider: GitHub, Inc. (Microsoft Corporation), USA. Because we do not select or commission this service, there is no data processing agreement with GitHub; the transfer of data to the USA occurs at the teacher's own initiative, under GitHub's own data protection and transfer mechanisms. If the repository content contains personal data (e.g. in commit messages or file names), it is not filtered out. The access token can be revoked at any time directly in your own GitHub account, which immediately ends ExamCraft's access."
+          }
+        ]
+      },
       "ai": {
         "title": "Transmission of content to AI models",
         "humanInTheLoop": "ExamCraft AI follows a human-in-the-loop approach: the AI generates suggestions for exam questions and grading, which must be reviewed and approved by a teacher before leaving the system. Personal data of students is minimized before AI processing wherever possible.",

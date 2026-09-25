@@ -204,3 +204,27 @@ def test_avv_deletion_cross_reference_points_to_an_existing_tom_section() -> Non
     ), (
         f"AVV's deletion cross-reference points at an unrelated section: {referenced_heading!r}"
     )
+
+
+def test_github_is_documented_as_user_linked_not_as_a_subprocessor() -> None:
+    """TF-926: the optional GitHub-repository link in Portfolio-Assessment
+    is not a classic subprocessor (Talent Factory does not select or
+    commission it — the user links their own account), so it must NOT
+    appear in the AVV subprocessor list. The TOM annex must instead
+    document the exception and point at the public privacy policy.
+    """
+    content = get_compliance_content()
+    names = {sp.name for sp in content.subprocessors}
+
+    assert not any("GitHub" in name for name in names), (
+        "GitHub must not be listed as an AVV subprocessor — it is a "
+        "user-linked third-party service, not one Talent Factory selects "
+        "or commissions (see TF-926)"
+    )
+
+    tom_text = " ".join(
+        section.heading + " " + " ".join(section.paragraphs)
+        for section in content.tom.sections
+    )
+    assert "GitHub" in tom_text
+    assert "Vom Nutzer selbst verknüpfte Drittdienste" in tom_text

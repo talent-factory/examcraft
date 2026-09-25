@@ -592,6 +592,16 @@
           }
         ]
       },
+      "userLinkedThirdParties": {
+        "title": "Vom Nutzer selbst verknüpfte Drittdienste",
+        "intro": "Bestimmte Funktionen von ExamCraft AI sind optional und setzen voraus, dass Sie selbst einen externen Dienst mit Ihrem eigenen Konto verknüpfen. Diese Verknüpfung erfolgt auf Ihre eigene Veranlassung; wir wählen den betreffenden Dienst nicht aus und beauftragen ihn nicht, und gelten insoweit nicht als dessen Auftraggeberin im Sinne von Art. 28 DSGVO. Die Verarbeitung durch den Drittanbieter selbst unterliegt dessen eigener Datenschutzerklärung.",
+        "items": [
+          {
+            "name": "GitHub",
+            "description": "Bei der optionalen Portfolio-Bewertung können Lehrpersonen ein GitHub-Repository mit einer Portfolio-Bewertung verknüpfen, um den Code-Anteil einer studentischen Arbeit direkt abzurufen, statt ihn als ZIP-Datei hochzuladen. Das Repository gehört der/dem Studierenden; die Lehrperson benötigt dafür einen eigenen, persönlichen GitHub-Zugriffstoken, den sie selbst bei GitHub erzeugt und in ihrem ExamCraft-Benutzerkonto hinterlegt (dort verschlüsselt gespeichert). Beim Verknüpfen ruft ExamCraft AI lesend Repository-Metadaten und den Repository-Inhalt über die GitHub-API ab. Anbieter: GitHub, Inc. (Microsoft Corporation), USA. Da wir diesen Dienst nicht selbst auswählen oder beauftragen, besteht kein Auftragsverarbeitungsvertrag mit GitHub; die Datenübermittlung in die USA erfolgt auf Veranlassung der Lehrperson im Rahmen der von GitHub selbst angebotenen Datenschutz- und Transfermechanismen. Enthält der Repository-Inhalt personenbezogene Daten (z. B. in Commit-Nachrichten oder Dateinamen), werden diese nicht herausgefiltert. Der Zugriffstoken kann jederzeit direkt im eigenen GitHub-Konto widerrufen werden, wodurch der Zugriff für ExamCraft sofort erlischt."
+          }
+        ]
+      },
       "ai": {
         "title": "Übermittlung von Inhalten an KI-Modelle",
         "humanInTheLoop": "ExamCraft AI arbeitet nach dem Human-in-the-Loop-Prinzip: Die KI erstellt Vorschläge für Prüfungsfragen und Bewertungen, die von einer Lehrkraft geprüft und freigegeben werden müssen, bevor sie das System verlassen. Personenbezogene Daten von Studierenden werden vor der KI-Verarbeitung soweit möglich minimiert.",
