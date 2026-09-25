@@ -7,16 +7,19 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import database models for autogenerate support
-from database import Base
+from database import Base, _normalize_db_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with DATABASE_URL environment variable if present
+# Override sqlalchemy.url with DATABASE_URL environment variable if present.
+# Normalized the same way as the main engine (TF-424 legacy scheme rewrite,
+# TF-938 explicit psycopg2 driver) since this reads DATABASE_URL directly,
+# bypassing database.py's own normalization of its module-level DATABASE_URL.
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", _normalize_db_url(database_url))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

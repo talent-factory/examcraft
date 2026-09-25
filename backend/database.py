@@ -12,7 +12,7 @@ load_dotenv()
 
 
 def _normalize_db_url(url: str) -> str:
-    """Normalize the legacy ``postgres://`` scheme to ``postgresql://``.
+    """Normalize the legacy ``postgres://`` scheme and pin the psycopg2 driver.
 
     Fly's managed Postgres injects ``DATABASE_URL`` with the deprecated
     ``postgres://`` scheme, which SQLAlchemy 1.4+ no longer recognizes as a
@@ -24,13 +24,24 @@ def _normalize_db_url(url: str) -> str:
     the single point where the URL is consumed, makes every invocation path
     robust regardless of how the process was started.
 
+    TF-938: SQLAlchemy 2.1.0 changed the *implicit* default driver for a
+    scheme-less ``postgresql://`` URL from ``psycopg2`` to ``psycopg`` (v3),
+    which isn't installed here (we use ``psycopg2-binary``). Explicitly
+    qualifying the driver makes the app immune to SQLAlchemy changing that
+    default again, instead of relying on an undocumented implicit choice.
+
     Only the leading scheme is rewritten, so a ``postgres://`` substring inside
-    a password is never touched. ``postgresql://`` (and driver-qualified
-    variants like ``postgresql+psycopg2://``) pass through unchanged.
+    a password is never touched. Driver-qualified variants like
+    ``postgresql+psycopg2://`` already pass through unchanged.
     """
-    prefix = "postgres://"
-    if url.startswith(prefix):
-        return "postgresql://" + url[len(prefix) :]
+    legacy_prefix = "postgres://"
+    if url.startswith(legacy_prefix):
+        url = "postgresql://" + url[len(legacy_prefix) :]
+
+    driverless_prefix = "postgresql://"
+    if url.startswith(driverless_prefix):
+        url = "postgresql+psycopg2://" + url[len(driverless_prefix) :]
+
     return url
 
 

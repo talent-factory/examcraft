@@ -45,7 +45,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-from database import Base
+from database import Base, _normalize_db_url
 from main import app
 
 # Ensure all models are registered with Base before create_all() is called.
@@ -88,7 +88,10 @@ if _base_url and not os.getenv("TEST_DATABASE_URL"):
     _test_db_url = _base_url.rsplit("/", 1)[0] + "/examcraft_test"
 else:
     _test_db_url = _default_db_url
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", _test_db_url)
+# TF-938: normalize so the psycopg2 driver is explicit regardless of
+# SQLAlchemy's implicit-default resolution for scheme-less postgresql:// URLs
+# — admin_url below is derived from this, so it inherits the fix too.
+TEST_DATABASE_URL = _normalize_db_url(os.getenv("TEST_DATABASE_URL", _test_db_url))
 
 
 # Test Database Setup
