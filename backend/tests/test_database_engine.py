@@ -80,24 +80,30 @@ def test_engine_pool_pre_ping_remains_enabled():
 # outside the entrypoint (e.g. `fly ssh console -C "python -m ..."` for the
 # repro tooling) bypass it. _normalize_db_url makes the URL robust at the single
 # point where it is consumed.
+#
+# --- TF-938: explicit psycopg2 driver ----------------------------------------
+# SQLAlchemy 2.1.0 changed the *implicit* default driver for a scheme-less
+# `postgresql://` URL from psycopg2 to psycopg (v3), which isn't installed
+# (we use psycopg2-binary). _normalize_db_url now also qualifies the driver
+# explicitly so the app doesn't depend on SQLAlchemy's undocumented default.
 
 
 def test_normalize_db_url_rewrites_legacy_postgres_scheme():
-    """`postgres://` (Fly legacy) → `postgresql://` so create_engine resolves the dialect."""
+    """`postgres://` (Fly legacy) → `postgresql+psycopg2://` (scheme rewrite + driver pin)."""
     from database import _normalize_db_url
 
     assert (
         _normalize_db_url("postgres://user:pw@host:5432/db")
-        == "postgresql://user:pw@host:5432/db"
+        == "postgresql+psycopg2://user:pw@host:5432/db"
     )
 
 
-def test_normalize_db_url_leaves_postgresql_scheme_untouched():
-    """Already-correct `postgresql://` must pass through verbatim (no double-rewrite)."""
+def test_normalize_db_url_pins_psycopg2_driver_for_scheme_less_url():
+    """Scheme-less `postgresql://` gets the psycopg2 driver pinned explicitly (TF-938)."""
     from database import _normalize_db_url
 
     url = "postgresql://user:pw@host:5432/db"
-    assert _normalize_db_url(url) == url
+    assert _normalize_db_url(url) == "postgresql+psycopg2://user:pw@host:5432/db"
 
 
 def test_normalize_db_url_preserves_driver_qualified_scheme():
@@ -114,7 +120,7 @@ def test_normalize_db_url_only_rewrites_leading_scheme():
 
     # Pathological but valid: the password literally contains "postgres://".
     url = "postgres://user:postgres://pw@host/db"
-    assert _normalize_db_url(url) == "postgresql://user:postgres://pw@host/db"
+    assert _normalize_db_url(url) == "postgresql+psycopg2://user:postgres://pw@host/db"
 
 
 def test_normalize_db_url_leaves_non_postgres_urls_untouched():

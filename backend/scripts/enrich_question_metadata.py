@@ -87,6 +87,7 @@ def main():
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
+    from database import _normalize_db_url
     from models.question_review import QuestionReview
     from services import llm_gateway
 
@@ -94,6 +95,10 @@ def main():
     if not database_url:
         logger.error("DATABASE_URL not set")
         return
+    # TF-938: pin psycopg2 explicitly — SQLAlchemy 2.1 changed the implicit
+    # default driver for scheme-less postgresql:// URLs to psycopg (v3),
+    # which isn't installed here.
+    database_url = _normalize_db_url(database_url)
 
     if not llm_gateway.gateway_enabled():
         logger.error("LLM_GATEWAY_URL not set")
