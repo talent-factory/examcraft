@@ -3,12 +3,15 @@ Database Configuration for ExamCraft AI
 SQLAlchemy setup and session management
 """
 
+import logging
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_db_url(url: str) -> str:
@@ -135,13 +138,11 @@ def create_tables():
         )
         from models.feedback_cluster import FeedbackCluster  # noqa: F401
 
-        print(
-            "✅ Core models imported (Auth + Documents + Question Review + RBAC + Email + Help)"
+        logger.info(
+            "Core models imported (Auth + Documents + Question Review + RBAC + Email + Help)"
         )
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
+        logger.exception("Failed to import core models (cannot start)")
         raise RuntimeError(f"Failed to import core models (cannot start): {e}") from e
 
     # Import Premium models (if available)
@@ -165,18 +166,15 @@ def create_tables():
                 from premium.models.chat_db import ChatSession  # noqa: F401
                 from premium.models.wizard import WizardSession, WizardMessage  # noqa: F401
 
-                print(
-                    "✅ Premium models imported (Prompt Knowledge Base + ChatBot + Wizard)"
+                logger.info(
+                    "Premium models imported (Prompt Knowledge Base + ChatBot + Wizard)"
                 )
             except ImportError as ie:
-                print(f"⚠️  Premium models import failed: {ie}")
+                logger.warning(f"Premium models import failed: {ie}")
         else:
-            print("⚠️  Premium package not found - skipping premium models")
-    except Exception as e:
-        print(f"⚠️  Premium models not available: {e}")
-        import traceback
-
-        traceback.print_exc()
+            logger.warning("Premium package not found - skipping premium models")
+    except Exception:
+        logger.exception("Premium models not available")
 
     # Run migrations (Alembic) or create tables directly (fallback)
     _run_migrations_or_create_all()
@@ -199,10 +197,10 @@ def _seed_system_data():
         with engine.begin() as conn:
             inserted = seed_system_grading_schemes(conn)
         if inserted:
-            print(f"🌱 Seeded {inserted} system grading scheme(s)")
+            logger.info(f"Seeded {inserted} system grading scheme(s)")
     except Exception as e:  # noqa: BLE001 — a seed failure must never block boot
-        print(
-            f"⚠️  System-Seed übersprungen ({e}) — grading_schemes evtl. leer; "
+        logger.warning(
+            f"System-Seed übersprungen ({e}) — grading_schemes evtl. leer; "
             "Notenauflösung kann fehlschlagen. Manuell nachholbar via "
             "seed_system_grading_schemes()."
         )
@@ -246,7 +244,7 @@ def _run_migrations_or_create_all():
                 current_rev = context.get_current_revision()
 
             if current_rev == head_rev:
-                print(f"✅ Database schema is up to date (revision: {current_rev})")
+                logger.info(f"Database schema is up to date (revision: {current_rev})")
                 return
 
             # Fresh database: no revision and no tables — create schema
@@ -257,13 +255,15 @@ def _run_migrations_or_create_all():
 
                 inspector = sa_inspect(engine)
                 if not inspector.has_table("users"):
-                    print("🆕 Fresh database detected — creating schema from models...")
+                    logger.info(
+                        "Fresh database detected — creating schema from models..."
+                    )
                     Base.metadata.create_all(bind=engine)
                     command.stamp(alembic_cfg, "head")
                     # create_all skips migration bodies → catch up on data
                     # seeds (TF-433).
                     _seed_system_data()
-                    print(f"✅ Schema created and stamped at {head_rev}")
+                    logger.info(f"Schema created and stamped at {head_rev}")
                     return
 
             pending_msg = (
@@ -271,24 +271,23 @@ def _run_migrations_or_create_all():
             )
 
             if auto_migrate:
-                print(f"🔄 {pending_msg} — running alembic upgrade head...")
+                logger.info(f"{pending_msg} — running alembic upgrade head...")
                 command.upgrade(alembic_cfg, "head")
-                print("✅ Database migrations applied successfully")
+                logger.info("Database migrations applied successfully")
                 return
             else:
-                print(f"⚠️  {pending_msg}")
-                print("⚠️  Set AUTO_MIGRATE=true or run manually: alembic upgrade head")
+                logger.warning(pending_msg)
+                logger.warning(
+                    "Set AUTO_MIGRATE=true or run manually: alembic upgrade head"
+                )
                 # Don't abort — the app should still start, but the warning stays visible
                 return
 
         except ImportError:
             # Alembic not installed — acceptable to fall back to create_all
-            print("⚠️  Alembic not installed, falling back to create_all")
+            logger.warning("Alembic not installed, falling back to create_all")
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            print(f"⚠️  CRITICAL: Alembic migration failed: {e}")
+            logger.exception("CRITICAL: Alembic migration failed")
             # When AUTO_MIGRATE=true, the operator explicitly asked us to apply
             # migrations on boot. Falling through to Base.metadata.create_all()
             # would mask the failure: new model tables get created, but
@@ -301,14 +300,14 @@ def _run_migrations_or_create_all():
                 raise RuntimeError(
                     f"Alembic migration failed under AUTO_MIGRATE=true: {e}"
                 ) from e
-            print(
-                "⚠️  The database schema may be inconsistent. Fix migrations before proceeding."
+            logger.warning(
+                "The database schema may be inconsistent. Fix migrations before proceeding."
             )
 
     Base.metadata.create_all(bind=engine)
     # create_all skips migration bodies → catch up on data seeds (TF-433).
     _seed_system_data()
-    print("Database tables created/verified (create_all fallback)")
+    logger.info("Database tables created/verified (create_all fallback)")
 
 
 if __name__ == "__main__":

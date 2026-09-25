@@ -75,6 +75,20 @@ Antwort als JSON-Array (NUR das Array, kein Markdown):
     return results
 
 
+def _validated_bloom_level(bloom: object, question_id: int) -> int | None:
+    """Returns ``bloom`` if it's a valid Bloom-Taxonomy level (1-6), else logs
+    why it was rejected and returns ``None``."""
+    if bloom is None:
+        logger.warning(f"No bloom_level returned for question {question_id}")
+        return None
+    if not isinstance(bloom, int) or not (1 <= bloom <= 6):
+        logger.warning(
+            f"Invalid bloom_level {bloom} for question {question_id}, skipping"
+        )
+        return None
+    return bloom
+
+
 def main():
     # Deferred imports: path setup needed for model imports
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -140,14 +154,8 @@ def main():
                 bloom_map = {r["id"]: r["bloom_level"] for r in results}
 
                 for q in batch:
-                    bloom = bloom_map.get(q.id)
-                    if bloom is None:
-                        logger.warning(f"No bloom_level returned for question {q.id}")
-                    elif not isinstance(bloom, int) or not (1 <= bloom <= 6):
-                        logger.warning(
-                            f"Invalid bloom_level {bloom} for question {q.id}, skipping"
-                        )
-                    else:
+                    bloom = _validated_bloom_level(bloom_map.get(q.id), q.id)
+                    if bloom is not None:
                         q.bloom_level = bloom
                         actually_enriched += 1
 
