@@ -76,6 +76,7 @@ export {
   setLogoutCallback,
   setAdoptStoredTokensCallback,
 } from './api/apiClient';
+export { ACCESS_TOKEN_KEY } from './api/tokenRefreshLock';
 
 // ============================================================================
 // Utils

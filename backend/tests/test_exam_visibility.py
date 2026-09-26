@@ -862,7 +862,7 @@ def test_submissions_grading_ignores_exam_visibility(ev_db):
     )
     ev_db.commit()
 
-    loaded = _load_exam_for_user(db=ev_db, user=grader, exam_id=e.id)
+    loaded = _load_exam_for_user(db=ev_db, user=grader, exam_id=e.id, locale="de")
     assert loaded.id == e.id
 
 

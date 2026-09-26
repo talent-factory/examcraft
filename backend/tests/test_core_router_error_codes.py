@@ -1,4 +1,5 @@
-"""Ein Test je Fehlercode der elf Router aus TF-773 PR 2d.
+"""Ein Test je Fehlercode der elf Router aus TF-773 PR 2d, dazu ``submissions.py``
+und ``tags.py`` (Review-Nachtrag zu Teil D, PR #319).
 
 Der Contract-Test (``test_error_codes_contract.py``) prüft statisch, dass jeder
 Code einen Locale-Schlüssel hat. Das sagt nichts darüber, ob der Code je
@@ -7,7 +8,7 @@ anfasst, wäre dort grün und im Betrieb ein generischer Satz.
 
 Diese Datei schliesst die Lücke von der anderen Seite: sie ruft jede Wurfstelle
 und liest den Code aus der Antwort. ``test_jede_wurfstelle_ist_hier_abgedeckt``
-unten hält die beiden Seiten zusammen — ein neuer Code in einem der elf Router
+unten hält die beiden Seiten zusammen — ein neuer Code in einem dieser Router
 macht diese Datei rot, bis jemand ihn hier belegt.
 
 Abgrenzung: wo ein Code auch die *Meldung* trägt, wird zusätzlich geprüft, dass
@@ -55,7 +56,11 @@ pytestmark = pytest.mark.usefixtures("test_engine")
 
 
 # ---------------------------------------------------------------------------
-# Die elf Router und was sie werfen dürfen
+# Die Router und was sie werfen dürfen
+#
+# Die elf aus PR 2d plus ``submissions.py`` (Teil D von TF-773, letzter Router
+# mit nackten ``HTTPException``) und ``tags.py`` (Review-Nachtrag PR #319: war
+# schon vor Teil D auf Codes umgestellt, stand aber nie in dieser Liste).
 # ---------------------------------------------------------------------------
 
 #: ``ROUTERS`` selbst bleibt relativ (kürzer, matcht main.py-Importpfade) —
@@ -76,6 +81,8 @@ ROUTERS = (
     "api/specula_test.py",
     "api/stats.py",
     "api/students.py",
+    "api/submissions.py",
+    "api/tags.py",
     "api/v1/webhooks.py",
 )
 
@@ -99,6 +106,44 @@ PRE_EXISTING: dict[str, str] = {
     "submissions_grade_export_blocked_draft": "tests/test_grade_export_api.py",
     "submissions_grade_export_blocked_pending_review": "tests/test_grade_export_api.py",
     "submissions_grade_export_internal_error": "tests/test_grade_export_api.py",
+    # -- submissions.py, TF-773 PR 2c (Import-Endpunkte)
+    "submissions_import_driver_unknown": "tests/test_submissions_import_error_codes.py",
+    "submissions_import_enqueue_failed": "tests/test_submissions_import_error_codes.py",
+    "submissions_import_file_too_large": "tests/test_submissions_import_error_codes.py",
+    "submissions_import_internal_error": "tests/test_submissions_import_error_codes.py",
+    # -- tags.py (Review-Nachtrag zu TF-773 Teil D, PR #319: der Router fehlte
+    # in ROUTERS, wodurch test_backend_codes_sind_im_frontend_registriert ihn
+    # nie mit dem Frontend abglich — ein neuer tags_*-Code wäre still auf den
+    # UI-Sammelsatz gefallen)
+    "tags_access_denied": "tests/test_tags_api_iter2.py::test_unarchive_others_tag_as_non_admin_returns_403",
+    "tags_create_questions_permission_required": (
+        "tests/test_tags_api.py::test_create_tag_without_permission_returns_403"
+    ),
+    "tags_delete_archived_only": "tests/test_tags_api_iter2.py::test_cannot_delete_active_tag",
+    "tags_global_create_superuser_only": (
+        "tests/test_tags_kind_tf397.py::test_content_global_tag_still_requires_superuser"
+    ),
+    "tags_global_edit_superuser_only": (
+        "tests/test_tags_kind_tf397.py::test_non_creator_cannot_archive_global_prompt_tag"
+    ),
+    "tags_merge_target_in_sources": (
+        "tests/test_tags_api_iter2.py::test_merge_with_target_as_source_returns_422"
+    ),
+    "tags_name_exists": "tests/test_tags_api.py::test_create_tag_race_condition_returns_409",
+    "tags_name_exists_on_rename": (
+        "tests/test_tags_api_iter2.py::test_rename_to_existing_name_returns_409"
+    ),
+    "tags_not_found": (
+        "tests/test_error_envelope.py::"
+        "test_umgestellter_endpunkt_liefert_detail_und_error_code"
+    ),
+    "tags_prompt_create_permission_required": (
+        "tests/test_tags_kind_tf397.py::"
+        "test_prompt_tag_create_denied_without_prompt_create_permission"
+    ),
+    "tags_prompt_delete_not_allowed": "tests/test_tags_kind_tf397.py::test_delete_prompt_tag_blocked",
+    "tags_prompt_merge_not_allowed": "tests/test_tags_kind_tf397.py::test_merge_blocks_prompt_kind",
+    "tags_still_in_use": "tests/test_tags_api_iter2.py::test_cannot_delete_tag_with_usage",
 }
 
 #: Codes, die ein Test unten tatsächlich aus einer Antwort liest, plus die
@@ -152,6 +197,10 @@ COVERED: dict[str, str] = {
         "HTTP-Test über den bereits vorhandenen Broker-down-Mock für diesen "
         "SuperAdmin-gated Endpunkt."
     ),
+    # -- submissions.py (TF-773 Teil D; exams_not_found und
+    #    stats_submission_not_found stehen oben, derselbe Code aus zwei Routern)
+    "submissions_import_job_not_found": "test_submissions_import_job_not_found",
+    "submissions_delete_audit_unavailable": "test_submissions_delete_audit_unavailable",
     # -- v1/webhooks.py
     "webhooks_stripe_not_configured": "test_webhook_without_secret",
     "webhooks_stripe_invalid_payload": "test_webhook_invalid_payload",
@@ -183,7 +232,7 @@ def _codes_raised_by(rel_path: str) -> set[str]:
 def test_jede_wurfstelle_ist_hier_abgedeckt() -> None:
     """Der Wächter, der diese Datei am Code festnagelt.
 
-    Ohne ihn wäre ein neuer Code in einem der elf Router hier unsichtbar — und
+    Ohne ihn wäre ein neuer Code in einem dieser Router hier unsichtbar — und
     genau das war die Lücke, die PR 2d überhaupt erst gefunden hat.
     """
     raised: set[str] = set()
@@ -192,14 +241,14 @@ def test_jede_wurfstelle_ist_hier_abgedeckt() -> None:
 
     fehlend = sorted(raised - set(COVERED) - set(PRE_EXISTING))
     assert not fehlend, (
-        f"Diese Codes werfen die PR-2d-Router, ohne dass ein Test sie liest: "
+        f"Diese Codes werfen die Router aus ROUTERS, ohne dass ein Test sie liest: "
         f"{fehlend}. Einen Test ergänzen oder — wenn er sich nicht über HTTP "
         f"auslösen lässt — mit Begründung in COVERED eintragen."
     )
 
     ueberfluessig = sorted((set(COVERED) | set(PRE_EXISTING)) - raised)
     assert not ueberfluessig, (
-        f"COVERED nennt Codes, die keiner der elf Router mehr wirft: "
+        f"COVERED nennt Codes, die keiner der Router mehr wirft: "
         f"{ueberfluessig}. Der Eintrag ist tot — löschen, sonst behauptet diese "
         f"Datei eine Abdeckung, die es nicht gibt."
     )
@@ -232,6 +281,42 @@ def test_keine_rohe_exception_mehr_in_den_routern() -> None:
                 ):
                     treffer.append(f"{rel}:{node.lineno} (str(...) im detail)")
     assert not treffer, "Rohe Exception-Texte in der Antwort: " + ", ".join(treffer)
+
+
+def test_kein_core_router_wirft_nackte_http_exception() -> None:
+    """Kein Router unter ``api/`` erzeugt mehr ein ``HTTPException`` ohne Code.
+
+    Seit TF-773 Teil D gilt das ausnahmslos: ``submissions.py`` war der letzte
+    Core-Router mit nackten ``HTTPException`` (vier Stellen, handgeschriebenes
+    Deutsch ohne ``error_code``). Geprüft wird bewusst *jede* Datei unter
+    ``api/`` und nicht nur ``ROUTERS`` — ein neuer Router soll nicht erst in
+    eine Liste eingetragen werden müssen, bevor der Wächter ihn sieht.
+
+    Nur der Aufruf zählt. ``except HTTPException:`` und ein ``raise`` einer
+    gefangenen Instanz bleiben erlaubt; ``AppHTTPException`` ist der
+    dokumentierte Weg für einen Text, der bewusst nicht aus den Locales kommt.
+    """
+    api_dir = BACKEND_ROOT / "api"
+    dateien = sorted(api_dir.rglob("*.py"))
+    assert len(dateien) > 20, (
+        f"Nur {len(dateien)} Dateien unter {api_dir} — der Scan greift "
+        f"vermutlich nicht mehr."
+    )
+    treffer: list[str] = []
+    for path in dateien:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", getattr(node.func, "attr", ""))
+            if name == "HTTPException":
+                treffer.append(f"{path.relative_to(BACKEND_ROOT)}:{node.lineno}")
+    assert not treffer, (
+        "Nackte HTTPException ohne error_code: "
+        + ", ".join(treffer)
+        + ". api_error(status, code, locale) verwenden; der Code braucht einen "
+        "Schlüssel in allen vier core/backend/locales/t.*.json."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1001,6 +1086,113 @@ def test_webhook_unexpected_error_returns_500(test_db: Session, monkeypatch) -> 
 
 
 # ---------------------------------------------------------------------------
+# submissions.py (TF-773 Teil D)
+# ---------------------------------------------------------------------------
+
+
+def test_submissions_exam_not_found(test_db: Session) -> None:
+    """``_load_exam_for_user`` sendet den gemeinsamen Code, kein Synonym."""
+    inst = _institution(test_db, "sub-exam-404")
+    user = _user(test_db, inst.id, "subexam404@test.ch")
+    test_db.commit()
+    resp = _client(test_db, user, "api.submissions").get(
+        "/api/v1/submissions/import/summary", params={"exam_id": 999999}
+    )
+    assert resp.status_code == 404
+    assert resp.json()["error_code"] == "exams_not_found"
+
+
+def test_submissions_import_job_not_found(test_db: Session) -> None:
+    """Bewusst dieselbe Wurfstelle wie
+    ``test_submissions_import_error_codes.py::test_unbekannter_import_job_hat_eigenen_code``
+    (beide von ``test_jede_wurfstelle_ist_hier_abgedeckt`` bzw. dessen
+    Import-Pendant ``test_jeder_import_code_hat_einen_nachweis`` verlangt,
+    unabhängig voneinander): jener Test prüft nur die Abwesenheit von Interna
+    (``_assert_clean``), dieser hier zusätzlich den exakten, lokalisierten
+    ``detail``-Text — kein Kopierfehler, sondern zwei verschiedene Zusagen."""
+    inst = _institution(test_db, "sub-job-404")
+    user = _user(test_db, inst.id, "subjob404@test.ch")
+    test_db.commit()
+    resp = _client(test_db, user, "api.submissions").get(
+        "/api/v1/submissions/import-jobs/999999"
+    )
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["error_code"] == "submissions_import_job_not_found"
+    assert body["detail"] == "Import-Job nicht gefunden"
+
+
+def test_submissions_detail_not_found(test_db: Session) -> None:
+    """Dieselbe Tatsache wie in ``stats.py``, derselbe Code (ADR 0006)."""
+    inst = _institution(test_db, "sub-detail-404")
+    user = _user(test_db, inst.id, "subdetail404@test.ch")
+    test_db.commit()
+    resp = _client(test_db, user, "api.submissions").get("/api/v1/submissions/999999")
+    assert resp.status_code == 404
+    assert resp.json()["error_code"] == "stats_submission_not_found"
+
+
+def test_submissions_delete_audit_unavailable(test_db: Session, monkeypatch) -> None:
+    """Scheitert der Audit-Eintrag, wird die Löschung zurückgerollt — und die
+    Antwort muss das sagen, nicht bloss «Löschen fehlgeschlagen»."""
+    import api.submissions as mod
+
+    inst = _institution(test_db, "sub-audit")
+    user = _user(test_db, inst.id, "subaudit@test.ch")
+    exam = _exam(test_db, inst.id, questions=1)
+    test_db.commit()
+    monkeypatch.setattr(mod.AuditService, "log_action", lambda **_kwargs: None)
+
+    resp = _client(test_db, user, "api.submissions").delete(
+        "/api/v1/submissions/import", params={"exam_id": exam.id}
+    )
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body["error_code"] == "submissions_delete_audit_unavailable"
+    assert "Audit-Log" in body["detail"]
+
+
+@pytest.mark.parametrize(
+    ("preferred", "accept_language", "erwarteter_text"),
+    [
+        # 1. preferred_language gesetzt — gewinnt auch gegen Accept-Language
+        ("fr", "it-CH,it;q=0.9", "Tâche d'import introuvable"),
+        # 2. nur Accept-Language
+        (None, "en-US,en;q=0.9", "Import job not found"),
+        # 3. keines von beiden — Default de
+        (None, None, "Import-Job nicht gefunden"),
+    ],
+    ids=["preferred_language", "accept_language", "default"],
+)
+def test_submissions_locale_aufloesungspfade(
+    test_db: Session, preferred, accept_language, erwarteter_text
+) -> None:
+    """Die drei Auflösungspfade über HTTP, an einem Endpunkt, dem Teil D die
+    Locale erst verdrahtet hat.
+
+    ``test_error_envelope.py::test_aufloesungspfade`` prüft dieselben drei
+    Pfade seit #249 an ``tags.py``. Das beweist aber nichts für einen anderen
+    Router: dort war die Lehre, dass die Unit-Tests grün waren, während
+    ``tags.py`` die Locale gar nicht auflöste. Hier also dieselbe Probe für
+    ``submissions.py``.
+    """
+    inst = _institution(test_db, f"sub-loc-{preferred}-{bool(accept_language)}")
+    user = _user(
+        test_db, inst.id, f"subloc-{preferred}-{bool(accept_language)}@test.ch"
+    )
+    user.preferred_language = preferred
+    test_db.commit()
+    headers = {"Accept-Language": accept_language} if accept_language else {}
+    resp = _client(test_db, user, "api.submissions").get(
+        "/api/v1/submissions/import-jobs/999999", headers=headers
+    )
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["error_code"] == "submissions_import_job_not_found"
+    assert body["detail"] == erwarteter_text
+
+
+# ---------------------------------------------------------------------------
 # Der Wächter, an dem der Zweck dieses PRs hängt
 # ---------------------------------------------------------------------------
 
@@ -1020,22 +1212,36 @@ NICHT_IM_FRONTEND: dict[str, str] = {
     "audit_invalid_date_range": "Passthrough (TF-295), AuditLogView sendet keine Datumsfilter",
     "audit_unknown_category": "Passthrough (TF-295), Kategorie kommt aus einem Select",
     "grade_export_unsupported_format": "Passthrough (TF-295), hinter einem Literal unerreichbar",
-    "stats_submission_not_found": (
-        "kein Consumer — StatisticsService.getSubmissionStats wird in keinem "
-        "der drei Frontend-Tiers aufgerufen (get_submission_stats hat keinen "
-        "UI-Pfad, nur getOverview/getPerQuestion sind verdrahtet)"
-    ),
     "specula_test_dev_only": "Diagnose-Endpunkt, kein Frontend-Pfad",
     "specula_test_queue_unavailable": "Diagnose-Endpunkt, kein Frontend-Pfad",
-    # Die ganze rag_*-Gruppe aus dem Backend ist in dieser Registry nicht
-    # registriert — `codes/rag.ts` sagt das ausdrücklich und hält die sieben
-    # `rag_validation_*` des Browser-Checks bewusst davon getrennt. Nur diese
-    # drei einzutragen wäre willkürlich: sie sind nicht anders gelagert als die
-    # zwölf, die seit PR #249 dort warten. Der Consumer ist ausserdem
-    # `premium/frontend`s RAGService mit einer eigenen AppError-Familie.
-    "rag_tag_ids_invalid": "ganze rag_*-Gruppe unregistriert, siehe codes/rag.ts",
-    "rag_tag_archived": "ganze rag_*-Gruppe unregistriert, siehe codes/rag.ts",
-    "rag_service_unhealthy": "ganze rag_*-Gruppe unregistriert, siehe codes/rag.ts",
+    # rag_*: seit TF-773 Teil D sind die erreichbaren zehn registriert (und
+    # RAGService liest den Code überhaupt erst). Diese vier erreicht keine
+    # Aufrufstelle — dieselbe Liste steht im Kopf von codes/rag.ts.
+    "rag_invalid_question_type": (
+        "RAGService.validateRAGRequest lässt vor dem Senden nur eine echte "
+        "Teilmenge der Backend-Fragetypen durch"
+    ),
+    "rag_retry_only_failed": (
+        "Retry-Knopf nur bei FAILURE/REVOKED und während des Laufs gesperrt"
+    ),
+    "rag_retry_no_request_data": "generate-exam speichert request_data immer",
+    "rag_service_unhealthy": "RAGService.checkHealth hat keinen Aufrufer",
+    # tags_prompt_*: TagCreateForm/TagSettingsPage senden nie kind='prompt'
+    # (listTags()/createTag() ohne kind, Backend-Default 'content') — dieselbe
+    # Begründung steht im Kopf von codes/tags.ts.
+    "tags_prompt_create_permission_required": (
+        "Nur für kind='prompt'; TagCreateForm/TagSettingsPage senden nie kind='prompt'"
+    ),
+    "tags_prompt_delete_not_allowed": (
+        "Nur für kind='prompt'; TagCreateForm/TagSettingsPage senden nie kind='prompt'"
+    ),
+    "tags_prompt_merge_not_allowed": (
+        "Nur für kind='prompt'; TagCreateForm/TagSettingsPage senden nie kind='prompt'"
+    ),
+    "submissions_grade_export_internal_error": (
+        "NotenexportPanel rendert nur die conflict-Art aus der Antwort; ein 500 "
+        "bekommt den eigenen auswertungen.export.*-Satz, siehe codes/submissions.ts"
+    ),
     "webhooks_stripe_not_configured": "Stripe ruft das, kein Browser",
     "webhooks_stripe_invalid_payload": "Stripe ruft das, kein Browser",
     "webhooks_stripe_invalid_signature": "Stripe ruft das, kein Browser",
@@ -1100,10 +1306,12 @@ def test_backend_codes_sind_im_frontend_registriert() -> None:
     Code muss entweder registriert werden oder mit Grund in
     ``NICHT_IM_FRONTEND`` stehen.
     """
+    # PRE_EXISTING zählt hier mit: dass ein anderer Test den Code *wirft*,
+    # sagt nichts darüber, ob das UI ihn *zeigt*. Bis Teil D fehlten genau
+    # dort die zwölf rag_*-Codes aus #249.
     raised: set[str] = set()
     for rel in ROUTERS:
         raised |= _codes_raised_by(rel)
-    raised -= set(PRE_EXISTING)
 
     root = _frontend_root()
     if root is None:
@@ -1131,7 +1339,7 @@ def test_backend_codes_sind_im_frontend_registriert() -> None:
 
     tot = sorted(set(NICHT_IM_FRONTEND) - raised)
     assert not tot, (
-        f"NICHT_IM_FRONTEND nennt Codes, die keiner der elf Router wirft: {tot}."
+        f"NICHT_IM_FRONTEND nennt Codes, die keiner der Router wirft: {tot}."
     )
 
 
@@ -1145,7 +1353,7 @@ def test_registrierte_codes_haben_einen_frontend_text() -> None:
     raised: set[str] = set()
     for rel in ROUTERS:
         raised |= _codes_raised_by(rel)
-    zu_pruefen = raised - set(PRE_EXISTING) - set(NICHT_IM_FRONTEND)
+    zu_pruefen = raised - set(NICHT_IM_FRONTEND)
 
     root = _frontend_root()
     if root is None:

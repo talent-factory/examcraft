@@ -283,6 +283,7 @@ class TestPromptTagRBAC:
             json={"name": "blocked", "scope": "global", "kind": "prompt"},
         )
         assert resp.status_code == 403
+        assert resp.json()["error_code"] == "tags_prompt_create_permission_required"
 
     def test_content_global_tag_still_requires_superuser(
         self, tags_db: Session, tags_client: TestClient
@@ -302,6 +303,7 @@ class TestPromptTagRBAC:
             json={"name": "global-content", "scope": "global", "kind": "content"},
         )
         assert resp.status_code == 403
+        assert resp.json()["error_code"] == "tags_global_create_superuser_only"
 
 
 class TestPromptTagWriteRBAC:
@@ -323,6 +325,7 @@ class TestPromptTagWriteRBAC:
         )
         resp = tags_client.delete(f"/api/v1/tags/{tag.id}")
         assert resp.status_code == 422
+        assert resp.json()["error_code"] == "tags_prompt_delete_not_allowed"
 
     def test_creator_can_archive_own_global_prompt_tag(
         self, tags_db: Session, tags_client: TestClient
@@ -361,6 +364,7 @@ class TestPromptTagWriteRBAC:
         )
         resp = tags_client.post(f"/api/v1/tags/{tag.id}/archive")
         assert resp.status_code == 403
+        assert resp.json()["error_code"] == "tags_global_edit_superuser_only"
 
 
 class TestRenameKindAwareness:
@@ -413,3 +417,4 @@ class TestMergeKindGuard:
             json={"target_id": target.id, "source_ids": [prompt_source.id]},
         )
         assert resp.status_code == 422, resp.text
+        assert resp.json()["error_code"] == "tags_prompt_merge_not_allowed"

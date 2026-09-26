@@ -954,6 +954,7 @@ _EIGENE_TESTS = {
     "submissions_import_internal_error": (
         "test_absturz_loggt_die_ursache_statt_server_logs_zu_nennen"
     ),
+    "submissions_import_job_not_found": "test_unbekannter_import_job_hat_eigenen_code",
     "submissions_import_moodle_connection_invalid": (
         "test_unlesbarer_token_loggt_interna"
     ),
@@ -961,6 +962,18 @@ _EIGENE_TESTS = {
         "test_fehlende_verbindung_loggt_interna"
     ),
 }
+
+
+def test_unbekannter_import_job_hat_eigenen_code(import_client) -> None:
+    """The polling endpoint answered a plain ``HTTPException`` with a German
+    sentence and no code until TF-773 Teil D — ImportDialog showed its generic
+    «Import fehlgeschlagen.» when a job disappeared mid-poll."""
+    client, _exam_id = import_client
+    response = client.get("/api/v1/submissions/import-jobs/999999")
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error_code"] == "submissions_import_job_not_found"
+    _assert_clean(body)
 
 
 def test_jeder_import_code_hat_einen_nachweis() -> None:

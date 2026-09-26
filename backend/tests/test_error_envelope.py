@@ -6,7 +6,8 @@ sieht: Feldform, Rückwärtskompatibilität und welche Sprache gewinnt.
 
 Die Tags-API dient als Messpunkt, weil sie in TF-671 der belegte Schadensfall
 war — deutscher Prosatext ohne Code, den das Frontend nur über den
-Sonderfall ``errors/apiDetail.ts`` retten konnte.
+Sonderfall ``errors/apiDetail.ts`` retten konnte. Seit TF-773 Teil D ist der
+Sonderfall weg; das Frontend liest die ``tags_*``-Codes wie jeden anderen.
 
 Abgrenzung zu ``test_translation_service.py``: das prüft ``get_request_locale``
 als Einheit gegen Mock-Objekte und deckt dieselben drei Auflösungspfade bereits
