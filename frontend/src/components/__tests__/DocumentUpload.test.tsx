@@ -1,4 +1,3 @@
-jest.mock('../../api/apiClient');
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -7,6 +6,7 @@ import DocumentUpload from '../DocumentUpload';
 import { DocumentService } from '../../services/DocumentService';
 
 import { useDropzone } from 'react-dropzone';
+jest.mock('../../api/apiClient');
 
 // Mock DocumentService
 jest.mock('../../services/DocumentService');
@@ -339,8 +339,8 @@ describe.skip('DocumentUpload', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Fehler')).toBeInTheDocument();
-        expect(screen.getByText('Upload fehlgeschlagen')).toBeInTheDocument();
       });
+      expect(screen.getByText('Upload fehlgeschlagen')).toBeInTheDocument();
     });
   });
 
@@ -467,9 +467,9 @@ describe.skip('DocumentUpload', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Upload-Statistiken')).toBeInTheDocument();
-        expect(screen.getByText('2')).toBeInTheDocument(); // Total
-        expect(screen.getByText('Gesamt')).toBeInTheDocument();
       });
+      expect(screen.getByText('2')).toBeInTheDocument(); // Total
+      expect(screen.getByText('Gesamt')).toBeInTheDocument();
     });
 
     it('shows success summary after upload completion', async () => {
@@ -501,6 +501,8 @@ describe.skip('DocumentUpload', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Upload abgeschlossen')).toBeInTheDocument();
+      });
+      await waitFor(() => {
         expect(mockOnAllUploadsComplete).toHaveBeenCalled();
       });
     });

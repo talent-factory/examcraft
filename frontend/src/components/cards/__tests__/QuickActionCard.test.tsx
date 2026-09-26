@@ -58,7 +58,7 @@ describe('QuickActionCard Component', () => {
   });
 
   it('applies correct color class', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <QuickActionCard
         icon="📄"
         title="Documents"
@@ -68,7 +68,7 @@ describe('QuickActionCard Component', () => {
       />
     );
 
-    const card = container.querySelector('.card');
+    const card = screen.getByText('Documents').closest('.card');
     expect(card).toHaveClass('bg-primary-50');
   });
 

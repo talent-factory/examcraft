@@ -1,4 +1,3 @@
-jest.mock('../../api/apiClient');
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
@@ -6,6 +5,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { MemoryRouter } from 'react-router-dom';
 import DocumentLibrary from '../DocumentLibrary';
 import { Document, DocumentStatus } from '../../types/document';
+jest.mock('../../api/apiClient');
 
 // Preserve the real `DocumentFetchError` class (so `new DocumentFetchError(...)`
 // here produces an instance the component's duck-type catch recognises) while

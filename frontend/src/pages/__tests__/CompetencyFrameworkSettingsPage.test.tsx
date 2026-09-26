@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CompetencyFrameworkSettingsPage from '../CompetencyFrameworkSettingsPage';
 import type { CompetencyFramework } from '../../types/competencyFramework';
+import { competencyFrameworksApi } from '../../api/competencyFrameworksApi';
 
 jest.mock('../../api/competencyFrameworksApi', () => ({
   competencyFrameworksApi: {
@@ -14,7 +15,6 @@ jest.mock('../../api/competencyFrameworksApi', () => ({
     unarchiveFramework: jest.fn(),
   },
 }));
-import { competencyFrameworksApi } from '../../api/competencyFrameworksApi';
 const mockList = competencyFrameworksApi.listFrameworks as jest.Mock;
 const mockArchive = competencyFrameworksApi.archiveFramework as jest.Mock;
 

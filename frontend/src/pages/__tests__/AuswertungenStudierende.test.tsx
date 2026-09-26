@@ -1,10 +1,9 @@
-jest.mock('../../api/apiClient');
 /**
  * Smoke tests for the Studi-Liste (TF-336 G3).
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -12,6 +11,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import AuswertungenStudierende from '../AuswertungenStudierende';
 import { StudentsService } from '../../services/studentsService';
 import { StudentClassesService } from '../../services/studentClassesService';
+jest.mock('../../api/apiClient');
 
 jest.mock('../../services/studentsService');
 jest.mock('../../services/studentClassesService');
@@ -65,7 +65,7 @@ describe('AuswertungenStudierende', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('studi-table'));
+    await screen.findByTestId('studi-table');
     expect(screen.getByTestId('studi-1')).toHaveTextContent('anna@example.org');
     expect(screen.getByTestId('studi-1')).toHaveTextContent('Anna B.');
     expect(screen.getByTestId('studi-2')).toHaveTextContent(
@@ -87,7 +87,7 @@ describe('AuswertungenStudierende', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByRole('alert'));
+    await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent(/keine|no/i);
   });
 });

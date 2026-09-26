@@ -1,10 +1,9 @@
-jest.mock('../../api/apiClient');
 /**
  * Smoke tests for the Klassen list page (TF-336 G2).
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -12,6 +11,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import AuswertungenKlassen from '../AuswertungenKlassen';
 import { StudentClassesService } from '../../services/studentClassesService';
 import { ApiError } from '../../services/submissionsService';
+jest.mock('../../api/apiClient');
 
 jest.mock('../../services/studentClassesService');
 const mocked = StudentClassesService as jest.Mocked<typeof StudentClassesService>;
@@ -37,7 +37,7 @@ describe('AuswertungenKlassen', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByRole('alert'));
+    await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent(/Klassen|class/i);
   });
 
@@ -68,7 +68,7 @@ describe('AuswertungenKlassen', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('klassen-table'));
+    await screen.findByTestId('klassen-table');
     expect(screen.getByTestId('klasse-1')).toHaveTextContent('INF-23a');
     expect(screen.getByTestId('klasse-2')).toHaveTextContent('INF-23b');
   });
@@ -93,7 +93,7 @@ describe('AuswertungenKlassen', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('quota-banner'));
+    await screen.findByTestId('quota-banner');
     expect(screen.getByTestId('quota-banner-upgrade')).toBeInTheDocument();
   });
 });

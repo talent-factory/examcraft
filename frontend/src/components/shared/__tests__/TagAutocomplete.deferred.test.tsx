@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TagAutocomplete from '../TagAutocomplete';
 import { isPendingTag } from '../../../api/tagsApi';
 
+import { tagsApi } from '../../../api/tagsApi';
+
 jest.mock('../../../api/tagsApi', () => {
   const actual = jest.requireActual('../../../api/tagsApi');
   return {
@@ -18,8 +20,6 @@ jest.mock('../../../api/tagsApi', () => {
     },
   };
 });
-
-import { tagsApi } from '../../../api/tagsApi';
 
 const renderDeferred = (value: any[] = [], onChange = jest.fn()) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -2122,23 +2122,6 @@
     "cards": {
       "open": "Apri →"
     },
-    "basicExamCreator": {
-      "title": "Genera domande d'esame",
-      "subtitle": "Crea domande d'esame basate su un argomento",
-      "topicRequired": "Inserisci un argomento",
-      "generationError": "Errore durante la generazione",
-      "successMessage": "Domande d'esame generate con successo!",
-      "topicLabel": "Argomento",
-      "topicPlaceholder": "es. Algoritmi e strutture dati",
-      "questionCountLabel": "Numero di domande",
-      "difficultyLabel": "Livello di difficoltà",
-      "difficultyEasy": "Facile",
-      "difficultyMedium": "Medio",
-      "difficultyHard": "Difficile",
-      "back": "Indietro",
-      "generate": "Genera",
-      "tagsLabel": "Tag (opzionale)"
-    },
     "questionReviewDetail": {
       "errorLoad": "Errore nel caricamento della domanda",
       "errorSave": "Errore nel salvataggio",
@@ -3165,7 +3148,6 @@
     "exams_no_questions_fit_constraints": "Nessuna domanda soddisfa i vincoli specificati",
     "exams_not_found": "Esame non trovato",
     "exams_question_add_failed": "Impossibile aggiungere le domande.",
-    "exams_question_generation_failed": "Errore durante la generazione",
     "exams_question_not_approved": "La domanda non è approvata",
     "exams_question_not_found": "Domanda non trovata",
     "exams_question_points_update_failed": "Impossibile aggiornare i punti.",

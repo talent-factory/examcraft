@@ -4,6 +4,8 @@ import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { BrowserRouter } from 'react-router-dom';
 
+import HelpWidget, { clampPanelDimension } from '../HelpWidget';
+
 jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 1, roles: [{ name: 'teacher' }], institution: null },
@@ -40,8 +42,6 @@ jest.mock('../useHelpContext', () => ({
     hasSkippedSteps: false,
   })),
 }));
-
-import HelpWidget, { clampPanelDimension } from '../HelpWidget';
 
 const theme = createTheme();
 

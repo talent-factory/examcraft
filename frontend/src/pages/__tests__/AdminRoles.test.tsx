@@ -85,7 +85,7 @@ describe('AdminRoles', () => {
     mockedService.list.mockResolvedValue([adminRole, customRole]);
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Administrator')).toBeInTheDocument());
+    await screen.findByText('Administrator');
     expect(screen.getByText('Fachbereichsleiter')).toBeInTheDocument();
   });
 
@@ -127,7 +127,7 @@ describe('AdminRoles', () => {
     mockedService.list.mockResolvedValue([adminRole, customRole]);
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Administrator')).toBeInTheDocument());
+    await screen.findByText('Administrator');
     const rows = screen.getAllByRole('row');
     const adminRow = rows.find((r) => r.textContent?.includes('Administrator'))!;
     expect(within(adminRow).getByLabelText('Löschen')).toBeDisabled();
@@ -138,7 +138,7 @@ describe('AdminRoles', () => {
     mockedService.remove.mockResolvedValue(undefined);
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Fachbereichsleiter')).toBeInTheDocument());
+    await screen.findByText('Fachbereichsleiter');
     fireEvent.click(screen.getByLabelText('Löschen'));
     fireEvent.click(await screen.findByRole('button', { name: 'Endgültig löschen' }));
 
@@ -159,7 +159,7 @@ describe('AdminRoles', () => {
     );
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Fachbereichsleiter')).toBeInTheDocument());
+    await screen.findByText('Fachbereichsleiter');
     fireEvent.click(screen.getByLabelText('Löschen'));
     fireEvent.click(await screen.findByRole('button', { name: 'Endgültig löschen' }));
 
@@ -186,7 +186,7 @@ describe('AdminRoles', () => {
     mockedService.remove.mockRejectedValueOnce(new Error('boom'));
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Fachbereichsleiter')).toBeInTheDocument());
+    await screen.findByText('Fachbereichsleiter');
     const rows = screen.getAllByRole('row');
     const roleARow = rows.find((r) => r.textContent?.includes('Fachbereichsleiter'))!;
     const roleBRow = rows.find((r) => r.textContent?.includes('Prüfer'))!;

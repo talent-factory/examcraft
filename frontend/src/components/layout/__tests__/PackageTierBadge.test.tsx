@@ -98,8 +98,8 @@ describe('PackageTierBadge', () => {
     // Assert
     await waitFor(() => {
       expect(screen.getByText(/Premium/i)).toBeInTheDocument();
-      expect(screen.getByText(/Starter/i)).toBeInTheDocument();
     });
+    expect(screen.getByText(/Starter/i)).toBeInTheDocument();
   });
 
   it('shows Free tier for unauthenticated user', async () => {
@@ -112,8 +112,8 @@ describe('PackageTierBadge', () => {
     // Assert: Should show Free tier immediately (no API call)
     await waitFor(() => {
       expect(screen.getByText(/Core/i)).toBeInTheDocument();
-      expect(screen.getByText(/Free/i)).toBeInTheDocument();
     });
+    expect(screen.getByText(/Free/i)).toBeInTheDocument();
 
     // Verify NO API call was made
     expect(global.fetch).not.toHaveBeenCalled();
@@ -322,31 +322,31 @@ describe('PackageTierBadge', () => {
     });
 
     // Act
-    const { container } = render(<PackageTierBadge />);
+    render(<PackageTierBadge />);
 
     // Assert: Check for purple color (MUI uses inline styles)
+    // MUI applies backgroundColor via inline styles or CSS-in-JS
+    // We just verify the badge is rendered with Professional tier
     await waitFor(() => {
-      const badge = container.querySelector('.MuiChip-root');
-      expect(badge).toBeInTheDocument();
-      // MUI applies backgroundColor via inline styles or CSS-in-JS
-      // We just verify the badge is rendered with Professional tier
       expect(screen.getByText(/Professional/i)).toBeInTheDocument();
     });
+    const badge = screen.getByText(/Professional/i).closest('.MuiChip-root');
+    expect(badge).toBeInTheDocument();
   });
 
   it('uses gray color for Free tier', async () => {
     // Arrange: No token
 
     // Act
-    const { container } = render(<PackageTierBadge />);
+    render(<PackageTierBadge />);
 
     // Assert: Check for Free tier badge
+    // MUI applies backgroundColor via inline styles or CSS-in-JS
+    // We just verify the badge is rendered with Free tier
     await waitFor(() => {
-      const badge = container.querySelector('.MuiChip-root');
-      expect(badge).toBeInTheDocument();
-      // MUI applies backgroundColor via inline styles or CSS-in-JS
-      // We just verify the badge is rendered with Free tier
       expect(screen.getByText(/Free/i)).toBeInTheDocument();
     });
+    const badge = screen.getByText(/Free/i).closest('.MuiChip-root');
+    expect(badge).toBeInTheDocument();
   });
 });

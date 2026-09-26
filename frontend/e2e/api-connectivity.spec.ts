@@ -7,7 +7,6 @@
  * This specifically tests the fixes made on Feb 11, 2026:
  * - REACT_APP_API_URL environment variable standardization
  * - Removal of hardcoded localhost URLs in:
- *   - BasicExamCreator.tsx (question generation)
  *   - ChatInterface.tsx (chat download)
  *   - promptsApi.ts (prompts service)
  */
@@ -88,54 +87,6 @@ test.describe.skip('API Connectivity - Authenticated', () => {
 
     // Page should load - may show prompts or access denied
     await expect(page.locator('text=Prompts, text=Prompt, text=Zugriff, text=Access, [data-testid="prompts-list"]')).toBeVisible({ timeout: 10000 });
-  });
-});
-
-// Skip until exam-creator page UI is implemented
-test.describe.skip('Question Generation API (BasicExamCreator fix)', () => {
-
-  test.beforeEach(async ({ page }) => {
-    await loginUser(page, E2E_TEST_USER.email, E2E_TEST_USER.password);
-  });
-
-  test('should not use hardcoded localhost for question generation', async ({ page }) => {
-    // Set up network interception to verify API calls go to correct URL
-    const apiCalls: string[] = [];
-
-    page.on('request', request => {
-      if (request.url().includes('/api/v1/questions/generate')) {
-        apiCalls.push(request.url());
-      }
-    });
-
-    // Navigate to exam creator
-    await page.goto('/exam-creator');
-
-    // Wait for page to load
-    await expect(page.locator('text=Exam, text=Prüfung, text=Fragen')).toBeVisible({ timeout: 10000 });
-
-    // Try to generate questions (may fail due to missing documents, but API call should go to correct URL)
-    const generateButton = page.locator('button:has-text("Generate"), button:has-text("Generieren")');
-
-    if (await generateButton.isVisible()) {
-      // Fill in required fields if present
-      const topicInput = page.locator('input[name="topic"], textarea[name="topic"]');
-      if (await topicInput.isVisible()) {
-        await topicInput.fill('Test topic');
-      }
-
-      await generateButton.click();
-
-      // Wait a moment for API call
-      await page.waitForTimeout(2000);
-
-      // Verify no calls went to localhost:8000 if we're not in development
-      if (!API_BASE_URL.includes('localhost')) {
-        for (const url of apiCalls) {
-          expect(url).not.toContain('localhost:8000');
-        }
-      }
-    }
   });
 });
 

@@ -1,4 +1,3 @@
-jest.mock('../../../api/apiClient');
 /**
  * MoodleConnectionForm tests (TF-336 G4).
  */
@@ -15,6 +14,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import MoodleConnectionForm from '../MoodleConnectionForm';
 import { MoodleConnectionsService } from '../../../services/moodleConnectionsService';
+jest.mock('../../../api/apiClient');
 
 jest.mock('../../../services/moodleConnectionsService');
 const mocked = MoodleConnectionsService as jest.Mocked<
@@ -91,7 +91,7 @@ describe('MoodleConnectionForm', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('moodle-base-url'));
+    await screen.findByTestId('moodle-base-url');
     expect(screen.getByTestId('moodle-token')).toBeInTheDocument();
     expect(screen.getByTestId('moodle-save')).toBeInTheDocument();
     // Create-mode hides Test/Delete.
@@ -133,7 +133,7 @@ describe('MoodleConnectionForm', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('moodle-base-url'));
+    await screen.findByTestId('moodle-base-url');
     fireEvent.change(screen.getByTestId('moodle-base-url'), {
       target: { value: 'https://moodle.example.org' },
     });
@@ -175,10 +175,10 @@ describe('MoodleConnectionForm', () => {
       </Wrapper>,
     );
 
-    await waitFor(() => screen.getByTestId('moodle-test'));
+    await screen.findByTestId('moodle-test');
     fireEvent.click(screen.getByTestId('moodle-test'));
 
-    await waitFor(() => screen.getByTestId('moodle-test-result'));
+    await screen.findByTestId('moodle-test-result');
     expect(screen.getByTestId('moodle-test-result')).toHaveTextContent(
       /Test Moodle/,
     );

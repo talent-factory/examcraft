@@ -3,13 +3,13 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TagSettingsPage from '../TagSettingsPage';
+import { tagsApi } from '../../api/tagsApi';
 
 jest.mock('../../api/tagsApi', () => ({
   tagsApi: {
     listTags: jest.fn(),
   },
 }));
-import { tagsApi } from '../../api/tagsApi';
 const mockListTags = tagsApi.listTags as jest.Mock;
 
 let mockIsAdmin = false;

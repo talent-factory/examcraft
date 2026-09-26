@@ -2122,23 +2122,6 @@
     "cards": {
       "open": "Ouvrir →"
     },
-    "basicExamCreator": {
-      "title": "Générer des questions d'examen",
-      "subtitle": "Crée des questions d'examen basées sur un sujet",
-      "topicRequired": "Saisis un sujet",
-      "generationError": "Erreur lors de la génération",
-      "successMessage": "Questions d'examen générées avec succès !",
-      "topicLabel": "Sujet",
-      "topicPlaceholder": "ex. Algorithmes et structures de données",
-      "questionCountLabel": "Nombre de questions",
-      "difficultyLabel": "Niveau de difficulté",
-      "difficultyEasy": "Facile",
-      "difficultyMedium": "Moyen",
-      "difficultyHard": "Difficile",
-      "back": "Retour",
-      "generate": "Générer",
-      "tagsLabel": "Tags (optionnel)"
-    },
     "questionReviewDetail": {
       "errorLoad": "Erreur lors du chargement de la question",
       "errorSave": "Erreur lors de l'enregistrement",
@@ -3165,7 +3148,6 @@
     "exams_no_questions_fit_constraints": "Aucune question ne correspond aux contraintes spécifiées",
     "exams_not_found": "Examen introuvable",
     "exams_question_add_failed": "Impossible d'ajouter les questions.",
-    "exams_question_generation_failed": "Erreur lors de la génération",
     "exams_question_not_approved": "La question n'est pas approuvée",
     "exams_question_not_found": "Question introuvable",
     "exams_question_points_update_failed": "Impossible de mettre à jour les points.",

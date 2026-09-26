@@ -3,6 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { tagsApi } from '../../api/tagsApi';
+import { QuestionEditor } from '../QuestionEditor';
+
 jest.mock('../../api/tagsApi', () => {
   const actual = jest.requireActual('../../api/tagsApi');
   return {
@@ -27,9 +30,6 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 jest.mock('../MarkdownRenderer', () => ({ __esModule: true, default: ({ content }: any) => <div>{content}</div> }));
-
-import { tagsApi } from '../../api/tagsApi';
-import { QuestionEditor } from '../QuestionEditor';
 
 const mockQuestion: any = {
   id: 1,
@@ -120,8 +120,8 @@ describe('QuestionEditor — Pending Tags beim Speichern', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(tagsApi.createTag).not.toHaveBeenCalled();
       expect(tagsApi.setQuestionTags).toHaveBeenCalledWith(1, [5]);
     });
+    expect(tagsApi.createTag).not.toHaveBeenCalled();
   });
 });

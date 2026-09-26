@@ -126,7 +126,6 @@ npx playwright install
 - **Health Check** - Backend reachability
 - **Protected Endpoints** - 401 without auth
 - **URL Configuration** - No hardcoded localhost in production
-- **Question Generation** - BasicExamCreator API calls
 - **Chat Download** - ChatInterface download API calls
 - **Prompts API** - promptsApi service calls
 

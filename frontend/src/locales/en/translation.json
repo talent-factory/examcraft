@@ -2122,23 +2122,6 @@
     "cards": {
       "open": "Open →"
     },
-    "basicExamCreator": {
-      "title": "Generate Exam Questions",
-      "subtitle": "Create exam questions based on a topic",
-      "topicRequired": "Please enter a topic",
-      "generationError": "Error during generation",
-      "successMessage": "Exam questions successfully generated!",
-      "topicLabel": "Topic",
-      "topicPlaceholder": "e.g. Algorithms and Data Structures",
-      "questionCountLabel": "Number of Questions",
-      "difficultyLabel": "Difficulty",
-      "difficultyEasy": "Easy",
-      "difficultyMedium": "Medium",
-      "difficultyHard": "Hard",
-      "back": "Back",
-      "generate": "Generate",
-      "tagsLabel": "Tags (optional)"
-    },
     "questionReviewDetail": {
       "errorLoad": "Error loading question",
       "errorSave": "Error saving",
@@ -3165,7 +3148,6 @@
     "exams_no_questions_fit_constraints": "No questions fit within the specified constraints",
     "exams_not_found": "Exam not found",
     "exams_question_add_failed": "Could not add questions.",
-    "exams_question_generation_failed": "Error during generation",
     "exams_question_not_approved": "Question is not approved",
     "exams_question_not_found": "Question not found",
     "exams_question_points_update_failed": "Could not update points.",

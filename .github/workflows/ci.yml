@@ -146,17 +146,17 @@ jobs:
         run: bun run i18n:check
 
       - name: Typecheck Frontend
-        # Non-blocking wie "Lint Frontend": es können vorbestehende,
-        # von einzelnen PRs unabhängige Typfehler auftreten. Der Schritt
-        # macht sie sichtbar, ohne den Merge zu blockieren.
+        # Blocking since TF-882: the pre-existing type errors have been
+        # fixed. Before, this step reported green even though tsc found
+        # errors.
         working-directory: frontend
         run: bun run typecheck
-        continue-on-error: true
 
       - name: Lint Frontend
+        # Strict on errors since TF-882; warnings stay visible but don't
+        # block.
         working-directory: frontend
         run: bun run lint
-        continue-on-error: true
 
       - name: Run Frontend Tests
         working-directory: frontend

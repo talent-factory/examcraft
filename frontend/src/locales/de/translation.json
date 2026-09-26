@@ -2122,23 +2122,6 @@
     "cards": {
       "open": "Öffnen →"
     },
-    "basicExamCreator": {
-      "title": "Prüfungsfragen generieren",
-      "subtitle": "Erstelle Prüfungsfragen basierend auf einem Thema",
-      "topicRequired": "Bitte gib ein Thema ein",
-      "generationError": "Fehler bei der Generierung",
-      "successMessage": "Prüfungsfragen erfolgreich generiert!",
-      "topicLabel": "Thema",
-      "topicPlaceholder": "z.B. Algorithmen und Datenstrukturen",
-      "questionCountLabel": "Anzahl Fragen",
-      "difficultyLabel": "Schwierigkeitsgrad",
-      "difficultyEasy": "Einfach",
-      "difficultyMedium": "Mittel",
-      "difficultyHard": "Schwer",
-      "back": "Zurück",
-      "generate": "Generieren",
-      "tagsLabel": "Tags (optional)"
-    },
     "questionReviewDetail": {
       "errorLoad": "Fehler beim Laden der Frage",
       "errorSave": "Fehler beim Speichern",
@@ -3165,7 +3148,6 @@
     "exams_no_questions_fit_constraints": "Keine Fragen passen zu den angegebenen Einschränkungen",
     "exams_not_found": "Prüfung nicht gefunden",
     "exams_question_add_failed": "Fragen konnten nicht hinzugefügt werden.",
-    "exams_question_generation_failed": "Fehler bei der Generierung",
     "exams_question_not_approved": "Frage ist nicht genehmigt",
     "exams_question_not_found": "Frage nicht gefunden",
     "exams_question_points_update_failed": "Punktzahl konnte nicht aktualisiert werden.",
