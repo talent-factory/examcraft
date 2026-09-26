@@ -31,6 +31,14 @@ ALIAS_WIZARD = "examcraft/wizard"
 # independently on the gateway.
 ALIAS_PORTFOLIO_CLASSIFICATION = "examcraft/portfolio-classification"
 
+# Epic 4 (portfolio assessment, grading engine): its own alias instead of
+# reusing ALIAS_GRADING or ALIAS_PORTFOLIO_CLASSIFICATION -- the holistic
+# criteria grading (few but expensive calls, large prompt context) has
+# different cost/quality requirements than both regular free-text grading
+# and the many small classification calls, and should be routable
+# independently on the gateway.
+ALIAS_PORTFOLIO_GRADING = "examcraft/portfolio-grading"
+
 
 def gateway_enabled() -> bool:
     """True, wenn der Gateway-Pfad aktiv ist (Rollback = Variable leeren)."""
@@ -81,6 +89,33 @@ def gateway_generation_timeout() -> float:
     return float(os.getenv("LLM_GATEWAY_GENERATION_TIMEOUT", "120.0"))
 
 
+def gateway_portfolio_grading_timeout() -> float:
+    """Request timeout (seconds) specifically for portfolio grading (Epic 4).
+
+    Grading prompts can be up to 300'000 characters (MAX_CHARS_PER_PHASE_PROMPT)
+    plus up to 12'000 output tokens -- much larger than the short
+    classification/grading calls that gateway_timeout()/
+    gateway_generation_timeout() are calibrated for. Without its own,
+    larger time budget a large phase could never be graded successfully: a
+    timeout marks the phase as failed, and a resume attempt hits exactly
+    the same timeout again.
+
+    PR review (Epic 4): worst case per phase is 2 sequential calls (the
+    task's own semantic-validation retry, portfolio_grading_tasks.py) at
+    this timeout each = 600 s, NOT the request-level timeout alone -- TWO
+    separate retry knobs at the one call site that uses this timeout must
+    both be pinned to 0, or either one silently multiplies that figure:
+    ``make_pydantic_model(..., max_retries=0)`` (OpenAI SDK's own
+    client-level retry, default 2, i.e. up to 3x per request) AND
+    ``Agent(..., output_retries=0)`` (pydantic-ai's own retry-on-invalid-
+    output, default 1, i.e. up to 2x per call). _GRADING_TIME_BUDGET_SECONDS
+    (portfolio_grading_tasks.py) must stay low enough that budget + 600 s
+    leaves a safe margin under Celery's task_soft_time_limit (3300 s,
+    celery_app.py).
+    """
+    return float(os.getenv("LLM_GATEWAY_PORTFOLIO_GRADING_TIMEOUT", "300.0"))
+
+
 def _require_gateway_key() -> str:
     """Virtual Key oder fail-fast — kein leerer ``Bearer`` an den Gateway.
 
@@ -123,7 +158,9 @@ def make_openai_client():
     )
 
 
-def make_pydantic_model(alias: str, timeout: float | None = None):
+def make_pydantic_model(
+    alias: str, timeout: float | None = None, max_retries: int | None = None
+):
     """PydanticAI-Modell gegen den Gateway (Generierung, Chatbot, Wizard).
 
     Der Provider erhält einen ``AsyncOpenAI``-Client mit Default-Timeout,
@@ -133,14 +170,24 @@ def make_pydantic_model(alias: str, timeout: float | None = None):
     ``timeout`` überschreibt ``gateway_timeout()`` für Call-Sites mit
     abweichendem Zeitbudget (TF-593: Fragengenerierung braucht bei langen
     Custom-Prompts mehr als die 30-s-Default-Schranke).
+
+    ``max_retries`` überschreibt den OpenAI-SDK-Default (2, d. h. bis zu 3x
+    pro Request) für Call-Sites, deren eigenes Zeitbudget einen
+    ungebremsten Client-Retry nicht verträgt (PR review, Epic 4: siehe
+    ``gateway_portfolio_grading_timeout``'s Docstring für die Rechnung).
+    ``None`` behält den SDK-Default bei, um bestehende Call-Sites
+    unverändert zu lassen.
     """
     from openai import AsyncOpenAI
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
-    client = AsyncOpenAI(
-        base_url=gateway_base_url(),
-        api_key=_require_gateway_key(),
-        timeout=timeout if timeout is not None else gateway_timeout(),
-    )
+    client_kwargs = {
+        "base_url": gateway_base_url(),
+        "api_key": _require_gateway_key(),
+        "timeout": timeout if timeout is not None else gateway_timeout(),
+    }
+    if max_retries is not None:
+        client_kwargs["max_retries"] = max_retries
+    client = AsyncOpenAI(**client_kwargs)
     return OpenAIChatModel(alias, provider=OpenAIProvider(openai_client=client))

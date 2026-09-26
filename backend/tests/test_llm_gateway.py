@@ -67,6 +67,17 @@ def test_alias_portfolio_classification_is_distinct_from_grading():
     assert llm_gateway.ALIAS_PORTFOLIO_CLASSIFICATION != llm_gateway.ALIAS_GRADING
 
 
+def test_alias_portfolio_grading_is_distinct_from_others():
+    from services import llm_gateway
+
+    assert llm_gateway.ALIAS_PORTFOLIO_GRADING == "examcraft/portfolio-grading"
+    assert llm_gateway.ALIAS_PORTFOLIO_GRADING != llm_gateway.ALIAS_GRADING
+    assert (
+        llm_gateway.ALIAS_PORTFOLIO_GRADING
+        != llm_gateway.ALIAS_PORTFOLIO_CLASSIFICATION
+    )
+
+
 def test_gateway_timeout_default_and_override(monkeypatch):
     m = _reload(monkeypatch, url="http://gw:4000", key="k")
     monkeypatch.delenv("LLM_GATEWAY_TIMEOUT", raising=False)
@@ -86,6 +97,18 @@ def test_gateway_generation_timeout_default_and_override(monkeypatch):
     assert m.gateway_generation_timeout() == 90.0
 
 
+def test_gateway_portfolio_grading_timeout_default_and_override(monkeypatch):
+    """Epic 4 (Portfolio-Assessment, Bewertungs-Engine): eigener, grosszuegiger
+    Timeout fuer Grading-Prompts bis zu 300'000 Zeichen -- unabhaengig vom
+    generischen gateway_timeout()-Default und von gateway_generation_timeout()
+    (Fragengenerierung)."""
+    m = _reload(monkeypatch, url="http://gw:4000", key="k")
+    monkeypatch.delenv("LLM_GATEWAY_PORTFOLIO_GRADING_TIMEOUT", raising=False)
+    assert m.gateway_portfolio_grading_timeout() == 300.0
+    monkeypatch.setenv("LLM_GATEWAY_PORTFOLIO_GRADING_TIMEOUT", "180.0")
+    assert m.gateway_portfolio_grading_timeout() == 180.0
+
+
 def test_make_pydantic_model_timeout_override(monkeypatch):
     """make_pydantic_model's `timeout` param must win over gateway_timeout(),
     so gateway_generator._build_agent can request the longer generation
@@ -98,6 +121,24 @@ def test_make_pydantic_model_timeout_override(monkeypatch):
 
     overridden_model = m.make_pydantic_model(m.ALIAS_GENERATION, timeout=120.0)
     assert overridden_model.client.timeout == 120.0
+
+
+def test_make_pydantic_model_max_retries_override(monkeypatch):
+    """PR review (Epic 4): max_retries=None must preserve the OpenAI SDK's
+    own default (so every pre-existing call site is unaffected), while an
+    explicit override (e.g. 0 for the grading path) must reach the actual
+    client -- otherwise the SDK's own retry-on-timeout could silently
+    triple a call site's worst-case duration despite that call site
+    explicitly opting out."""
+    m = _reload(monkeypatch, url="http://gw:4000", key="sk-x")
+
+    default_model = m.make_pydantic_model(m.ALIAS_GENERATION)
+    from openai import AsyncOpenAI
+
+    assert default_model.client.max_retries == AsyncOpenAI(api_key="x").max_retries
+
+    overridden_model = m.make_pydantic_model(m.ALIAS_GENERATION, max_retries=0)
+    assert overridden_model.client.max_retries == 0
 
 
 def test_make_client_fails_fast_without_key(monkeypatch):
