@@ -483,6 +483,49 @@ _premium_portfolio_ingestion_routes = (
 celery_app.conf.task_routes.update(_premium_portfolio_ingestion_routes)
 
 
+def _resolve_premium_portfolio_classification_task_registration(
+    deployment_mode: str,
+) -> dict:
+    """Conditional Celery registration for the portfolio classification task
+    (Epic 3, TF-941). Mirrors
+    ``_resolve_premium_portfolio_ingestion_task_registration`` 1:1 -- on-demand
+    (no beat schedule), same queue as ingestion (same assessment flow, no
+    dedicated worker per queue in this deployment, see fly.celery.toml).
+    """
+    if deployment_mode != "full":
+        return {}
+    try:
+        import premium.tasks.portfolio_classification_tasks  # noqa: F401
+    except ImportError as e:
+        logger.warning("Premium portfolio-classification task not available: %s", e)
+        return {}
+    except Exception:
+        logger.error(
+            "Premium portfolio-classification task import failed unexpectedly — "
+            "degrading (task will not run)",
+            exc_info=True,
+        )
+        return {}
+
+    task_name = (
+        "premium.tasks.portfolio_classification_tasks.run_portfolio_classification"
+    )
+    return {
+        task_name: {
+            "queue": "document_processing",
+            "routing_key": "document.process",
+        }
+    }
+
+
+_premium_portfolio_classification_routes = (
+    _resolve_premium_portfolio_classification_task_registration(
+        os.getenv("DEPLOYMENT_MODE", "core")
+    )
+)
+celery_app.conf.task_routes.update(_premium_portfolio_classification_routes)
+
+
 def _resolve_premium_portfolio_watchdog_registration(
     deployment_mode: str,
 ) -> tuple[dict, dict]:

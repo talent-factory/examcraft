@@ -57,6 +57,16 @@ def test_alias_constants(monkeypatch):
     assert m.ALIAS_WIZARD == "examcraft/wizard"
 
 
+def test_alias_portfolio_classification_is_distinct_from_grading():
+    from services import llm_gateway
+
+    assert (
+        llm_gateway.ALIAS_PORTFOLIO_CLASSIFICATION
+        == "examcraft/portfolio-classification"
+    )
+    assert llm_gateway.ALIAS_PORTFOLIO_CLASSIFICATION != llm_gateway.ALIAS_GRADING
+
+
 def test_gateway_timeout_default_and_override(monkeypatch):
     m = _reload(monkeypatch, url="http://gw:4000", key="k")
     monkeypatch.delenv("LLM_GATEWAY_TIMEOUT", raising=False)

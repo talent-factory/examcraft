@@ -250,6 +250,49 @@ def test_portfolio_ingestion_task_is_registered_and_routed_in_running_app():
     assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
 
 
+def test_premium_portfolio_classification_task_registration_empty_in_core_mode():
+    from celery_app import _resolve_premium_portfolio_classification_task_registration
+
+    routes = _resolve_premium_portfolio_classification_task_registration("core")
+    assert routes == {}
+
+
+def test_premium_portfolio_classification_task_registration_reflects_actual_importability_in_full_mode():
+    from celery_app import _resolve_premium_portfolio_classification_task_registration
+
+    try:
+        import premium.tasks.portfolio_classification_tasks  # noqa: F401
+
+        premium_importable = True
+    except ImportError:
+        premium_importable = False
+
+    routes = _resolve_premium_portfolio_classification_task_registration("full")
+
+    if not premium_importable:
+        assert routes == {}
+        return
+
+    task_name = (
+        "premium.tasks.portfolio_classification_tasks.run_portfolio_classification"
+    )
+    assert routes[task_name] == {
+        "queue": "document_processing",
+        "routing_key": "document.process",
+    }
+
+
+def test_portfolio_classification_task_is_registered_and_routed_in_running_app():
+    from celery_app import celery_app
+
+    task_name = (
+        "premium.tasks.portfolio_classification_tasks.run_portfolio_classification"
+    )
+    if task_name not in celery_app.conf.task_routes:
+        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+    assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
+
+
 def test_premium_portfolio_watchdog_registration_empty_in_core_mode():
     from celery_app import _resolve_premium_portfolio_watchdog_registration
 

@@ -47,6 +47,40 @@ async def test_text_file_produces_chunks(processor, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_text_file_populates_raw_text(processor, tmp_path):
+    """TF-941 review-fix regression: raw_text must carry the actual
+    pre-chunking extraction, not something a future refactor could
+    accidentally wire to the post-chunking/normalized text instead -- that
+    mistake is exactly what corrupted PortfolioDocument.extracted_text in
+    the original bug. Uses >1000 unique words (processor's chunk_size=1000,
+    chunk_overlap=200) so the document produces multiple overlapping
+    chunks -- with a single chunk, a chunk-join is byte-identical to
+    raw_text and the two implementations are indistinguishable by any
+    assertion."""
+    txt_file = tmp_path / "notes.txt"
+    words = [f"wort{i:04d}" for i in range(1500)]
+    txt_file.write_text(" ".join(words), encoding="utf-8")
+
+    result = await processor.process_document(
+        document_id=1,
+        file_path=str(txt_file),
+        filename="notes.txt",
+        mime_type="text/plain",
+    )
+
+    assert result.total_chunks > 1  # sanity check: overlap actually exercised
+    chunk_join = "\n\n".join(chunk.content for chunk in result.chunks)
+    # The chunk-join duplicates the ~200-word overlap at each boundary, so
+    # it is strictly longer than the true pre-chunking text -- the concrete
+    # signal that raw_text and chunk-join are NOT the same extraction path
+    # for this (realistically-sized) document.
+    assert len(chunk_join) > len(result.raw_text)
+    assert result.raw_text.count("wort0500") == 1  # no boundary duplication
+    assert "wort0000" in result.raw_text
+    assert "wort1499" in result.raw_text
+
+
+@pytest.mark.asyncio
 async def test_text_file_latin1_fallback(processor, tmp_path):
     """Latin-1 encoded .txt must not crash and must extract correctly."""
     txt_file = tmp_path / "umlaute.txt"

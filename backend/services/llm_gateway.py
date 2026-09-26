@@ -24,6 +24,13 @@ ALIAS_EMBEDDING = "tf/embedding-small"
 ALIAS_CHAT = "examcraft/chat"
 ALIAS_WIZARD = "examcraft/wizard"
 
+# TF-941 (Epic 3, portfolio assessment): dedicated alias instead of reusing
+# ALIAS_GRADING -- classification (many small file->phase calls per
+# assessment) and the holistic criteria grading (Epic 4, few but expensive
+# calls) have different cost/quality requirements and should be routable
+# independently on the gateway.
+ALIAS_PORTFOLIO_CLASSIFICATION = "examcraft/portfolio-classification"
+
 
 def gateway_enabled() -> bool:
     """True, wenn der Gateway-Pfad aktiv ist (Rollback = Variable leeren)."""

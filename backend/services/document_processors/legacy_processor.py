@@ -114,6 +114,7 @@ class LegacyProcessor:
                 chunks=chunks,
                 metadata=doc_metadata,
                 processing_time=processing_time,
+                raw_text=raw_text,
             )
 
             logger.info(

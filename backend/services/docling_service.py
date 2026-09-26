@@ -37,6 +37,15 @@ class ProcessedDocument:
     chunks: List[DocumentChunk]
     metadata: Dict[str, Any]
     processing_time: float
+    # TF-941 (Epic 3, Review-Fix): pre-chunking raw text. `chunks` are
+    # overlapping word-windows (see chunking.create_chunks) meant for
+    # RAG/embedding, not for reconstructing the original document -- joining
+    # them duplicates ~chunk_overlap words at every window boundary and
+    # normalizes whitespace. Consumers that need the *original* extracted
+    # text (e.g. portfolio_ingestion_tasks._ingest_single_file) should prefer
+    # this field. Defaulted so existing callers that don't pass it keep
+    # working.
+    raw_text: str = ""
 
 
 class DoclingService:

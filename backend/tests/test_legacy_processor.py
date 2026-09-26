@@ -193,6 +193,42 @@ class TestLegacyProcessorMarkdownProcessing:
         assert "Test Document" in content
         assert "Section 1" in content
 
+    @pytest.mark.asyncio
+    async def test_raw_text_matches_pre_chunking_text_not_chunk_join(
+        self, legacy_processor, tmp_path
+    ):
+        """TF-941 review-fix regression: raw_text must be the actual
+        pre-chunking text this processor extracted, not something a future
+        refactor could accidentally wire to the post-chunking/normalized
+        text instead -- that mistake is exactly what corrupted
+        PortfolioDocument.extracted_text in the original bug. Uses >1000
+        unique words (chunk_size=1000, chunk_overlap=200, see the
+        `legacy_processor` fixture) so the document produces multiple
+        overlapping chunks -- with a single chunk (the previous, too-small
+        fixture), a chunk-join is byte-identical to raw_text and the two
+        implementations are indistinguishable by any assertion."""
+        words = [f"wort{i:04d}" for i in range(1500)]
+        md_file = tmp_path / "big.md"
+        md_file.write_text("# Titel\n\n" + " ".join(words), encoding="utf-8")
+
+        result = await legacy_processor.process_document(
+            document_id=1,
+            file_path=str(md_file),
+            filename="big.md",
+            mime_type="text/markdown",
+        )
+
+        assert result.total_chunks > 1  # sanity check: overlap actually exercised
+        chunk_join = "\n\n".join(chunk.content for chunk in result.chunks)
+        # The chunk-join duplicates the ~200-word overlap at each boundary,
+        # so it is strictly longer than the true pre-chunking text -- the
+        # concrete signal that raw_text and chunk-join are NOT the same
+        # extraction path for this (realistically-sized) document.
+        assert len(chunk_join) > len(result.raw_text)
+        assert result.raw_text.count("wort0500") == 1  # no boundary duplication
+        assert "wort0000" in result.raw_text
+        assert "wort1499" in result.raw_text
+
 
 class TestLegacyProcessorChunking:
     """Tests for text chunking"""
