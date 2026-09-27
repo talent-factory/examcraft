@@ -133,6 +133,18 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/__tests__/**"
+        ],
+        "rules": {
+          "testing-library/no-node-access": "warn"
+        }
+      }
     ]
   },
   "browserslist": {

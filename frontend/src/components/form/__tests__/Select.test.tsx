@@ -14,11 +14,11 @@ const options = [
 
 describe('Select Component', () => {
   it('renders select field', () => {
-    const { container } = render(
+    render(
       <Select options={options} />
     );
 
-    const select = container.querySelector('select');
+    const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
   });
 
@@ -77,11 +77,11 @@ describe('Select Component', () => {
   });
 
   it('applies disabled state', () => {
-    const { container } = render(
+    render(
       <Select options={options} disabled />
     );
 
-    const select = container.querySelector('select');
+    const select = screen.getByRole('combobox');
     expect(select).toBeDisabled();
   });
 
@@ -90,6 +90,7 @@ describe('Select Component', () => {
       <Select options={options} fullWidth />
     );
 
+    // eslint-disable-next-line testing-library/no-container -- the outermost wrapper div has no role or text of its own (the select is nested in a second div), and its width class is exactly what this test checks
     const wrapper = container.querySelector('div');
     expect(wrapper).toHaveClass('w-full');
   });

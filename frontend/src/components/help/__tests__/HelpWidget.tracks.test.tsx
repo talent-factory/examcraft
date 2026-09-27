@@ -17,6 +17,8 @@ import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { BrowserRouter } from 'react-router-dom';
 
+import HelpWidget from '../HelpWidget';
+
 const mockUpdateTrackStep = jest.fn().mockResolvedValue(undefined);
 const mockCompleteStep = jest.fn().mockResolvedValue(undefined);
 
@@ -51,8 +53,6 @@ jest.mock('driver.js', () => ({
   driver: jest.fn(() => ({ highlight: mockHighlight, destroy: jest.fn() })),
 }));
 jest.mock('driver.js/dist/driver.css', () => ({}));
-
-import HelpWidget from '../HelpWidget';
 
 // i18n_key values point at real entries in de/translation.json — the test's
 // i18n mock resolves against that file, so a broken key shows up as the key

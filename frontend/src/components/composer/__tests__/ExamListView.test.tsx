@@ -196,9 +196,9 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Prüfung Eins')).toBeInTheDocument();
-        expect(screen.getByText('Prüfung Zwei')).toBeInTheDocument();
-        expect(screen.getByText('Prüfung Drei')).toBeInTheDocument();
       });
+      expect(screen.getByText('Prüfung Zwei')).toBeInTheDocument();
+      expect(screen.getByText('Prüfung Drei')).toBeInTheDocument();
     });
   });
 
@@ -272,8 +272,8 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(mockComposerService.archiveExam).toHaveBeenCalled();
-        expect(mockComposerService.archiveExam.mock.calls[0][0]).toBe(5);
       });
+      expect(mockComposerService.archiveExam.mock.calls[0][0]).toBe(5);
     });
 
     // TF-772 PR 7: the composer renders the backend's error_code, never the
@@ -320,10 +320,10 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(mockComposerService.restoreExam).toHaveBeenCalled();
-        // react-query passes (variables, context) to a bare mutationFn ref;
-        // restoreExam only consumes the first arg (the exam id).
-        expect(mockComposerService.restoreExam.mock.calls[0][0]).toBe(9);
       });
+      // react-query passes (variables, context) to a bare mutationFn ref;
+      // restoreExam only consumes the first arg (the exam id).
+      expect(mockComposerService.restoreExam.mock.calls[0][0]).toBe(9);
     });
 
     it('calls deleteExam when an archived exam is deleted and confirmed', async () => {
@@ -348,8 +348,8 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(mockComposerService.deleteExam).toHaveBeenCalled();
-        expect(mockComposerService.deleteExam.mock.calls[0][0]).toBe(7);
       });
+      expect(mockComposerService.deleteExam.mock.calls[0][0]).toBe(7);
     });
 
     it('does NOT call deleteExam when delete is cancelled', async () => {
@@ -473,8 +473,8 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Kurs/)).toBeInTheDocument();
       });
+      expect(screen.getByLabelText(/Kurs/)).toBeInTheDocument();
     });
 
     it('Erstellen button is disabled when title is empty', async () => {
@@ -536,8 +536,8 @@ describe('ExamListView', () => {
 
       await waitFor(() => {
         expect(mockComposerService.createExam).toHaveBeenCalled();
-        expect(mockComposerService.createExam.mock.calls[0][0]).toMatchObject({ title: 'Meine neue Prüfung' });
       });
+      expect(mockComposerService.createExam.mock.calls[0][0]).toMatchObject({ title: 'Meine neue Prüfung' });
 
       await waitFor(() => {
         expect(mockOnSelectExam).toHaveBeenCalledWith(99);

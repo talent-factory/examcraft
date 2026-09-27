@@ -77,12 +77,8 @@ describe('RolePermissionsEditor', () => {
     const onSaved = jest.fn();
     renderEditor({ onSaved });
 
-    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
-    await waitFor(() =>
-      expect(
-        screen.getByRole('checkbox', { name: /Organisationseinheiten verwalten/ }),
-      ).toBeInTheDocument(),
-    );
+    await screen.findByLabelText('Name');
+    await screen.findByRole('checkbox', { name: /Organisationseinheiten verwalten/ });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'fachbereichsleiter' } });
     fireEvent.change(screen.getByLabelText('Anzeigename'), { target: { value: 'Fachbereichsleiter' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /Organisationseinheiten verwalten/ }));
@@ -114,7 +110,7 @@ describe('RolePermissionsEditor', () => {
     );
     renderEditor();
 
-    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
+    await screen.findByLabelText('Name');
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'fachbereichsleiter' } });
     fireEvent.change(screen.getByLabelText('Anzeigename'), { target: { value: 'Fachbereichsleiter' } });
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -131,12 +127,8 @@ describe('RolePermissionsEditor', () => {
   it('create mode: save button is disabled while name or display name is empty', async () => {
     renderEditor();
 
-    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
-    await waitFor(() =>
-      expect(
-        screen.getByRole('checkbox', { name: /Organisationseinheiten verwalten/ }),
-      ).toBeInTheDocument(),
-    );
+    await screen.findByLabelText('Name');
+    await screen.findByRole('checkbox', { name: /Organisationseinheiten verwalten/ });
 
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
 
@@ -162,7 +154,7 @@ describe('RolePermissionsEditor', () => {
       },
     });
 
-    await waitFor(() => expect(screen.getByLabelText('Name')).toBeInTheDocument());
+    await screen.findByLabelText('Name');
     expect(screen.getByLabelText('Name')).toBeDisabled();
     await waitFor(() =>
       expect(screen.getByRole('checkbox', { name: /Organisationseinheiten verwalten/ })).toBeChecked(),
@@ -194,9 +186,7 @@ describe('RolePermissionsEditor', () => {
       },
     });
 
-    await waitFor(() =>
-      expect(screen.getByRole('checkbox', { name: /Fragen begutachten/ })).toBeInTheDocument(),
-    );
+    await screen.findByRole('checkbox', { name: /Fragen begutachten/ });
     fireEvent.change(screen.getByLabelText('Anzeigename'), {
       target: { value: 'Administrator geändert' },
     });

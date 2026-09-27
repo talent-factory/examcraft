@@ -112,11 +112,11 @@ describe.skip('ReviewQueue', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Total')).toBeInTheDocument();
-        expect(screen.getByText('Pending')).toBeInTheDocument();
-        expect(screen.getByText('Approved')).toBeInTheDocument();
-        expect(screen.getByText('Rejected')).toBeInTheDocument();
-        expect(screen.getByText('In Review')).toBeInTheDocument();
       });
+      expect(screen.getByText('Pending')).toBeInTheDocument();
+      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.getByText('Rejected')).toBeInTheDocument();
+      expect(screen.getByText('In Review')).toBeInTheDocument();
     });
 
     it('displays correct statistics values', async () => {
@@ -141,8 +141,8 @@ describe.skip('ReviewQueue', () => {
 
       await waitFor(() => {
         expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-        expect(screen.getByText('Explain the concept of polymorphism.')).toBeInTheDocument();
       });
+      expect(screen.getByText('Explain the concept of polymorphism.')).toBeInTheDocument();
     });
   });
 
@@ -183,10 +183,8 @@ describe.skip('ReviewQueue', () => {
 
       fireEvent.mouseDown(statusFilter);
 
-      await waitFor(() => {
-        const pendingOption = screen.getByRole('option', { name: /Pending/i });
-        fireEvent.click(pendingOption);
-      });
+      const pendingOption = await screen.findByRole('option', { name: /Pending/i });
+      fireEvent.click(pendingOption);
 
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
@@ -215,10 +213,8 @@ describe.skip('ReviewQueue', () => {
 
       fireEvent.mouseDown(difficultyFilter);
 
-      await waitFor(() => {
-        const mediumOption = screen.getByRole('option', { name: /Medium/i });
-        fireEvent.click(mediumOption);
-      });
+      const mediumOption = await screen.findByRole('option', { name: /Medium/i });
+      fireEvent.click(mediumOption);
 
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
@@ -247,10 +243,8 @@ describe.skip('ReviewQueue', () => {
 
       fireEvent.mouseDown(typeFilter);
 
-      await waitFor(() => {
-        const mcOption = screen.getByRole('option', { name: /Multiple Choice/i });
-        fireEvent.click(mcOption);
-      });
+      const mcOption = await screen.findByRole('option', { name: /Multiple Choice/i });
+      fireEvent.click(mcOption);
 
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(

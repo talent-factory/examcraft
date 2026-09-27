@@ -59,7 +59,7 @@ describe('StatsCard Component', () => {
   });
 
   it('applies correct color class', () => {
-    const { container } = render(
+    render(
       <StatsCard
         icon="📊"
         label="Generated Questions"
@@ -68,7 +68,7 @@ describe('StatsCard Component', () => {
       />
     );
 
-    const card = container.querySelector('.card');
+    const card = screen.getByText('Generated Questions').closest('.card');
     expect(card).toHaveClass('bg-green-50');
   });
 

@@ -425,9 +425,9 @@ describe('Sidebar Component — layout', () => {
     // theme.extend.minHeight but consumed via the h-* utility (which reads
     // theme.height, not minHeight), so the class never generated any CSS and
     // the sidebar had no explicit height at all.
-    const { container } = renderAt('/dashboard');
+    renderAt('/dashboard');
 
-    const aside = container.querySelector('aside');
+    const aside = screen.getByRole('complementary');
     expect(aside).not.toBeNull();
     expect(aside).toHaveClass('h-[calc(100vh_-_64px)]');
   });

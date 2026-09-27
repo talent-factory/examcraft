@@ -4,6 +4,8 @@ import '@testing-library/jest-dom';
 import { MemoryRouter } from 'react-router-dom';
 import { SIDEBAR_REVEAL_NAV_EVENT, SidebarRevealNavDetail } from '../../layout/sidebarNavReveal';
 
+import HelpOnboarding, { OnboardingStep } from '../HelpOnboarding';
+
 // Capture driver.js calls so tests can trigger callbacks
 let capturedHighlightConfig: any = null;
 let capturedDriverConfig: any = null;
@@ -20,8 +22,6 @@ jest.mock('driver.js', () => ({
   driver: (config: any) => mockDriverFactory(config),
 }));
 jest.mock('driver.js/dist/driver.css', () => {});
-
-import HelpOnboarding, { OnboardingStep } from '../HelpOnboarding';
 
 const mockStatus = { id: 1, role: 'teacher', current_step: 1, completed_steps: [0], completed: false };
 

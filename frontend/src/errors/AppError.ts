@@ -21,9 +21,11 @@ import { RAG_ERROR_CODES } from './codes/rag';
 import { RBAC_ERROR_CODES } from './codes/rbac';
 import { RESERVED_ERROR_CODES } from './codes/reserved';
 import { REVIEW_ERROR_CODES } from './codes/review';
+import { STATS_ERROR_CODES } from './codes/stats';
 import { STUDENT_CLASSES_ERROR_CODES } from './codes/studentClasses';
 import { STUDENTS_ERROR_CODES } from './codes/students';
 import { SUBMISSIONS_ERROR_CODES } from './codes/submissions';
+import { TAGS_ERROR_CODES } from './codes/tags';
 import { VECTOR_SEARCH_ERROR_CODES } from './codes/vectorSearch';
 import { VISIBILITY_ERROR_CODES } from './codes/visibility';
 import { WIZARD_ERROR_CODES } from './codes/wizard';
@@ -76,9 +78,11 @@ export const APP_ERROR_CODES = [
   ...RAG_ERROR_CODES,
   ...RBAC_ERROR_CODES,
   ...REVIEW_ERROR_CODES,
+  ...STATS_ERROR_CODES,
   ...STUDENT_CLASSES_ERROR_CODES,
   ...STUDENTS_ERROR_CODES,
   ...SUBMISSIONS_ERROR_CODES,
+  ...TAGS_ERROR_CODES,
   ...VECTOR_SEARCH_ERROR_CODES,
   ...VISIBILITY_ERROR_CODES,
   ...WIZARD_ERROR_CODES,
@@ -126,9 +130,7 @@ export type ErrorParams = Record<string, string | number>;
  * and `AppErrorCode` makes that a type-checked contract, not just a naming
  * convention: `new AppError('typo.doesNotExist', ...)` fails to compile.
  * `detail` keeps the raw backend/system text for logging; it must never be
- * rendered (see translateError). Not to be confused with the `apiDetail()`
- * helper (apiDetail.ts), which reads a different `detail` field off a plain
- * axios error and IS safe to render for the one API that answers in German.
+ * rendered (see translateError).
  */
 export class AppError extends Error {
   constructor(

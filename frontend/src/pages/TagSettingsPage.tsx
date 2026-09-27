@@ -24,7 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 import TagRenameInline from '../components/tags/TagRenameInline';
 import TagMergeModal from '../components/tags/TagMergeModal';
 import TagCreateForm from '../components/tags/TagCreateForm';
-import { apiDetail, translateError } from '../errors';
+import { appErrorFromAxios, translateError } from '../errors';
 import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
 
 type FilterMode = 'all' | 'active' | 'archived';
@@ -79,19 +79,19 @@ const TagSettingsPage: React.FC = () => {
       invalidate();
       setRenamingId(null);
     },
-    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.renameFailed')),
+    onError: (err) => setError(translateError(appErrorFromAxios(err, 'tags_rename_failed'), t, 'components.tags.renameFailed')),
   });
 
   const archiveMutation = useMutation({
     mutationFn: (id: number) => tagsApi.archiveTag(id),
     onSuccess: invalidate,
-    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.archiveFailed')),
+    onError: (err) => setError(translateError(appErrorFromAxios(err, 'tags_archive_failed'), t, 'components.tags.archiveFailed')),
   });
 
   const unarchiveMutation = useMutation({
     mutationFn: (id: number) => tagsApi.unarchiveTag(id),
     onSuccess: invalidate,
-    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.restoreFailed')),
+    onError: (err) => setError(translateError(appErrorFromAxios(err, 'tags_restore_failed'), t, 'components.tags.restoreFailed')),
   });
 
   const mergeMutation = useMutation({
@@ -102,7 +102,7 @@ const TagSettingsPage: React.FC = () => {
       setSelectedIds(new Set());
       setMergeOpen(false);
     },
-    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.mergeFailed')),
+    onError: (err) => setError(translateError(appErrorFromAxios(err, 'tags_merge_failed'), t, 'components.tags.mergeFailed')),
   });
 
   const deleteMutation = useMutation({
@@ -111,7 +111,7 @@ const TagSettingsPage: React.FC = () => {
       invalidate();
       setSelectedIds(new Set());
     },
-    onError: (err) => setError(apiDetail(err) ?? translateError(err, t, 'components.tags.deleteFailed')),
+    onError: (err) => setError(translateError(appErrorFromAxios(err, 'tags_delete_failed'), t, 'components.tags.deleteFailed')),
   });
 
   const filteredTags = allTags

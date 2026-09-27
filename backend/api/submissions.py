@@ -30,7 +30,6 @@ from fastapi import (
     Depends,
     File,
     Form,
-    HTTPException,
     Query,
     Request,
     UploadFile,
@@ -270,11 +269,13 @@ class SubmissionDetailOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _load_exam_for_user(*, db: Session, user: User, exam_id: int) -> Exam:
+def _load_exam_for_user(*, db: Session, user: User, exam_id: int, locale: str) -> Exam:
     """Load Exam with multi-tenancy check; 404 on foreign institution.
 
     404 (not 403) is intentional: revealing existence-but-no-access leaks
-    information about other tenants.
+    information about other tenants. The code is the shared
+    ``exams_not_found`` (TF-773 Teil D) — the same fact the stats and
+    grade-export routers already report under that name.
     """
     exam = (
         db.query(Exam)
@@ -286,7 +287,7 @@ def _load_exam_for_user(*, db: Session, user: User, exam_id: int) -> Exam:
         .one_or_none()
     )
     if exam is None:
-        raise HTTPException(status_code=404, detail="Prüfung nicht gefunden")
+        raise api_error(404, "exams_not_found", locale)
     return exam
 
 
@@ -589,7 +590,7 @@ async def import_preview(
     ``/import/commit`` run.
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
     _reject_driver_without_upload_body(driver_name, locale=locale)
     # Tier gate before the expensive parsing — Free/Starter may not use
     # an API driver, otherwise the preview would burn the token.
@@ -639,7 +640,7 @@ async def import_commit(
     on grading.
     """
     locale = get_request_locale(http_request, current_user)
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
     _reject_driver_without_upload_body(driver_name, locale=locale)
     assert_driver_allowed(user=current_user, driver_name=driver_name)
     # The monthly limit only applies to a new exam, not to re-importing
@@ -705,7 +706,7 @@ async def get_import_job(
         .one_or_none()
     )
     if job is None:
-        raise HTTPException(status_code=404, detail="Import-Job nicht gefunden")
+        raise api_error(404, "submissions_import_job_not_found", locale)
     return _import_job_to_out(job, locale=locale)
 
 
@@ -758,6 +759,7 @@ def _deletion_summary_to_out(summary: DeletionSummary) -> ImportDeletionSummaryO
 @router.get("/import/summary", response_model=ImportDeletionSummaryOut)
 async def get_import_deletion_summary(
     exam_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> ImportDeletionSummaryOut:
@@ -766,7 +768,8 @@ async def get_import_deletion_summary(
     Powers the confirmation dialog (affected students/attempts). Read-only —
     requires only ``submissions:read``.
     """
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    locale = get_request_locale(http_request, current_user)
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
     summary = ResultsDeletionService(db).summary(exam=exam)
     return _deletion_summary_to_out(summary)
 
@@ -789,7 +792,8 @@ async def delete_import(
     the audit write fails, the whole operation rolls back (fail-closed — no
     silent data loss without a trail), mirroring the superuser-bypass policy.
     """
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    locale = get_request_locale(http_request, current_user)
+    exam = _load_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
 
     summary = ResultsDeletionService(db).delete_exam_results(exam=exam)
 
@@ -817,10 +821,10 @@ async def delete_import(
             exam.id,
             current_user.id,
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Audit-Log nicht verfügbar; Löschung abgebrochen.",
-        )
+        # 503, not 500: the message tells the caller to retry later, and this
+        # is a transient dependency failure (audit log persistence), not a
+        # server bug.
+        raise api_error(503, "submissions_delete_audit_unavailable", locale)
 
     return _deletion_summary_to_out(summary)
 
@@ -833,6 +837,7 @@ async def delete_import(
 @router.get("", response_model=SubmissionListOut)
 async def list_submissions(
     exam_id: int,
+    http_request: Request,
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(require_permission("submissions:read")),
@@ -843,7 +848,8 @@ async def list_submissions(
     The default 200 / max 1000 cap keeps a single request from OOMing
     the worker on huge classes; the frontend paginates above that.
     """
-    _load_exam_for_user(db=db, user=current_user, exam_id=exam_id)
+    locale = get_request_locale(http_request, current_user)
+    _load_exam_for_user(db=db, user=current_user, exam_id=exam_id, locale=locale)
 
     base_query = (
         db.query(Submission, Student)
@@ -897,10 +903,12 @@ async def list_submissions(
 @router.get("/{submission_id}", response_model=SubmissionDetailOut)
 async def get_submission(
     submission_id: int,
+    http_request: Request,
     current_user: User = Depends(require_permission("submissions:read")),
     db: Session = Depends(get_db),
 ) -> SubmissionDetailOut:
     """Detail with all attempts + answers + grades."""
+    locale = get_request_locale(http_request, current_user)
     submission = (
         db.query(Submission)
         .join(Student, Student.id == Submission.student_id)
@@ -918,7 +926,7 @@ async def get_submission(
         .one_or_none()
     )
     if submission is None:
-        raise HTTPException(status_code=404, detail="Submission nicht gefunden")
+        raise api_error(404, "stats_submission_not_found", locale)
 
     return SubmissionDetailOut(
         id=submission.id,
@@ -998,7 +1006,9 @@ async def import_api_preview(
     import json as _json
 
     locale = get_request_locale(http_request, current_user)
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
+    exam = _load_exam_for_user(
+        db=db, user=current_user, exam_id=body.exam_id, locale=locale
+    )
     # Tier gate before any web-service calls — Free/Starter may not use
     # the API at all.
     assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
@@ -1043,7 +1053,9 @@ async def import_api_commit(
     import json as _json
 
     locale = get_request_locale(http_request, current_user)
-    exam = _load_exam_for_user(db=db, user=current_user, exam_id=body.exam_id)
+    exam = _load_exam_for_user(
+        db=db, user=current_user, exam_id=body.exam_id, locale=locale
+    )
     assert_driver_allowed(user=current_user, driver_name=DriverName.MOODLE_API.value)
     assert_exam_quota_for_import(db=db, user=current_user, exam_id=exam.id)
     source_bytes = _json.dumps({"quiz_id": body.quiz_id}).encode("utf-8")
@@ -1092,6 +1104,7 @@ exams_alias_router = APIRouter(prefix="/api/v1/exams", tags=["Submissions"])
 )
 async def list_submissions_for_exam(
     exam_id: int,
+    http_request: Request,
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(require_permission("submissions:read")),
@@ -1100,6 +1113,7 @@ async def list_submissions_for_exam(
     """Alias for ``GET /api/v1/submissions?exam_id=X``."""
     return await list_submissions(
         exam_id=exam_id,
+        http_request=http_request,
         limit=limit,
         offset=offset,
         current_user=current_user,

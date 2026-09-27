@@ -6,6 +6,7 @@
  * conventions of GradeExportService.
  */
 
+import { ACCESS_TOKEN_KEY } from '../api/tokenRefreshLock';
 import { ApiError, statusToKind } from './submissionsService';
 import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 
@@ -28,7 +29,7 @@ export interface PushJob {
 }
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

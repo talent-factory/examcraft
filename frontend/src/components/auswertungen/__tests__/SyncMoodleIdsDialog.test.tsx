@@ -1,4 +1,3 @@
-jest.mock('../../../api/apiClient');
 /**
  * SyncMoodleIdsDialog tests (TF-336 G4 / Subarea D).
  */
@@ -16,6 +15,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import SyncMoodleIdsDialog from '../SyncMoodleIdsDialog';
 import { MoodleConnectionsService } from '../../../services/moodleConnectionsService';
 import { ApiError } from '../../../services/submissionsService';
+jest.mock('../../../api/apiClient');
 
 jest.mock('../../../services/moodleConnectionsService');
 
@@ -118,7 +118,7 @@ describe('SyncMoodleIdsDialog', () => {
     });
     fireEvent.click(screen.getByTestId('sync-submit'));
 
-    await waitFor(() => screen.getByTestId('sync-error'));
+    await screen.findByTestId('sync-error');
     expect(screen.getByTestId('sync-error')).toHaveTextContent(
       /nicht sichtbar|not visible/,
     );

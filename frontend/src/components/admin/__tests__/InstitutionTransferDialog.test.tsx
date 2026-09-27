@@ -211,6 +211,8 @@ describe('InstitutionTransferDialog', () => {
 
     await waitFor(() => {
       expect(AdminService.transferUser).toHaveBeenCalled();
+    });
+    await waitFor(() => {
       expect(onSuccess).toHaveBeenCalled();
     });
   });

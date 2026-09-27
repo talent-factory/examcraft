@@ -35,17 +35,9 @@
  *   exams_auto_fill_failed, exams_compose_failed, exams_create_failed,
  *   exams_documents_load_failed, exams_export_failed, exams_finalize_failed,
  *   exams_list_failed, exams_load_failed, exams_question_add_failed,
- *   exams_question_generation_failed, exams_question_points_update_failed,
- *   exams_question_remove_failed, exams_questions_reorder_failed,
- *   exams_unfinalize_failed, exams_update_failed
- *
- * `exams_question_generation_failed` closes the one remaining `detail`/
- * `err.message` leak the PR 7 review found: `BasicExamCreator` had its own
- * inline `fetch` parser instead of going through the family. Its endpoint,
- * `POST /api/v1/questions/generate` in `main.py`, predates ADR 0005 and
- * raises a plain `HTTPException` with no `error_code`, so this is a
- * frontend-only fallback like the others above, not a registered backend
- * code.
+ *   exams_question_points_update_failed, exams_question_remove_failed,
+ *   exams_questions_reorder_failed, exams_unfinalize_failed,
+ *   exams_update_failed
  *
  * `exams_list_failed` and `exams_load_failed` belong to the Auswertungen pages;
  * `exams_load_failed` is new text, because `AuswertungenExam` had one sentence
@@ -86,7 +78,6 @@ export const EXAMS_ERROR_CODES = [
   'exams_no_questions_fit_constraints',
   'exams_not_found',
   'exams_question_add_failed',
-  'exams_question_generation_failed',
   'exams_question_not_approved',
   'exams_question_not_found',
   'exams_question_points_update_failed',

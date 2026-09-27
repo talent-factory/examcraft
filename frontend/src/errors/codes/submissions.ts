@@ -17,6 +17,24 @@
  * reach it. The fr/it texts of the two 409s follow TF-773 PR 2a, which moved
  * them from «veuillez»/«si prega» to the informal register the project uses.
  *
+ * REMAINING ROUTER CODES (TF-773 Teil D). The last four plain
+ * `HTTPException`s in `submissions.py` now carry a code. Two are new:
+ *
+ *   submissions_import_job_not_found      404, import-job polling in
+ *                                         `ImportDialog` — the job row goes
+ *                                         when its exam is deleted mid-import
+ *   submissions_delete_audit_unavailable  503, `DeleteImportDialog` — the
+ *                                         audit write failed and the deletion
+ *                                         was rolled back; «Löschen
+ *                                         fehlgeschlagen.» hid that nothing
+ *                                         was deleted. 503 (not 500): a
+ *                                         transient, retryable dependency
+ *                                         failure — the text itself says
+ *                                         «Bitte versuche es später erneut.»
+ *
+ * The other two reuse existing names for the same fact: `exams_not_found`
+ * (`exams.ts`) and `stats_submission_not_found` (`stats.ts`).
+ *
  * IMPORT CODES (TF-773 PR 2c). The four import endpoints —
  * `/import/{preview,commit,api-preview,api-commit}` — answered with
  * `detail=str(exc)` until then, which is why the interim loss below existed:
@@ -88,6 +106,7 @@
  * submissions in one `Promise.all` and had one sentence for both.
  */
 export const SUBMISSIONS_ERROR_CODES = [
+  'submissions_delete_audit_unavailable',
   'submissions_detail_load_failed',
   'submissions_grade_export_blocked_draft',
   'submissions_grade_export_blocked_pending_review',
@@ -104,6 +123,7 @@ export const SUBMISSIONS_ERROR_CODES = [
   'submissions_import_file_not_utf8',
   'submissions_import_file_too_large',
   'submissions_import_internal_error',
+  'submissions_import_job_not_found',
   'submissions_import_json_structure_invalid',
   'submissions_import_moodle_auth_failed',
   'submissions_import_moodle_connection_invalid',

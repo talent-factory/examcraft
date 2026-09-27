@@ -8,11 +8,11 @@ import { Input } from '../Input';
 
 describe('Input Component', () => {
   it('renders input field', () => {
-    const { container } = render(
+    render(
       <Input placeholder="Test input" />
     );
 
-    const input = container.querySelector('input');
+    const input = screen.getByRole('textbox');
     expect(input).toBeInTheDocument();
   });
 
@@ -61,20 +61,21 @@ describe('Input Component', () => {
   });
 
   it('applies disabled state', () => {
-    const { container } = render(
+    render(
       <Input disabled />
     );
 
-    const input = container.querySelector('input');
+    const input = screen.getByRole('textbox');
     expect(input).toBeDisabled();
   });
 
   it('applies fullWidth class', () => {
-    const { container } = render(
+    render(
       <Input fullWidth />
     );
 
-    const wrapper = container.querySelector('div');
+    // The input sits directly inside the wrapper div that carries the width class.
+    const wrapper = screen.getByRole('textbox').closest('div');
     expect(wrapper).toHaveClass('w-full');
   });
 });

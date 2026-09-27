@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { tagsApi } from '../../api/tagsApi';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiDetail, translateError } from '../../errors';
+import { appErrorFromAxios, translateError } from '../../errors';
 
 export interface ExistingTagInfo {
   id: number;
@@ -43,7 +43,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
       setCreateError(null);
     },
     onError: (err) =>
-      setCreateError(apiDetail(err) ?? translateError(err, t, 'components.tags.createErrorFallback')),
+      setCreateError(translateError(appErrorFromAxios(err, 'tags_create_failed'), t, 'components.tags.createErrorFallback')),
   });
 
   const unarchiveMutation = useMutation({
@@ -53,7 +53,7 @@ const TagCreateForm: React.FC<Props> = ({ existingTags }) => {
       setName('');
     },
     onError: (err) =>
-      setCreateError(apiDetail(err) ?? translateError(err, t, 'components.tags.restoreFailed')),
+      setCreateError(translateError(appErrorFromAxios(err, 'tags_restore_failed'), t, 'components.tags.restoreFailed')),
   });
 
   const handleCreate = () => {

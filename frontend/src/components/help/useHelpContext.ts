@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserRole } from '../../types/auth';
 import { helpService, HelpStatus, OnboardingStatus, ContextHint } from '../../services/HelpService';
 import { reportHandledError } from '../../utils/errorReporting';
 
@@ -39,7 +40,7 @@ export function useHelpContext() {
   const [contextHint, setContextHint] = useState<ContextHint | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const role = hasRole('admin') ? 'admin' : 'teacher';
+  const role = hasRole(UserRole.ADMIN) ? 'admin' : 'teacher';
   const route = location.pathname;
 
   useEffect(() => {

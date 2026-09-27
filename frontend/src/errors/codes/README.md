@@ -49,12 +49,17 @@ in `AppError.ts` grows by one import line.
    `dashboard.ts` is fallback-only because `dashboard.py` raises no
    `HTTPException` at all today.
 
-   `rag.ts` is frontend-only for a different reason: its `rag_validation_*`
-   codes come from `RAGService.validateRAGRequest`, a check that runs in the
-   browser before any request is sent (TF-772 PR 5). The backend's own `rag_*`
-   codes already exist in `rag_exams.py` (TF-773, PR #249) but are not yet
-   registered here; the `validation` infix keeps the two groups apart once
-   they are.
+   `rag.ts` holds two groups under one prefix. Its `rag_validation_*` codes
+   are frontend-only: they come from `RAGService.validateRAGRequest`, a check
+   that runs in the browser before any request is sent (TF-772 PR 5). The
+   backend's own `rag_*` codes from `rag_exams.py` joined them in TF-773
+   Teil D — the reachable ten, with the four unreachable ones named in the
+   file's header. The `validation` infix keeps the two groups apart.
+
+   `tags.ts` (TF-773 Teil D) replaced the `apiDetail()` special case: the two
+   tag-management surfaces render the backend's codes like every other
+   component instead of its raw German `detail`. `stats.ts` holds the one
+   `stats_*` code a component can receive, which `submissions.py` reuses.
 
    `grades.ts`, `orgUnits.ts` and `help.ts` were fallback-only when TF-772 PR 4
    branched — `grades.py`, `org_units.py` and `core/backend/api/v1/help.py`

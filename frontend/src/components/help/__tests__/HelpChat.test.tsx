@@ -1,7 +1,10 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+
+import HelpChat from '../HelpChat';
+import { helpService } from '../../../services/HelpService';
 
 // jsdom does not implement scrollIntoView
 window.HTMLElement.prototype.scrollIntoView = jest.fn();
@@ -32,9 +35,6 @@ jest.mock('react-i18next', () => ({
     i18n: { language: 'de' },
   }),
 }));
-
-import HelpChat from '../HelpChat';
-import { helpService } from '../../../services/HelpService';
 
 const theme = createTheme();
 const renderChat = () =>
@@ -73,12 +73,10 @@ describe('HelpChat — Loading-Indikator', () => {
     const input = screen.getByPlaceholderText(/Stelle eine Frage/i);
     fireEvent.change(input, { target: { value: 'Test?' } });
 
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-    });
+    fireEvent.keyDown(input, { key: 'Enter' });
 
+    expect(await screen.findByText('Hier ist die Antwort.')).toBeInTheDocument();
     expect(screen.queryByText(/Denke nach/i)).not.toBeInTheDocument();
-    expect(screen.getByText('Hier ist die Antwort.')).toBeInTheDocument();
   });
 });
 
@@ -113,12 +111,13 @@ describe('HelpChat — sessionStorage Persistenz', () => {
     const input = screen.getByPlaceholderText(/Stelle eine Frage/i);
     fireEvent.change(input, { target: { value: 'Meine Frage' } });
 
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-    });
+    fireEvent.keyDown(input, { key: 'Enter' });
 
-    const saved = JSON.parse(sessionStorage.getItem('ec_help_chat_messages') || '[]');
-    expect(saved).toHaveLength(2);
+    // The persistence effect runs after the answer is committed, so wait on
+    // the stored array itself rather than on the rendered answer text.
+    const readSaved = () => JSON.parse(sessionStorage.getItem('ec_help_chat_messages') || '[]');
+    await waitFor(() => expect(readSaved()).toHaveLength(2));
+    const saved = readSaved();
     expect(saved[0]).toMatchObject({ role: 'user', content: 'Meine Frage' });
     expect(saved[1]).toMatchObject({ role: 'assistant', content: 'Die Antwort.' });
   });
@@ -135,9 +134,8 @@ describe('HelpChat — sessionStorage Persistenz', () => {
     const input = screen.getByPlaceholderText(/Stelle eine Frage/i);
     fireEvent.change(input, { target: { value: 'Frage' } });
 
-    await act(async () => {
-      fireEvent.keyDown(input, { key: 'Enter' });
-    });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await screen.findByText('Antwort.');
 
     fireEvent.click(screen.getByRole('button', { name: /Neue Konversation/i }));
 

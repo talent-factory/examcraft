@@ -436,7 +436,7 @@ const ReviewQueue: React.FC<Props> = ({
                     inputProps={{
                       'aria-label': t('auswertungen.exam.review.selectGradeAria'),
                       'data-testid': `select-${item.grade_id}`,
-                    }}
+                    } as React.InputHTMLAttributes<HTMLInputElement>}
                   />
                   <Box sx={{ flexGrow: 1 }}>
                     <Stack direction="row" spacing={1} sx={{ mb: 1 }}>

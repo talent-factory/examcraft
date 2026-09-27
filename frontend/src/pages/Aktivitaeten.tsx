@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import type { Locale } from 'date-fns';
 import { de, enUS, fr, it } from 'date-fns/locale';
 import { reportHandledError } from '../utils/errorReporting';
 import {

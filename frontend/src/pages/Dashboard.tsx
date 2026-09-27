@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import type { Locale } from 'date-fns';
 import { de, enUS, fr, it } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
 import { QuickActionCard } from '../components/cards/QuickActionCard';

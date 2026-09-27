@@ -1353,7 +1353,8 @@ def test_delete_import_aborts_and_rolls_back_when_audit_fails(
     test_db: Session,
 ) -> None:
     """Fail-closed: if the audit write fails, the deletion is rolled back and
-    the endpoint returns 500 — no data loss without a trail (TF-421)."""
+    the endpoint returns 503 (transient, retryable) — no data loss without a
+    trail (TF-421)."""
     from models.submission import Attempt, Submission
     from services.audit_service import AuditService
 
@@ -1378,7 +1379,7 @@ def test_delete_import_aborts_and_rolls_back_when_audit_fails(
             "DELETE", "/api/v1/submissions/import", params={"exam_id": exam.id}
         )
 
-    assert response.status_code == 500, response.text
+    assert response.status_code == 503, response.text
     logged.assert_called_once()
     # Deletion was rolled back — results survive.
     assert test_db.query(Submission).filter(Submission.exam_id == exam.id).count() == 2

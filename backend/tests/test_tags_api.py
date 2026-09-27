@@ -2,8 +2,9 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from main import app
 from models.auth import Institution, User, UserStatus
@@ -260,6 +261,36 @@ class TestCreateTag:
         resp = tags_client.post("/api/v1/tags", json={"name": "verboten"})
 
         assert resp.status_code == 403
+        assert resp.json()["error_code"] == "tags_create_questions_permission_required"
+
+    def test_create_tag_race_condition_returns_409(
+        self, tags_db: Session, tags_client: TestClient
+    ) -> None:
+        """``tags_name_exists`` (TF-773 Teil D) is a race-condition guard, not
+        the normal duplicate path: a plain duplicate never reaches ``commit()``
+        because the case-insensitive pre-check above already returns the
+        existing tag (200, see ``test_create_tag_duplicate_returns_existing_tag``).
+        The 409 only fires if a concurrent request commits the same name
+        between the pre-check and this request's own commit — simulated here
+        by forcing ``IntegrityError`` on commit, the same pattern as
+        ``test_gdpr_deletion_service.py::test_delete_user_and_gdpr_data_keeps_file_when_commit_fails``."""
+        inst = make_institution(tags_db, "race")
+        user_db = make_user(tags_db, inst.id, "race")
+
+        from utils.auth_utils import get_current_user
+
+        mock_user = _make_mock_user(inst.id, user_db.id)
+        app.dependency_overrides[get_current_user] = lambda: mock_user
+
+        with patch.object(
+            tags_db,
+            "commit",
+            side_effect=IntegrityError("INSERT INTO tags ...", {}, Exception()),
+        ):
+            resp = tags_client.post("/api/v1/tags", json={"name": "wettlauf"})
+
+        assert resp.status_code == 409
+        assert resp.json()["error_code"] == "tags_name_exists"
 
 
 # ---------------------------------------------------------------------------

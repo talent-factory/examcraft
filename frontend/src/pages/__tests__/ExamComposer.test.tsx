@@ -128,8 +128,8 @@ describe('ExamComposer', () => {
       // ExamBuilderView mock should now be visible
       await waitFor(() => {
         expect(screen.getByTestId('exam-builder-view')).toBeInTheDocument();
-        expect(screen.getByTestId('exam-builder-exam-id')).toHaveTextContent('42');
       });
+      expect(screen.getByTestId('exam-builder-exam-id')).toHaveTextContent('42');
     });
 
     it('switches back to ExamListView when onBack is called from builder', async () => {
@@ -168,6 +168,8 @@ describe('ExamComposer', () => {
 
       await waitFor(() => {
         expect(screen.queryByTestId('exam-builder-view')).not.toBeInTheDocument();
+      });
+      await waitFor(() => {
         expect(screen.getByText('Prüfungskomponist')).toBeInTheDocument();
       });
     });
@@ -208,8 +210,8 @@ describe('ExamComposer', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('exam-builder-view')).toBeInTheDocument();
-        expect(screen.getByTestId('exam-builder-exam-id')).toHaveTextContent('99');
       });
+      expect(screen.getByTestId('exam-builder-exam-id')).toHaveTextContent('99');
     });
   });
 

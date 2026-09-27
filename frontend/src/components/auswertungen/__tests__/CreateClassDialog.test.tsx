@@ -1,4 +1,3 @@
-jest.mock('../../../api/apiClient');
 /**
  * Tests for CreateClassDialog (TF-336 G2).
  */
@@ -16,6 +15,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CreateClassDialog from '../CreateClassDialog';
 import { StudentClassesService } from '../../../services/studentClassesService';
 import { ApiError } from '../../../services/submissionsService';
+jest.mock('../../../api/apiClient');
 
 jest.mock('../../../services/studentClassesService');
 
@@ -78,7 +78,7 @@ describe('CreateClassDialog', () => {
     });
     fireEvent.click(screen.getByTestId('create-class-submit'));
 
-    await waitFor(() => screen.getByTestId('create-class-error'));
+    await screen.findByTestId('create-class-error');
     expect(screen.getByTestId('create-class-error')).toHaveTextContent(
       /existiert bereits/,
     );

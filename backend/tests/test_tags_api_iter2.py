@@ -249,6 +249,7 @@ class TestArchiveUnarchive:
 
         resp = tags_client.post(f"/api/v1/tags/{tag.id}/unarchive")
         assert resp.status_code == 403
+        assert resp.json()["error_code"] == "tags_access_denied"
 
     def test_archived_tag_not_assignable(self, tags_db, tags_client):
         inst = make_institution(tags_db, "ar3")
@@ -294,6 +295,7 @@ class TestRenameTag:
 
         resp = tags_client.patch(f"/api/v1/tags/{tag.id}", json={"name": "existing"})
         assert resp.status_code == 409
+        assert resp.json()["error_code"] == "tags_name_exists_on_rename"
 
 
 class TestMergeTags:
@@ -352,6 +354,7 @@ class TestMergeTags:
             json={"source_ids": [tag.id], "target_id": tag.id},
         )
         assert resp.status_code == 422
+        assert resp.json()["error_code"] == "tags_merge_target_in_sources"
 
 
 class TestUsageCount:
@@ -510,6 +513,7 @@ class TestDeleteTag:
 
         resp = tags_client.delete(f"/api/v1/tags/{tag.id}")
         assert resp.status_code == 422
+        assert resp.json()["error_code"] == "tags_still_in_use"
 
     def test_cannot_delete_active_tag(self, tags_db, tags_client):
         inst = make_institution(tags_db, "del3")
@@ -522,6 +526,7 @@ class TestDeleteTag:
 
         resp = tags_client.delete(f"/api/v1/tags/{tag.id}")
         assert resp.status_code == 422
+        assert resp.json()["error_code"] == "tags_delete_archived_only"
 
     def test_non_admin_can_delete_own_archived_tag(self, tags_db, tags_client):
         inst = make_institution(tags_db, "del4")

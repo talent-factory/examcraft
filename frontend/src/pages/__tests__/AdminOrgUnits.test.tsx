@@ -127,7 +127,7 @@ describe('AdminOrgUnits', () => {
 
   it('opens the create dialog when clicking the create button', async () => {
     renderWithTheme();
-    await waitFor(() => screen.getByTestId('ou-page-table'));
+    await screen.findByTestId('ou-page-table');
 
     fireEvent.click(screen.getByTestId('ou-page-create'));
 
@@ -138,7 +138,7 @@ describe('AdminOrgUnits', () => {
   it('shows a descendant-count warning and deletes on confirm', async () => {
     mockedService.remove.mockResolvedValue(undefined);
     renderWithTheme();
-    await waitFor(() => screen.getByTestId('ou-row-1'));
+    await screen.findByTestId('ou-row-1');
 
     fireEvent.click(screen.getByTestId('ou-btn-delete-1'));
 
@@ -163,7 +163,7 @@ describe('AdminOrgUnits', () => {
     // the case that fires for the overwhelming majority of real org units.
     mockedService.list.mockResolvedValue({ items: [fakultaet] });
     renderWithTheme();
-    await waitFor(() => screen.getByTestId('ou-row-3'));
+    await screen.findByTestId('ou-row-3');
 
     fireEvent.click(screen.getByTestId('ou-btn-delete-3'));
 

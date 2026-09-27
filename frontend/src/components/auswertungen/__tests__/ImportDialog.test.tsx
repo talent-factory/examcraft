@@ -1,4 +1,3 @@
-jest.mock('../../../api/apiClient');
 /**
  * Tests for ImportDialog.
  */
@@ -17,6 +16,7 @@ import ImportDialog from '../ImportDialog';
 import { SubmissionsService } from '../../../services/submissionsService';
 import { ImportJob, ImportPreview } from '../../../types/submission';
 import { useActivityHeartbeat } from '../../../hooks/useActivityHeartbeat';
+jest.mock('../../../api/apiClient');
 
 jest.mock('../../../services/submissionsService');
 const mockSubmissionsService = SubmissionsService as jest.Mocked<

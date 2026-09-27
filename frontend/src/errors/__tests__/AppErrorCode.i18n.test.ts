@@ -21,8 +21,7 @@ import itLocale from '../../locales/it/translation.json';
  * (`generic`, `network`, `oauth.callbackFailed`, `oauth.providerError`) are
  * legitimate translateError() fallback keys or direct t() calls, not
  * AppError codes, and distinguishing those from real orphans needs more than
- * a JSON walk. See TagSettingsPage's apiDetail.boundary.test.ts for the same
- * "forward-only, documented scope" tradeoff.
+ * a JSON walk — a "forward-only, documented scope" tradeoff.
  */
 
 const ERROR_KEY_PREFIX = 'errors.';

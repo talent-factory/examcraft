@@ -352,7 +352,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
       error: null,
     });
 
-    const first = renderProvider();
+    const view = renderProvider();
     await waitFor(() => expect(captured!.getTask('task-done')?.result).toEqual(EXAM_RESULT));
 
     act(() => {
@@ -361,7 +361,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     expect(captured!.getTask('task-done')).toBeUndefined();
 
     // Simulate a reload: new provider, same sessionStorage.
-    first.unmount();
+    view.unmount();
     mockGetTaskResult.mockClear();
     renderProvider();
 

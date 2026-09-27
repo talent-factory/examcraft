@@ -526,6 +526,48 @@ _premium_portfolio_classification_routes = (
 celery_app.conf.task_routes.update(_premium_portfolio_classification_routes)
 
 
+def _resolve_premium_portfolio_grading_task_registration(
+    deployment_mode: str,
+) -> dict:
+    """Conditional Celery registration for the portfolio grading task
+    (Epic 4). Mirrors
+    ``_resolve_premium_portfolio_classification_task_registration`` 1:1 --
+    on-demand (no beat schedule), same queue as ingestion/classification
+    (same assessment flow, no dedicated worker per queue in this
+    deployment, see fly.celery.toml).
+    """
+    if deployment_mode != "full":
+        return {}
+    try:
+        import premium.tasks.portfolio_grading_tasks  # noqa: F401
+    except ImportError as e:
+        logger.warning("Premium portfolio-grading task not available: %s", e)
+        return {}
+    except Exception:
+        logger.error(
+            "Premium portfolio-grading task import failed unexpectedly — "
+            "degrading (task will not run)",
+            exc_info=True,
+        )
+        return {}
+
+    task_name = "premium.tasks.portfolio_grading_tasks.run_portfolio_grading"
+    return {
+        task_name: {
+            "queue": "document_processing",
+            "routing_key": "document.process",
+        }
+    }
+
+
+_premium_portfolio_grading_routes = (
+    _resolve_premium_portfolio_grading_task_registration(
+        os.getenv("DEPLOYMENT_MODE", "core")
+    )
+)
+celery_app.conf.task_routes.update(_premium_portfolio_grading_routes)
+
+
 def _resolve_premium_portfolio_watchdog_registration(
     deployment_mode: str,
 ) -> tuple[dict, dict]:
