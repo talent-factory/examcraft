@@ -31,6 +31,15 @@ ALIAS_WIZARD = "examcraft/wizard"
 # independently on the gateway.
 ALIAS_PORTFOLIO_CLASSIFICATION = "examcraft/portfolio-classification"
 
+# Epic 4 (Portfolio-Assessment, Bewertungs-Engine): eigener Alias statt
+# Wiederverwendung von ALIAS_GRADING oder ALIAS_PORTFOLIO_CLASSIFICATION --
+# die holistische Kriterien-Bewertung (wenige aber teure Calls, grosser
+# Prompt-Kontext) hat andere Kosten-/Qualitaetsanforderungen als sowohl das
+# normale Freitext-Grading als auch die vielen kleinen
+# Klassifikations-Calls, und soll unabhaengig davon auf dem Gateway
+# geroutet werden koennen.
+ALIAS_PORTFOLIO_GRADING = "examcraft/portfolio-grading"
+
 
 def gateway_enabled() -> bool:
     """True, wenn der Gateway-Pfad aktiv ist (Rollback = Variable leeren)."""
