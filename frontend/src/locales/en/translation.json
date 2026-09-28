@@ -528,7 +528,7 @@
   "footer": {
     "tagline": "AI-assisted exam assistant",
     "legalLinks": "Legal information",
-    "aiNoticeText": "AI notice: content is sent to AI models for question generation, help chat, automatic grading, and indexing of uploaded documents. Structured personal data such as names, email addresses, or grades is not deliberately transmitted.",
+    "aiNoticeText": "AI notice: content is sent to AI models for question generation, help chat, automatic grading (including multi-phase portfolio/project assessments), and indexing of uploaded or GitHub-repository-linked documents. Structured personal data such as names, email addresses, or grades is not deliberately transmitted.",
     "aiNoticeLinkLabel": "Learn more",
     "aiNoticeLinkAriaLabel": "Learn more: transmission of content to AI models"
   },

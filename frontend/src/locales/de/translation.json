@@ -528,7 +528,7 @@
   "footer": {
     "tagline": "KI-gestützte Prüfungsassistenz",
     "legalLinks": "Rechtliche Informationen",
-    "aiNoticeText": "KI-Hinweis: Für Fragengenerierung, Hilfe-Chat, automatische Bewertung und die Indexierung hochgeladener Dokumente werden Inhalte an KI-Modelle übermittelt. Strukturierte Personendaten wie Namen, E-Mail-Adressen oder Noten werden dabei nicht gezielt übermittelt.",
+    "aiNoticeText": "KI-Hinweis: Für Fragengenerierung, Hilfe-Chat, automatische Bewertung (auch mehrphasige Portfolio-/Projektarbeiten) und die Indexierung hochgeladener oder per GitHub-Repository verknüpfter Dokumente werden Inhalte an KI-Modelle übermittelt. Strukturierte Personendaten wie Namen, E-Mail-Adressen oder Noten werden dabei nicht gezielt übermittelt.",
     "aiNoticeLinkLabel": "Mehr erfahren",
     "aiNoticeLinkAriaLabel": "Mehr erfahren: Übermittlung von Inhalten an KI-Modelle"
   },

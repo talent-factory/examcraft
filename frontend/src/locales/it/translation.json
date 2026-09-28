@@ -528,7 +528,7 @@
   "footer": {
     "tagline": "Assistente d'esame assistito dall'IA",
     "legalLinks": "Informazioni legali",
-    "aiNoticeText": "Nota IA: per la generazione delle domande, la chat di aiuto, la valutazione automatica e l'indicizzazione dei documenti caricati vengono trasmessi contenuti a modelli di IA. I dati personali strutturati come nomi, indirizzi e-mail o voti non vengono trasmessi in modo mirato.",
+    "aiNoticeText": "Nota IA: per la generazione delle domande, la chat di aiuto, la valutazione automatica (inclusa la valutazione di portfolio/lavori di progetto in più fasi) e l'indicizzazione dei documenti caricati o collegati tramite repository GitHub vengono trasmessi contenuti a modelli di IA. I dati personali strutturati come nomi, indirizzi e-mail o voti non vengono trasmessi in modo mirato.",
     "aiNoticeLinkLabel": "Scopri di più",
     "aiNoticeLinkAriaLabel": "Scopri di più: trasmissione di contenuti a modelli di IA"
   },

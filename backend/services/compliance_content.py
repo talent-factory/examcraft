@@ -93,9 +93,14 @@ def _build_avv() -> ComplianceDocument:
                 "hochgeladenen Unterrichtsmaterialien, KI-gestützte "
                 "Generierung von Prüfungsfragen auf Basis dieser Materialien, "
                 "Erfassung und automatisierte Vorbewertung von Prüfungs"
-                "antworten (als Vorschlag, nicht als finale Note), Speicherung "
-                "von Prüfungsergebnissen sowie Audit-Protokollierung "
-                "sicherheitsrelevanter Vorgänge.",
+                "antworten (als Vorschlag, nicht als finale Note), Erfassung "
+                "und mehrphasige KI-gestützte Vorbewertung von hochgeladenen "
+                "Portfolio- bzw. Projektarbeiten (ebenfalls als Vorschlag je "
+                "Phase, nicht als finale Bewertung, bis eine Lehrperson jede "
+                "Phase geprüft und bestätigt oder korrigiert hat), "
+                "Speicherung von Prüfungs- und Portfolio-Bewertungs"
+                "ergebnissen sowie Audit-Protokollierung sicherheits"
+                "relevanter Vorgänge.",
             ),
         ),
         ComplianceSection(
@@ -106,6 +111,9 @@ def _build_avv() -> ComplianceDocument:
                 "Kennungen von Lernenden (external_id — Klarnamen werden "
                 "gemäss Systemdesign standardmässig nicht gespeichert), "
                 "Prüfungsantworten und daraus abgeleitete Bewertungen, "
+                "hochgeladene Portfolio-/Projektunterlagen (Dokumente "
+                "bzw. optional vom Nutzer selbst verknüpfter GitHub-"
+                "Repository-Inhalt) und daraus abgeleitete Bewertungen, "
                 "technische Zugriffsdaten (IP-Adresse, User-Agent, "
                 "Zeitstempel) im Audit-Log.",
             ),
