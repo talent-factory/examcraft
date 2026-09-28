@@ -2,8 +2,9 @@
 
 Design: docs/adr/0004-institution-admin-read-all-bypass-convention.md
 
-Each of the five resources (documents, prompts, questions, exams,
-competencies) gets its own ``<resource>:read_all`` permission string.
+Each of the six resources (documents, prompts, questions, exams,
+competencies, portfolio_templates) gets its own ``<resource>:read_all``
+permission string.
 ``has_read_all_bypass()`` is the single point every resource's own
 visibility filter (the ``document_visibility.py`` pattern) is meant to call
 to check it -- wiring the actual query filter into any resource is that
@@ -55,13 +56,14 @@ def _make_role(db, name: str, permissions: list[str]) -> Role:
     return role
 
 
-def test_registry_maps_all_five_resources_to_their_permission_string():
+def test_registry_maps_all_six_resources_to_their_permission_string():
     assert dict(RESOURCE_READ_ALL_PERMISSIONS) == {
         "documents": "documents:read_all",
         "prompts": "prompt:read_all",
         "questions": "questions:read_all",
         "exams": "exams:read_all",
         "competencies": "competencies:read_all",
+        "portfolio_templates": "portfolio_templates:read_all",
     }
 
 

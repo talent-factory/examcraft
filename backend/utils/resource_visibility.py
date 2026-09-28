@@ -2,13 +2,18 @@
 
 Design: docs/adr/0004-institution-admin-read-all-bypass-convention.md
 
-Each of the five in-scope resources (documents, prompts, questions, exams,
-competencies) gets its own ``<resource>:read_all`` permission string,
-registered in ``utils.permissions.KNOWN_PERMISSIONS`` so it is seedable
-(``utils.seed_roles``) and assignable to custom roles via the existing
-Role-Permissions-Editor GUI (TF-603) without any further wiring — any string
-present in ``KNOWN_PERMISSIONS`` is automatically listed and assignable
-there.
+Each of the six in-scope resources (documents, prompts, questions, exams,
+competencies, portfolio_templates) gets its own ``<resource>:read_all``
+permission string, registered in ``utils.permissions.KNOWN_PERMISSIONS`` so
+it is assignable to custom roles via the existing Role-Permissions-Editor GUI
+(TF-603) without any further wiring — any string present in
+``KNOWN_PERMISSIONS`` is automatically listed and assignable there.
+``portfolio_templates:read_all`` (TF-914) is, unlike the first five, opt-in
+only (``utils.permissions.OPT_IN_ONLY_PERMISSIONS``) rather than seeded to
+the default Admin role — the base ``portfolio_templates:read``/``:manage``
+permissions are themselves opt-in (Portfolio-Assessment is a pilot feature,
+TF-906), so auto-seeding the bypass would grant an institution admin a
+permission whose prerequisite they don't have by default.
 
 This module is deliberately thin: it does *not* build a query filter or a
 generic visibility abstraction. The actual filter shape (which visibility
@@ -36,6 +41,7 @@ RESOURCE_READ_ALL_PERMISSIONS: Mapping[str, str] = MappingProxyType(
         "questions": "questions:read_all",
         "exams": "exams:read_all",
         "competencies": "competencies:read_all",
+        "portfolio_templates": "portfolio_templates:read_all",
     }
 )
 
@@ -45,9 +51,9 @@ def has_read_all_bypass(user: User, resource: str) -> bool:
 
     ``resource`` must be a key of ``RESOURCE_READ_ALL_PERMISSIONS``
     (``"documents"``, ``"prompts"``, ``"questions"``, ``"exams"``,
-    ``"competencies"``) — an unknown key raises ``KeyError`` rather than
-    silently returning ``False``, so a typo'd resource name fails loudly
-    instead of quietly denying the bypass.
+    ``"competencies"``, ``"portfolio_templates"``) — an unknown key raises
+    ``KeyError`` rather than silently returning ``False``, so a typo'd
+    resource name fails loudly instead of quietly denying the bypass.
     """
     permission = RESOURCE_READ_ALL_PERMISSIONS[resource]
     return user.has_permission(permission)

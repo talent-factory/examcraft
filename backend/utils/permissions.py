@@ -15,7 +15,8 @@ A third group is opt-in only: registered here so it is assignable via the
 custom role editor, but deliberately never seeded to any default role — see
 ``OPT_IN_ONLY_PERMISSIONS`` for the current set (``users:impersonate``,
 TF-740, was the first member; ``ilias:use``, TF-782, the second;
-``portfolio_templates:manage``/``:read``, TF-906, the third and fourth).
+``portfolio_templates:manage``/``:read``, TF-906, the third and fourth;
+``portfolio_templates:read_all``, TF-914, the fifth).
 """
 
 import json
@@ -126,6 +127,14 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "label": "Portfolio-Bewertungs-Templates einsehen",
         "category": "Portfolio-Bewertung",
     },
+    # TF-914: institution-admin always-read-access bypass (mirrors the five
+    # TF-639 read_all permissions above), but opt-in only like the two
+    # portfolio_templates:* permissions above -- see OPT_IN_ONLY_PERMISSIONS
+    # and utils/resource_visibility.py's module docstring for why.
+    "portfolio_templates:read_all": {
+        "label": "Alle Portfolio-Bewertungs-Templates einsehen (Institutions-Admin)",
+        "category": "Portfolio-Bewertung",
+    },
     # TF-921: opt-in only, gleiche Begruendung wie portfolio_templates:*
     # oben -- Assessment-Ingestion ist Epic 2 derselben Pilot-Faehigkeit.
     "portfolio_assessments:manage": {
@@ -154,6 +163,7 @@ OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset(
         "ilias:use",
         "portfolio_templates:manage",
         "portfolio_templates:read",
+        "portfolio_templates:read_all",
         "portfolio_assessments:manage",
         "portfolio_assessments:read",
     }
