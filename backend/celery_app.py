@@ -571,15 +571,15 @@ celery_app.conf.task_routes.update(_premium_portfolio_grading_routes)
 def _resolve_premium_portfolio_watchdog_registration(
     deployment_mode: str,
 ) -> tuple[dict, dict]:
-    """Bedingte Celery-Registrierung fuer den Portfolio-Ingestion-Watchdog
-    (TF-936).
+    """Bedingte Celery-Registrierung fuer die Portfolio-Ingestion-/
+    Klassifikations-Watchdogs (TF-936/TF-944).
 
     Mirrors ``_resolve_premium_ops_alert_registration`` (Rueckgabe-statt-
     Seiteneffekt-Form, unit-testbar ohne Neuaufbau der echten Celery-App --
     siehe ``test_celery_config.py::test_premium_portfolio_watchdog_
     registration_*``), anders als ``_resolve_premium_portfolio_ingestion_
-    task_registration`` aber MIT Beat-Schedule-Haelfte: dieser Task ist
-    periodisch (reaped stuck ``PortfolioAssessmentJob``-Zeilen alle 5
+    task_registration`` aber MIT Beat-Schedule-Haelfte: beide Tasks sind
+    periodisch (reapen stuck ``PortfolioAssessmentJob``-Zeilen alle 5
     Minuten), nicht on-demand.
 
     MUSS erst aufgerufen werden, nachdem ``celery_app = Celery(...)`` oben
@@ -602,21 +602,33 @@ def _resolve_premium_portfolio_watchdog_registration(
         )
         return {}, {}
 
-    task_name = (
+    ingestion_task_name = (
         "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_ingestion_jobs"
+    )
+    classification_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks."
+        "reap_stuck_portfolio_classification_jobs"
     )
     return (
         {
             "reap-stuck-portfolio-ingestion-jobs-every-5-minutes": {
-                "task": task_name,
+                "task": ingestion_task_name,
                 "schedule": 300.0,  # 5 minutes
-            }
+            },
+            "reap-stuck-portfolio-classification-jobs-every-5-minutes": {
+                "task": classification_task_name,
+                "schedule": 300.0,  # 5 minutes
+            },
         },
         {
-            task_name: {
+            ingestion_task_name: {
                 "queue": "maintenance_processing",
                 "routing_key": "maintenance.process",
-            }
+            },
+            classification_task_name: {
+                "queue": "maintenance_processing",
+                "routing_key": "maintenance.process",
+            },
         },
     )
 

@@ -368,6 +368,19 @@ def test_premium_portfolio_watchdog_registration_reflects_actual_importability_i
         "routing_key": "maintenance.process",
     }
 
+    classification_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks."
+        "reap_stuck_portfolio_classification_jobs"
+    )
+    assert (
+        beat["reap-stuck-portfolio-classification-jobs-every-5-minutes"]["task"]
+        == classification_task_name
+    )
+    assert routes[classification_task_name] == {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    }
+
 
 def test_premium_portfolio_watchdog_registration_import_error_deterministically_degrades(
     monkeypatch,
@@ -430,5 +443,15 @@ def test_portfolio_watchdog_task_is_registered_and_routed_in_running_app():
         pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
     assert (
         "reap-stuck-portfolio-ingestion-jobs-every-5-minutes"
+        in celery_app.conf.beat_schedule
+    )
+
+    classification_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks."
+        "reap_stuck_portfolio_classification_jobs"
+    )
+    assert classification_task_name in celery_app.conf.task_routes
+    assert (
+        "reap-stuck-portfolio-classification-jobs-every-5-minutes"
         in celery_app.conf.beat_schedule
     )
