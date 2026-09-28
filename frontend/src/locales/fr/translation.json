@@ -3777,5 +3777,19 @@
       "v1_8_4_result_import": "L'import des résultats avec questions à réponse libre fonctionne désormais de manière fiable en arrière-plan, avec une progression visible",
       "v1_8_4_reasoning_formatting": "Les justifications dans la vue d'évaluation s'affichent désormais correctement mises en forme"
     }
+  },
+  "aiAct": {
+    "taskDraft": {
+      "label": "Projet de tâche généré par IA",
+      "hint": "Cette tâche a été rédigée par un système d'IA. Veuillez en vérifier le contenu avant de l'utiliser."
+    },
+    "gradingSuggestion": {
+      "label": "Proposition de notation assistée par IA",
+      "hint": "Cette proposition de notation provient d'un système d'IA. La note finale est fixée par l'enseignant."
+    },
+    "chat": {
+      "label": "Assistant IA",
+      "hint": "Vous interagissez avec un système d'IA et non avec un humain. Les réponses sont générées automatiquement et peuvent contenir des erreurs."
+    }
   }
 }

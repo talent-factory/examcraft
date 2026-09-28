@@ -2007,6 +2007,18 @@ class TestExamExportApi(
         detail = response.json()["detail"].lower()
         assert "nicht unterstützt" in detail or "unsupported" in detail
 
+    @pytest.mark.parametrize("fmt", ["md", "json", "pdf", "moodle"])
+    def test_export_sets_ai_disclosure_header(
+        self, fmt, exam_client, exam_db, exam_institution, exam_user
+    ):
+        """Every successful export is machine-marked (EU AI Act Art. 50, TF-747)."""
+        exam_id = self._create_exam_with_question(
+            exam_client, exam_db, exam_institution.id, exam_user.id
+        )
+        response = exam_client.get(f"/api/v1/exams/{exam_id}/export/{fmt}")
+        assert response.status_code == 200, response.text
+        assert response.headers["X-AI-Generated-Content"] == "true"
+
     def test_export_pdf_format(self, exam_client, exam_db, exam_institution, exam_user):
         """GET /export/pdf returns a real PDF with an attachment filename."""
         exam_id = self._create_exam_with_question(

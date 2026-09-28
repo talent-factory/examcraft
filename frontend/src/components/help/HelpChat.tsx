@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { helpService } from '../../services/HelpService';
 import HelpMessage from './HelpMessage';
+import AiNotice from '../common/AiNotice';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -97,6 +98,7 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        <AiNotice kind="chat" sx={{ mb: 2 }} />
         {messages.length === 0 && (
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 4 }}>
             {t('help.chatPlaceholder')}

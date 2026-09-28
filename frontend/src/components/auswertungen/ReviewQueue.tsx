@@ -46,6 +46,7 @@ import { translateError } from '../../errors';
 import { ReviewQueueItem } from '../../types/submission';
 import OverrideGradeDialog from './OverrideGradeDialog';
 import MarkdownRenderer from '../MarkdownRenderer';
+import AiNotice from '../common/AiNotice';
 import { reflowMoodleAnswer } from '../../utils/moodleAnswerReflow';
 
 // Lower bound for the bulk confidence threshold: 0% would collect
@@ -235,6 +236,7 @@ const ReviewQueue: React.FC<Props> = ({
 
   return (
     <Box data-testid="review-queue">
+      <AiNotice kind="gradingSuggestion" sx={{ mb: 2 }} />
       {/* Filters */}
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent>

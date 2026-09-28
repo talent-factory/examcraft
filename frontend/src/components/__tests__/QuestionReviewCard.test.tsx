@@ -64,6 +64,18 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
     });
 
+    it('labels the question as an AI-generated task draft (Art. 50)', () => {
+      render(
+        <TestWrapper>
+          <QuestionReviewCard question={mockQuestion} />
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('ai-notice-taskDraft')).toHaveTextContent(
+        'KI-generierter Aufgabenentwurf'
+      );
+    });
+
     it('renders all multiple choice options', () => {
       render(
         <TestWrapper>

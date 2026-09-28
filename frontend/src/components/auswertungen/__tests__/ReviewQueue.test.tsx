@@ -250,6 +250,14 @@ describe('ReviewQueue', () => {
     });
   });
 
+  it('labels the queue as AI-assisted grading suggestions (Art. 50)', async () => {
+    mockGradesService.getReviewQueue.mockResolvedValue({ items: [], total: 0 });
+    renderQueue();
+    expect(await screen.findByTestId('ai-notice-gradingSuggestion')).toHaveTextContent(
+      'KI-gestützter Bewertungsvorschlag',
+    );
+  });
+
   it('shows error alert when load fails', async () => {
     mockGradesService.getReviewQueue.mockRejectedValue(
       new Error('Boom'),

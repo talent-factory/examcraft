@@ -7,12 +7,18 @@ import json
 import logging
 import math
 from html.parser import HTMLParser
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Comment, Element, SubElement, tostring
 from xml.dom.minidom import parseString
 from xml.sax.saxutils import escape as _xml_escape
 
 import markdown as _markdown
 
+from services.ai_disclosure import (
+    AI_DISCLOSURE,
+    AI_DISCLOSURE_TAG,
+    GENERATOR,
+    exam_ai_notice,
+)
 from services.grading.deterministic_grader import DeterministicGrader
 from services.translation_service import DEFAULT_LOCALE, t
 from utils.question_options import normalize_options
@@ -51,6 +57,18 @@ def _md_to_html(text: str | None) -> str:
     return _markdown.markdown(text, extensions=["sane_lists", "nl2br"])
 
 
+def _md_answer_area(q: dict, locale: str) -> list[str]:
+    """Markdown lines for the answer area of one question, by question type."""
+    if q["question_type"] in ("single_choice", "multiple_choice") and q.get("options"):
+        return ["", *(f"- [ ] {opt}" for opt in q["options"]), ""]
+    if q["question_type"] == "true_false":
+        return [
+            f"\n- [ ] {t('export_true', locale=locale)}\n"
+            f"- [ ] {t('export_false', locale=locale)}\n"
+        ]
+    return [f"\n*{t('export_answer', locale=locale)}:*\n\n\\  \n\\  \n\\  \n"]
+
+
 class MarkdownExporter:
     @staticmethod
     def export(exam_data: dict, include_solutions: bool = False) -> str:
@@ -71,6 +89,8 @@ class MarkdownExporter:
 
         lines = []
         lines.append(f"# {exam_data['title']}\n")
+        # EU AI Act Art. 50 (TF-747): visible AI marking.
+        lines.append(f"> {exam_ai_notice(locale)}\n")
 
         if exam_data.get("course"):
             lines.append(
@@ -118,22 +138,7 @@ class MarkdownExporter:
             )
             lines.append(f"{q['question_text']}\n")
 
-            if q["question_type"] in ("single_choice", "multiple_choice") and q.get(
-                "options"
-            ):
-                lines.append("")
-                for opt in q["options"]:
-                    lines.append(f"- [ ] {opt}")
-                lines.append("")
-            elif q["question_type"] == "true_false":
-                lines.append(
-                    f"\n- [ ] {t('export_true', locale=locale)}\n"
-                    f"- [ ] {t('export_false', locale=locale)}\n"
-                )
-            else:
-                lines.append(
-                    f"\n*{t('export_answer', locale=locale)}:*\n\n\\  \n\\  \n\\  \n"
-                )
+            lines.extend(_md_answer_area(q, locale))
 
             if include_solutions and q.get("correct_answer"):
                 lines.append(
@@ -167,6 +172,11 @@ class JsonExporter:
     @staticmethod
     def _export(exam_data: dict) -> str:
         output = {
+            # EU AI Act Art. 50 (TF-747): machine-readable AI marking.
+            "ai_disclosure": {
+                **AI_DISCLOSURE,
+                "notice": exam_ai_notice(_exam_locale(exam_data)),
+            },
             "exam": {
                 "title": exam_data["title"],
                 "course": exam_data.get("course"),
@@ -259,12 +269,16 @@ class MoodleXmlExporter:
     @staticmethod
     def _export_impl(exam_data: dict) -> tuple[str, list[dict], list[int]]:
         quiz = Element("quiz")
+        # EU AI Act Art. 50 (TF-747): document-level marker; each exported
+        # question additionally gets a Moodle tag below.
+        quiz.append(Comment(f" {exam_ai_notice(_exam_locale(exam_data))} "))
         slot_mapping: list[dict] = []
         skipped_positions: list[int] = []
         slot = 0
 
         for order, q in enumerate(exam_data["questions"], start=1):
             qtype = q["question_type"]
+            children_before = len(quiz)
             if qtype == "single_choice":
                 skipped = _add_mc_question(quiz, q)
             elif qtype == "multiple_choice":
@@ -278,6 +292,9 @@ class MoodleXmlExporter:
             if skipped:
                 skipped_positions.append(q.get("position", order))
                 continue
+
+            if len(quiz) > children_before:
+                _add_ai_tag(quiz[-1])
 
             # Record the slot the question lands on. Defaults are
             # forgiving so the exporter still works on payload shapes
@@ -356,8 +373,13 @@ class IliasQtiExporter:
         assessment = SubElement(
             questestinterop, "assessment", title=exam_data.get("title") or ""
         )
-        section = SubElement(assessment, "section", ident="root_section")
+        # EU AI Act Art. 50 (TF-747): QTI comment only; the ILIAS-specific
+        # metadata fields stay untouched (import format verified, TF-782).
+        # ILIAS may show the comment as the imported test's description
+        # (not verified against a real import).
         locale = _exam_locale(exam_data)
+        SubElement(assessment, "qticomment").text = exam_ai_notice(locale)
+        section = SubElement(assessment, "section", ident="root_section")
         skipped_positions: list[int] = []
 
         for order, q in enumerate(exam_data["questions"], start=1):
@@ -783,6 +805,14 @@ def _add_tf_question(quiz: Element, q: dict) -> bool:
     return False
 
 
+def _add_ai_tag(question: Element) -> None:
+    """Mark a Moodle ``<question>`` as AI-generated via the ``<tags>`` element
+    (EU AI Act Art. 50, TF-747). Moodle imports it as a question tag."""
+    tags = SubElement(question, "tags")
+    tag = SubElement(tags, "tag")
+    SubElement(tag, "text").text = AI_DISCLOSURE_TAG
+
+
 def _add_essay_question(quiz: Element, q: dict):
     question = SubElement(quiz, "question", type="essay")
     name = SubElement(question, "name")
@@ -921,15 +951,16 @@ def _md_to_flowables(
         else:
             blocks.insert(0, ("para", prefix))
 
-    flowables = []
-    for kind, content in blocks:
-        if kind == "code":
-            flowables.append(Preformatted(content, styles["code"]))
-        elif kind == "bullet":
-            flowables.append(Paragraph(content, styles["indent"], bulletText="•"))
-        else:
-            flowables.append(Paragraph(content, styles[style_key]))
-    return flowables
+    builders = {
+        "code": lambda content: Preformatted(content, styles["code"]),
+        "bullet": lambda content: Paragraph(content, styles["indent"], bulletText="•"),
+    }
+    return [
+        builders.get(kind, lambda content: Paragraph(content, styles[style_key]))(
+            content
+        )
+        for kind, content in blocks
+    ]
 
 
 def _pdf_escape(value) -> str:
@@ -984,11 +1015,18 @@ class PdfExporter:
             topMargin=2 * cm,
             bottomMargin=2 * cm,
             title=exam_data["title"],
+            # EU AI Act Art. 50 (TF-747): machine-readable AI marking.
+            author=GENERATOR,
+            creator=GENERATOR,
+            subject=exam_ai_notice(_exam_locale(exam_data)),
+            keywords=AI_DISCLOSURE_TAG,
         )
 
         locale = _exam_locale(exam_data)
         story: list = []
         story.extend(_pdf_header(exam_data, styles))
+        story.append(Spacer(1, 0.2 * cm))
+        story.append(Paragraph(_pdf_escape(exam_ai_notice(locale)), styles["body"]))
         story.append(Spacer(1, 0.3 * cm))
         story.extend(_pdf_fill_in_block(styles, doc.width, locale))
 

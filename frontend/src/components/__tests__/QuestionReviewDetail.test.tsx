@@ -148,3 +148,14 @@ describe('QuestionReviewDetail', () => {
     });
   });
 });
+
+describe('QuestionReviewDetail — KI-Kennzeichnung (EU AI Act Art. 50, TF-747)', () => {
+  it('kennzeichnet die Frage als KI-generierten Aufgabenentwurf', async () => {
+    (ReviewService.getComments as jest.Mock).mockResolvedValue([]);
+    (ReviewService.getQuestionDetail as jest.Mock).mockResolvedValue(mockQuestion);
+
+    render(<QuestionReviewDetail />);
+
+    expect(await screen.findByTestId('ai-notice-taskDraft')).toBeInTheDocument();
+  });
+});

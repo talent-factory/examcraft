@@ -32,6 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../utils/dateLocale';
 import { ExamResponse, Question } from '../types/exam';
 import MarkdownRenderer from './MarkdownRenderer';
+import AiNotice from './common/AiNotice';
 
 interface ExamDisplayProps {
   exam: ExamResponse;
@@ -274,6 +275,7 @@ const ExamDisplay: React.FC<ExamDisplayProps> = ({ exam, onNewExam }) => {
     <Box>
       {/* Exam Header */}
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+        <AiNotice kind="taskDraft" sx={{ mb: 2 }} />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box>
             <Typography variant="h4" component="h1" sx={{ mb: 1 }}>

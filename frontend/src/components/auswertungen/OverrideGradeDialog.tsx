@@ -22,6 +22,7 @@ import {
 
 import { GradesService } from '../../services/gradesService';
 import { translateError } from '../../errors';
+import AiNotice from '../common/AiNotice';
 
 interface Props {
   open: boolean;
@@ -101,6 +102,7 @@ const OverrideGradeDialog: React.FC<Props> = ({
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          <AiNotice kind="gradingSuggestion" />
           <TextField
             label={t('auswertungen.exam.review.overrideDialog.pointsLabel')}
             type="number"

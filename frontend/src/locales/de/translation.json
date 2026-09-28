@@ -3777,5 +3777,19 @@
       "v1_8_4_result_import": "Resultatimport mit Freitextfragen läuft jetzt zuverlässig im Hintergrund, mit sichtbarem Fortschritt",
       "v1_8_4_reasoning_formatting": "Begründungen in der Bewertungs-Ansicht werden jetzt sauber formatiert dargestellt"
     }
+  },
+  "aiAct": {
+    "taskDraft": {
+      "label": "KI-generierter Aufgabenentwurf",
+      "hint": "Diese Aufgabe wurde von einem KI-System entworfen. Bitte inhaltlich prüfen, bevor sie verwendet wird."
+    },
+    "gradingSuggestion": {
+      "label": "KI-gestützter Bewertungsvorschlag",
+      "hint": "Dieser Bewertungsvorschlag stammt von einem KI-System. Die endgültige Bewertung trifft die Lehrperson."
+    },
+    "chat": {
+      "label": "KI-Assistent",
+      "hint": "Sie interagieren mit einem KI-System, nicht mit einem Menschen. Antworten werden automatisch generiert und können Fehler enthalten."
+    }
   }
 }

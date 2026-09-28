@@ -48,6 +48,7 @@ export { default as QuestionEditor } from './components/QuestionEditor';
 export { default as ReviewQueue } from './components/ReviewQueue';
 export { default as PackageTierBadge } from './components/layout/PackageTierBadge';
 export { default as MarkdownRenderer } from './components/MarkdownRenderer';
+export { AiNotice } from './components/common/AiNotice';
 export { default as ExamDisplay } from './components/ExamDisplay';
 export { default as QuestionReviewCard } from './components/QuestionReviewCard';
 

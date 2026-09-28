@@ -17,6 +17,7 @@ import { ReviewService } from '../services/ReviewService';
 import { translateError } from '../errors';
 import { useAuth } from '../contexts/AuthContext';
 import MarkdownRenderer from './MarkdownRenderer';
+import AiNotice from './common/AiNotice';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import { QuestionReview, ReviewStatus } from '../types/review';
 import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
@@ -206,6 +207,7 @@ const QuestionReviewDetail: React.FC = () => {
           <Typography variant="h5">
             Question #{question.id} &middot; {formatQuestionType(question.question_type)}
           </Typography>
+          <AiNotice kind="taskDraft" variant="chip" />
           <Chip
             label={question.review_status.toUpperCase()}
             color={getStatusColor(question.review_status)}

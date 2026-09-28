@@ -23,6 +23,7 @@ from models.auth import Institution, User
 from models.exam import Exam, ExamStatus
 from models.student import Student
 from models.submission import Submission
+from services.ai_disclosure import AI_DISCLOSURE_HEADER
 from services.grade_export_service import (
     GradeCsvExporter,
     GradeExportData,
@@ -200,5 +201,9 @@ async def export_grades(
     return Response(
         content=body,
         media_type=media_type,
-        headers={"Content-Disposition": content_disposition(filename)},
+        headers={
+            "Content-Disposition": content_disposition(filename),
+            # EU AI Act Art. 50 (TF-747): machine-readable AI marking.
+            AI_DISCLOSURE_HEADER: "true",
+        },
     )

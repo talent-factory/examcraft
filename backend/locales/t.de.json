@@ -245,6 +245,8 @@
     "export_type_true_false": "Wahr/Falsch",
     "export_type_open_ended": "Offene Frage",
     "export_solutions_suffix": "Lösungen",
+    "export_ai_notice": "KI-Hinweis: Die Aufgabenentwürfe in diesem Dokument wurden ganz oder teilweise mit KI generiert (ExamCraft AI) und von der verantwortlichen Lehrperson zusammengestellt und finalisiert.",
+    "export_ai_notice_grades": "KI-Hinweis: Die Bewertungen in dieser Liste basieren auf KI-gestützten Bewertungsvorschlägen. Sie wurden von der verantwortlichen Lehrperson geprüft und freigegeben.",
     "internal_error": "Es ist ein unerwarteter Fehler aufgetreten. Bitte versuch es später erneut.",
     "validation_error": "Die Anfrage ist ungültig. Bitte prüf deine Eingaben.",
     "tags_not_found": "Tag nicht gefunden.",

@@ -31,12 +31,20 @@ from datetime import date, datetime
 from typing import Any
 from xml.sax.saxutils import escape as _xml_escape
 
+from services.ai_disclosure import (
+    AI_DISCLOSURE_TAG,
+    GENERATOR,
+    grades_ai_notice,
+)
 from services.grading_scheme_evaluator import (
     GradingSchemeError,
     percentage_to_grade,
 )
 
 logger = logging.getLogger(__name__)
+
+# The grade list layout (headers, PDF labels) is German-only, so is its notice.
+_GRADE_EXPORT_LOCALE = "de"
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +180,10 @@ class GradeCsvExporter:
                 ]
             )
         # UTF-8 BOM so Excel-DE doesn't mojibake the umlauts.
+        # No in-file AI notice here (TF-747): the CSV holds only identifiers
+        # and numbers, and an extra row would break consumers that expect
+        # uniform data rows (Excel imports, Moodle reimport). The download
+        # carries the X-AI-Generated-Content header instead.
         return b"\xef\xbb\xbf" + buffer.getvalue().encode("utf-8")
 
 
@@ -262,6 +274,11 @@ class GradePdfExporter:
             topMargin=2 * cm,
             bottomMargin=2 * cm,
             title=f"Notenliste {data.exam_title}",
+            # EU AI Act Art. 50 (TF-747): machine-readable AI marking.
+            author=GENERATOR,
+            creator=GENERATOR,
+            subject=grades_ai_notice(_GRADE_EXPORT_LOCALE),
+            keywords=AI_DISCLOSURE_TAG,
         )
         styles = getSampleStyleSheet()
         story: list[Any] = []
@@ -334,7 +351,13 @@ class GradePdfExporter:
             )
         )
         story.append(table)
-        story.append(Spacer(1, 1.5 * cm))
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(
+            Paragraph(
+                _pdf_safe(grades_ai_notice(_GRADE_EXPORT_LOCALE)), styles["Italic"]
+            )
+        )
+        story.append(Spacer(1, 1.1 * cm))
 
         # --- Footer (signature)
         story.append(

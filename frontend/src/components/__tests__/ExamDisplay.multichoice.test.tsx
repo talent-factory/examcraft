@@ -79,3 +79,15 @@ describe('ExamDisplay — multiple_choice rendering (TF-403)', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 });
+
+describe('ExamDisplay — KI-Kennzeichnung (EU AI Act Art. 50, TF-747)', () => {
+  it('kennzeichnet die generierte Prüfung als KI-generierten Aufgabenentwurf', () => {
+    render(
+      <TestWrapper>
+        <ExamDisplay exam={baseExam([])} onNewExam={() => {}} />
+      </TestWrapper>,
+    );
+
+    expect(screen.getByTestId('ai-notice-taskDraft')).toBeInTheDocument();
+  });
+});

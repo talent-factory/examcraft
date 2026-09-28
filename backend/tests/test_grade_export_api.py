@@ -200,6 +200,23 @@ def test_export_csv_returns_correct_content_type(test_db: Session) -> None:
     # Excel-DE relies on the BOM — pin the byte literal at the API
     # boundary so a future codec swap can't silently strip it.
     assert response.content[:3] == b"\xef\xbb\xbf"
+    # The CSV carries no in-file AI notice, so the header is its only
+    # Art. 50 marking (TF-747).
+    assert response.headers["X-AI-Generated-Content"] == "true"
+
+
+def test_export_moodle_csv_sets_ai_disclosure_header(test_db: Session) -> None:
+    inst = _make_institution(test_db)
+    user = _make_user(test_db, inst.id)
+    exam = _make_exam(test_db, inst.id)
+    student = _make_student(test_db, inst.id, external_id="anna@example.org")
+    _make_submission(test_db, exam.id, student.id)
+    test_db.commit()
+
+    client = _client(test_db, user)
+    response = client.get(f"/api/v1/exams/{exam.id}/grades/export/moodle_csv")
+    assert response.status_code == 200, response.text
+    assert response.headers["X-AI-Generated-Content"] == "true"
 
 
 def test_export_pdf_returns_application_pdf(test_db: Session) -> None:
@@ -219,6 +236,7 @@ def test_export_pdf_returns_application_pdf(test_db: Session) -> None:
     assert response.status_code == 200, response.text
     assert response.headers["content-type"] == "application/pdf"
     assert response.content[:4] == b"%PDF"
+    assert response.headers["X-AI-Generated-Content"] == "true"
 
 
 def test_export_filename_is_ascii_safe_for_umlaut_titles(test_db: Session) -> None:

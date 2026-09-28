@@ -143,3 +143,14 @@ describe('HelpChat — sessionStorage Persistenz', () => {
     expect(screen.queryByText('Frage')).not.toBeInTheDocument();
   });
 });
+
+describe('HelpChat — KI-Kennzeichnung (EU AI Act Art. 50, TF-747)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('weist darauf hin, dass mit einem KI-System gechattet wird', () => {
+    renderChat();
+    expect(screen.getByTestId('ai-notice-chat')).toBeInTheDocument();
+  });
+});

@@ -30,6 +30,7 @@ from utils.question_visibility import (
     filter_questions_for_user,
 )
 from utils.exam_visibility import assert_exam_visible_for, filter_exams_for_user
+from services.ai_disclosure import AI_DISCLOSURE_HEADER
 from services.org_unit_service import get_user_accessible_org_unit_ids
 from services.point_utils import suggest_points
 from services.exam_export_service import (
@@ -2130,6 +2131,8 @@ async def export_exam(
         media_type=media_type,
         headers={
             "Content-Disposition": content_disposition(filename),
+            # EU AI Act Art. 50 (TF-747): machine-readable AI marking.
+            AI_DISCLOSURE_HEADER: "true",
             **extra_headers,
         },
     )

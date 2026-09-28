@@ -245,6 +245,8 @@
     "export_type_true_false": "Vrai/Faux",
     "export_type_open_ended": "Question ouverte",
     "export_solutions_suffix": "corrigé",
+    "export_ai_notice": "Mention IA : les projets de questions de ce document ont été générés en tout ou partie par une IA (ExamCraft AI) et ont été compilés et finalisés par l'enseignant responsable.",
+    "export_ai_notice_grades": "Mention IA : les notes de cette liste reposent sur des propositions de correction assistées par IA. Elles ont été vérifiées et validées par l'enseignant responsable.",
     "internal_error": "Une erreur inattendue s'est produite. Réessaie plus tard.",
     "validation_error": "La requête n'est pas valide. Vérifie tes saisies.",
     "tags_not_found": "Tag introuvable.",

@@ -3777,5 +3777,19 @@
       "v1_8_4_result_import": "Result import with free-text questions now runs reliably in the background, with visible progress",
       "v1_8_4_reasoning_formatting": "Reasoning text in the grading view is now displayed cleanly formatted"
     }
+  },
+  "aiAct": {
+    "taskDraft": {
+      "label": "AI-generated task draft",
+      "hint": "This task was drafted by an AI system. Please review its content before use."
+    },
+    "gradingSuggestion": {
+      "label": "AI-assisted grading suggestion",
+      "hint": "This grading suggestion comes from an AI system. The final grade is decided by the teacher."
+    },
+    "chat": {
+      "label": "AI assistant",
+      "hint": "You are interacting with an AI system, not a human. Answers are generated automatically and may contain errors."
+    }
   }
 }

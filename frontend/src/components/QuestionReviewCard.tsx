@@ -51,6 +51,7 @@ import { getDateLocale } from '../utils/dateLocale';
 import { QuestionReview, ReviewStatus, ReviewComment } from '../types/review';
 import { ReviewService } from '../services/ReviewService';
 import MarkdownRenderer from './MarkdownRenderer';
+import AiNotice from './common/AiNotice';
 
 interface QuestionReviewCardProps {
   question: QuestionReview;
@@ -216,6 +217,9 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
             <Typography variant="caption" color="text.secondary">
               {t('components.questionCard.questionNumber', { id: question.id })} • {formatQuestionType(question.question_type)}
             </Typography>
+            <Box sx={{ mt: 0.5 }}>
+              <AiNotice kind="taskDraft" variant="chip" />
+            </Box>
             <Box sx={{ mt: 0.5 }}>
               <MarkdownRenderer content={question.question_text} variant="compact" />
             </Box>

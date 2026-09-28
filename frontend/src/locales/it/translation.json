@@ -3777,5 +3777,19 @@
       "v1_8_4_result_import": "L'importazione dei risultati con domande a risposta libera ora funziona in modo affidabile in background, con progresso visibile",
       "v1_8_4_reasoning_formatting": "Le motivazioni nella vista di valutazione ora vengono visualizzate correttamente formattate"
     }
+  },
+  "aiAct": {
+    "taskDraft": {
+      "label": "Bozza di compito generata da IA",
+      "hint": "Questo compito è stato redatto da un sistema di IA. Verifica il contenuto prima di utilizzarlo."
+    },
+    "gradingSuggestion": {
+      "label": "Proposta di valutazione assistita da IA",
+      "hint": "Questa proposta di valutazione proviene da un sistema di IA. La valutazione finale spetta al docente."
+    },
+    "chat": {
+      "label": "Assistente IA",
+      "hint": "Stai interagendo con un sistema di IA, non con una persona. Le risposte sono generate automaticamente e possono contenere errori."
+    }
   }
 }

@@ -245,6 +245,8 @@
     "export_type_true_false": "Vero/Falso",
     "export_type_open_ended": "Domanda aperta",
     "export_solutions_suffix": "soluzioni",
+    "export_ai_notice": "Avviso IA: le bozze dei compiti in questo documento sono state generate in tutto o in parte da un'IA (ExamCraft AI) e sono state compilate e finalizzate dal docente responsabile.",
+    "export_ai_notice_grades": "Avviso IA: i voti in questo elenco si basano su proposte di valutazione assistite da IA. Sono stati verificati e approvati dal docente responsabile.",
     "internal_error": "Si è verificato un errore imprevisto. Riprova più tardi.",
     "validation_error": "La richiesta non è valida. Controlla i dati inseriti.",
     "tags_not_found": "Tag non trovato.",
