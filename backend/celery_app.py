@@ -5,7 +5,12 @@ Handles asynchronous task processing with RabbitMQ broker
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import after_setup_logger, celeryd_init, task_failure
+from celery.signals import (
+    after_setup_logger,
+    celeryd_init,
+    task_failure,
+    worker_process_init,
+)
 from kombu import Exchange, Queue
 import os
 import logging
@@ -114,6 +119,33 @@ def _validate_claude_model(**_kwargs):
             "Claude model startup validation failed in worker (ignored)",
             exc_info=True,
         )
+
+
+@worker_process_init.connect
+def _dispose_inherited_db_pool(**_kwargs):
+    """Give every forked pool child its own SQLAlchemy connection pool (TF-963).
+
+    ``database.engine`` is created at import time, and the worker parent imports
+    all task modules before the prefork pool forks its children — some of them
+    already open a connection at import (verified locally: the parent holds one
+    checked-out connection before the fork). Without this hook every child, and
+    every replacement child after ``worker_max_tasks_per_child`` recycles,
+    inherits the parent's pool including its live psycopg2 sockets. Two
+    processes speaking over one libpq connection surface as ``DatabaseError:
+    error with status PGRES_TUPLES_OK and no message from the libpq`` (the
+    v1.13.1 production symptom).
+
+    ``dispose(close=False)`` is the SQLAlchemy-documented pattern for forked
+    processes: it drops the child's references to the inherited connections
+    without closing them — closing would send a termination message over a
+    socket the parent still owns — and replaces the pool with a fresh one, so
+    every connection the child checks out afterwards is its own. ``database``
+    is the only engine in the worker (``alembic/env.py`` and the scripts in
+    ``scripts/`` run as separate processes).
+    """
+    from database import engine
+
+    engine.dispose(close=False)
 
 
 def _resolve_premium_ops_alert_registration(deployment_mode: str) -> tuple[dict, dict]:

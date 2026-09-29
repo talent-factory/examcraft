@@ -7,9 +7,15 @@ fastapi>=0.117.1,<0.137
 uvicorn[standard]==0.24.0
 
 # Database
-sqlalchemy>=2.0.43
+# Upper-Cap (TF-963): SQLAlchemy 2.1.0 kam ungepinnt mit dem v1.13.1-Build
+# (vorher 2.0.54, einzige DB-relevante Abhängigkeitsänderung) und fällt mit
+# sporadischen psycopg2-Fehlern in den Celery-Workern zusammen
+# ("PGRES_TUPLES_OK and no message from the libpq"). Zurück auf die letzte in
+# Prod bewährte Minor-Version. 2.1 erst nach gezielter Prüfung freigeben
+# (Worker-Last, TF-938-Treiber-Normalisierung bleibt kompatibel).
+sqlalchemy>=2.0.43,<2.1
 alembic>=1.17.0
-psycopg2-binary>=2.9.10
+psycopg2-binary>=2.9.10,<2.10
 
 # Redis
 redis==5.0.1
