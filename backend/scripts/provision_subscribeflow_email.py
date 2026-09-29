@@ -239,6 +239,53 @@ TEMPLATES: list[dict[str, Any]] = [
   </mj-body>
 </mjml>""",
     },
+    {
+        "name": "password-reset",
+        "subject": "Passwort zurücksetzen – ExamCraft AI",
+        "variables_schema": {"first_name": "string", "reset_url": "string"},
+        "mjml_content": """<mjml>
+  <mj-body background-color="#f9f9f9">
+    <mj-section background-color="#667eea" padding="30px">
+      <mj-column>
+        <mj-text align="center" color="#ffffff" font-size="24px" font-weight="bold">
+          ExamCraft AI
+        </mj-text>
+        <mj-text align="center" color="#ffffff" font-size="18px">
+          Passwort zurücksetzen
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#f9f9f9" padding="30px">
+      <mj-column>
+        <mj-text font-size="16px">Hallo {{ first_name }},</mj-text>
+        <mj-text font-size="16px">
+          du hast angefordert, dein Passwort für dein ExamCraft-AI-Konto zurückzusetzen.
+          Klicke auf den Button unten, um ein neues Passwort zu setzen.
+        </mj-text>
+        <mj-button background-color="#667eea" href="{{ reset_url }}" font-weight="bold">
+          Passwort zurücksetzen
+        </mj-button>
+        <mj-text font-size="14px" color="#666666">
+          Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br/>
+          <a href="{{ reset_url }}" style="color:#667eea; word-break: break-all;">{{ reset_url }}</a>
+        </mj-text>
+        <mj-text font-size="14px" color="#666666">
+          Dieser Link ist aus Sicherheitsgründen nur <strong>1 Stunde</strong> gültig und kann
+          nur einmal verwendet werden.
+        </mj-text>
+        <mj-text font-size="14px" color="#666666">
+          Wenn du kein neues Passwort angefordert hast, kannst du diese E-Mail ignorieren —
+          dein Passwort bleibt unverändert.
+        </mj-text>
+        <mj-divider border-color="#dddddd" />
+        <mj-text align="center" font-size="12px" color="#999999">
+          © Talent Factory GmbH. Alle Rechte vorbehalten.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>""",
+    },
 ]
 
 

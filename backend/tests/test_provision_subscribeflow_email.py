@@ -528,3 +528,27 @@ async def test_provision_logs_partial_progress_before_reraising_on_failure():
         "the fact that a key was created (its id) must still be recoverable "
         "from the log, even with the plaintext value redacted"
     )
+
+
+@pytest.mark.asyncio
+async def test_password_reset_template_matches_variables_sent_by_email_service():
+    """The "password-reset" template (TF-768) must be provisioned with exactly
+    the variables ``send_password_reset_email`` passes -- otherwise the live
+    email renders with empty placeholders or SubscribeFlow rejects the send."""
+    from services.email_service import EmailService
+
+    template = next((t for t in TEMPLATES if t["name"] == "password-reset"), None)
+    assert template is not None, "'password-reset' must be in TEMPLATES"
+
+    with patch.object(
+        EmailService, "_send", new=AsyncMock(return_value={"success": True})
+    ) as mock_send:
+        await EmailService.send_password_reset_email(
+            email="user@example.com", first_name="Ada", reset_token="tok"
+        )
+
+    sent = mock_send.call_args.kwargs
+    assert sent["template_slug"] == template["name"]
+    assert set(template["variables_schema"]) == set(sent["variables"])
+    for variable in sent["variables"]:
+        assert f"{{{{ {variable} }}}}" in template["mjml_content"]

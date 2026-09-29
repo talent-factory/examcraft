@@ -2,7 +2,8 @@
 Email Service using SubscribeFlow API (TF-764)
 
 Handles the transactional email types that are actually wired into the
-app: verification, welcome, impersonation-started, impersonation-ended.
+app: verification, welcome, password-reset, impersonation-started,
+impersonation-ended.
 Templates and their HTML rendering (incl. autoescaping of user-supplied
 values, replacing the manual html.escape() calls TF-742/TF-762 added)
 live in SubscribeFlow -- see scripts/provision_subscribeflow_email.py.
