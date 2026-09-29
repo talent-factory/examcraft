@@ -2900,6 +2900,7 @@
         "noPromptsAvailable": "Nessun prompt disponibile per {{type}}. Crea prima un prompt nella libreria.",
         "promptTemplateFor": "Template prompt per {{type}}",
         "useDefault": "Usa prompt predefinito",
+        "allQuestionTypes": "(tutti i tipi di domanda)",
         "errorRendering": "Errore nel rendering dell'anteprima",
         "livePreview": "Anteprima live (renderizzata)",
         "previewHint": "Questa anteprima mostra il prompt con le variabili inserite.",

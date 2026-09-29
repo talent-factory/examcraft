@@ -2900,6 +2900,7 @@
         "noPromptsAvailable": "No prompts available for {{type}}. Please create a prompt in the Prompt Library first.",
         "promptTemplateFor": "Prompt template for {{type}}",
         "useDefault": "Use default prompt",
+        "allQuestionTypes": "(all question types)",
         "errorRendering": "Error rendering preview",
         "livePreview": "Live Preview (rendered)",
         "previewHint": "This preview shows the prompt with the entered variables.",

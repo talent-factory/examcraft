@@ -9,6 +9,23 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-09-29
+
+### Fixed
+
+- **Generische Prompt-Vorlagen wieder nutzbar (TF-958):** Vorlagen mit
+  dem Use Case „Fragengenerierung (allgemein)“ (`question_generation`)
+  erschienen im Wizard „RAG-basierte Prüfungsfragen erstellen“ bei
+  keinem Fragetyp. Sie werden jetzt im Template-Dropdown jedes
+  Fragetyps angeboten, nach den typspezifischen Vorlagen und mit
+  „(alle Fragetypen)“ gekennzeichnet (neuer Listen-Parameter
+  `include_generic`, Sichtbarkeitsregeln unverändert). Wird eine
+  generische Vorlage verwendet, hängt die Generierung das
+  Output-Format des jeweiligen Fragetyps an. Bei der
+  Default-Auflösung dient eine generische Vorlage nur als Fallback:
+  Institution-spezifisch → Institution-generisch → System-spezifisch
+  → System-generisch.
+
 ## [1.13.0] - 2026-09-23
 
 ### Added
