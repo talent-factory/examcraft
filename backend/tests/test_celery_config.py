@@ -455,3 +455,27 @@ def test_portfolio_watchdog_task_is_registered_and_routed_in_running_app():
         "reap-stuck-portfolio-classification-jobs-every-5-minutes"
         in celery_app.conf.beat_schedule
     )
+
+
+def test_worker_process_init_disposes_inherited_db_pool(monkeypatch):
+    """Jeder geforkte Pool-Child muss den vom Parent geerbten SQLAlchemy-Pool
+    per ``engine.dispose(close=False)`` verwerfen (TF-963). Sonst teilen sich
+    Parent und Children offene psycopg2-Verbindungen, was in Prod als
+    ``PGRES_TUPLES_OK and no message from the libpq`` auftrat.
+
+    Löst das echte Celery-Signal aus statt den Handler direkt aufzurufen: So
+    ist abgedeckt, dass der Handler beim Import von ``celery_app`` verbunden
+    wird und wie Celery ihn aufruft (nur Keyword-Argumente)."""
+    from unittest.mock import MagicMock
+
+    from celery.signals import worker_process_init
+
+    import celery_app  # noqa: F401 — verbindet den Handler
+    import database
+
+    fake_engine = MagicMock()
+    monkeypatch.setattr(database, "engine", fake_engine)
+
+    worker_process_init.send(sender=None)
+
+    fake_engine.dispose.assert_called_once_with(close=False)
