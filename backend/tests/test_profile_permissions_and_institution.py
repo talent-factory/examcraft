@@ -2,7 +2,7 @@
 Tests for /api/auth/me profile endpoint fixes:
 - Permissions parsing from PostgreSQL array literal format {a,b,c}
 - Institution object with subscription_tier in response
-- Fresh database detection (create_all + stamp)
+- Fresh database detection (alembic upgrade head, TF-434)
 """
 
 import json
@@ -414,15 +414,16 @@ class TestFreshDatabaseDetection:
     def test_fresh_db_detection_logic_exists(self):
         """
         The database.py _run_migrations_or_create_all function must contain
-        fresh database detection that creates schema before running migrations.
+        fresh database detection that builds the schema by replaying the
+        migrations — not create_all + stamp, which skips migration bodies (TF-434).
         """
         import inspect
         from database import _run_migrations_or_create_all
 
         source = inspect.getsource(_run_migrations_or_create_all)
         assert "Fresh database detected" in source
-        assert "create_all" in source
-        assert "stamp" in source
+        assert 'command.upgrade(alembic_cfg, "head")' in source
+        assert "command.stamp" not in source
 
     def test_feedback_cluster_model_imported(self):
         """

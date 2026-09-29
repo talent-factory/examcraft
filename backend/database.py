@@ -183,13 +183,11 @@ def create_tables():
 def _seed_system_data():
     """Seeds migration-embedded reference data that the create_all path skips.
 
-    The create_all bootstrap (fresh-DB branch + fallback) builds the schema from
-    the models, but does not run migration bodies — data seeds that live inside
-    a migration (e.g. tf333's SYSTEM_GRADING_SCHEMES) would otherwise be missing.
-    Idempotent by name; safe to call on every bootstrap (TF-433). In steady-state
-    prod operation the seed is never reached (DB already stamped → early return);
-    on a first-time empty prod DB the fresh branch runs and so does the seed —
-    that is idempotent and intentional.
+    Only the create_all fallback (Alembic unavailable or failed) needs this: it
+    builds the schema from the models but does not run migration bodies — data
+    seeds that live inside a migration (e.g. tf333's SYSTEM_GRADING_SCHEMES)
+    would otherwise be missing. The fresh-DB branch replays the migrations and
+    gets the seed from tf333 itself (TF-434). Idempotent by name (TF-433).
     """
     try:
         from db_seed import seed_system_grading_schemes
@@ -247,23 +245,19 @@ def _run_migrations_or_create_all():
                 logger.info(f"Database schema is up to date (revision: {current_rev})")
                 return
 
-            # Fresh database: no revision and no tables — create schema
-            # from models, then stamp Alembic head so migrations don't
-            # try to ALTER tables that were just created with all columns.
+            # Fresh database: no revision and no tables — replay the full
+            # chain from the tf434_baseline root, exactly like production
+            # got there. Runs migration bodies incl. data seeds (TF-434).
             if current_rev is None:
                 from sqlalchemy import inspect as sa_inspect
 
                 inspector = sa_inspect(engine)
                 if not inspector.has_table("users"):
                     logger.info(
-                        "Fresh database detected — creating schema from models..."
+                        "Fresh database detected — running alembic upgrade head..."
                     )
-                    Base.metadata.create_all(bind=engine)
-                    command.stamp(alembic_cfg, "head")
-                    # create_all skips migration bodies → catch up on data
-                    # seeds (TF-433).
-                    _seed_system_data()
-                    logger.info(f"Schema created and stamped at {head_rev}")
+                    command.upgrade(alembic_cfg, "head")
+                    logger.info(f"Schema created via migrations at {head_rev}")
                     return
 
             pending_msg = (

@@ -1,7 +1,7 @@
 """add_user_audit_fields
 
 Revision ID: d715210cb3a3
-Revises:
+Revises: tf434_baseline
 Create Date: 2026-03-12
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 revision = "d715210cb3a3"  # pragma: allowlist secret
-down_revision = None
+down_revision = "tf434_baseline"
 branch_labels = None
 depends_on = None
 

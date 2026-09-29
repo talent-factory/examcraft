@@ -1,8 +1,8 @@
 """Regression guard: running Alembic in-process must not silence app loggers.
 
-`database._run_migrations_or_create_all()` calls `command.stamp` (fresh
-database) or `command.upgrade` (AUTO_MIGRATE=true) inside the running API
-process. Both execute `alembic/env.py`, which applies `alembic.ini` via
+`database._run_migrations_or_create_all()` calls `command.upgrade` (fresh
+database, or AUTO_MIGRATE=true) inside the running API process; the test
+below uses an offline `command.stamp`. Both execute `alembic/env.py`, which applies `alembic.ini` via
 `logging.config.fileConfig`. With the default `disable_existing_loggers=True`
 that call disables every logger already created at that point — i.e. the
 module loggers of all routers and services imported before startup. From then
