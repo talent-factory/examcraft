@@ -9,6 +9,7 @@ import React, {
 import { useAuth } from './AuthContext';
 import i18n from '../i18n';
 import { AppError } from '../errors';
+import { readParams } from '../errors/errorBody';
 import {
   readSessionSnapshot,
   writeSessionSnapshot,
@@ -170,6 +171,11 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             status: data.status,
             progress: prev[taskId]?.progress ?? 0,
             message: data.error || i18n.t('contexts.generationTasks.errorOccurred'),
+            // TF-967: rendered in the current language by errorMessageOf;
+            // `message` above is only the fallback when the code is missing
+            // or unknown.
+            errorCode: data.error_code ?? null,
+            errorParams: readParams(data.error_params) ?? null,
             result: null,
           },
         }));
@@ -179,7 +185,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         progressRef.current[taskId] = {
           status: data.status,
           progress: data.progress ?? 0,
-          message: data.message,
+          message: data.message ?? null,
           // TF-736: rendered in the user's language by progressMessageOf.
           messageCode: data.message_code ?? null,
           messageParams: data.message_params ?? null,
@@ -263,6 +269,10 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             // that a previous recovery pass already fetched from the job row.
             generatedQuestionCount: existingTask?.generatedQuestionCount ?? null,
             contextLimited: existingTask?.contextLimited ?? false,
+            // TF-967: same reason — /active-tasks carries no error, and the
+            // refetch below may find the Celery result expired.
+            errorCode: existingTask?.errorCode ?? null,
+            errorParams: existingTask?.errorParams ?? null,
           };
 
           if (TERMINAL_STATUSES.has(task.status)) {
@@ -301,6 +311,11 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
                         ...prev[taskId],
                         result: detail.result ?? null,
                         message: detail.error ?? prev[taskId].message,
+                        // TF-967: kept as code, like the WebSocket path.
+                        errorCode: detail.error_code ?? prev[taskId].errorCode ?? null,
+                        errorParams: detail.error_code
+                          ? readParams(detail.error_params) ?? null
+                          : prev[taskId].errorParams ?? null,
                         // TF-736: kept from the job row so the under-fill
                         // notice survives an expired Celery result.
                         questionCount:

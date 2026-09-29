@@ -75,13 +75,18 @@ class TaskStatusMessage(BaseModel):
     message_params: Optional[Dict[str, Any]] = None
     result: Optional[Any] = None
     error: Optional[str] = None
+    # TF-967: error code (= locale key, ADR 0005) plus interpolation values;
+    # the frontend renders the text in the user's language. ``error`` stays
+    # as German fallback for clients that do not know the code.
+    error_code: Optional[str] = None
+    error_params: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_status_fields(self) -> "TaskStatusMessage":
         if self.status == TaskStatus.SUCCESS:
             if self.progress != 100:
                 raise ValueError("SUCCESS status must have progress=100")
-            if self.error is not None:
+            if self.error is not None or self.error_code is not None:
                 raise ValueError("SUCCESS status must not have error")
         if self.status in (TaskStatus.FAILURE, TaskStatus.REVOKED):
             if self.result is not None:

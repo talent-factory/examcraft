@@ -21,7 +21,8 @@ from unittest.mock import MagicMock, Mock, patch
 from fastapi.testclient import TestClient
 
 from main import app
-from services.rag_errors import GENERIC_TASK_ERROR, NoContextError
+from services.rag_errors import NoContextError
+from services.translation_service import t
 
 # main.py still loads the core API modules via
 # importlib.spec_from_file_location, but since TF-660 under their canonical
@@ -125,6 +126,7 @@ class TestGetTaskResult:
         assert data["status"] == "SUCCESS"
         assert data["result"] == EXAM_RESULT
         assert data["error"] is None
+        assert data["error_code"] is None
         # TF-736: a row written before the migration (or one whose outcome
         # write failed) defaults to None/False, not an error — _make_job's
         # defaults stand in for that pre-migration/failed-write row here.
@@ -159,7 +161,11 @@ class TestGetTaskResult:
         data = response.json()
         assert data["status"] == state
         assert data["result"] is None
-        assert data["error"] == GENERIC_TASK_ERROR
+        # TF-967: the code is what the frontend renders; `error` stays as the
+        # German fallback for clients that do not know the code.
+        assert data["error_code"] == "rag_task_failed"
+        assert data["error_params"] is None
+        assert data["error"] == t("rag_task_failed", "de")
         assert "Claude timeout" not in data["error"]
         assert "internal-db-host" not in data["error"]
 
@@ -189,7 +195,8 @@ class TestGetTaskResult:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["error"] != GENERIC_TASK_ERROR
+        assert data["error_code"] == "rag_task_no_context"
+        assert data["error"] == t("rag_task_no_context", "de")
         assert "durchsuchbaren" in data["error"]
 
     def test_expired_celery_result_keeps_db_status(self, auth_client, mock_db):

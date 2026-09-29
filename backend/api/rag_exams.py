@@ -17,7 +17,7 @@ from database import get_db
 import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
-from services.rag_errors import GENERIC_TASK_ERROR, user_facing_task_error
+from services.rag_errors import TASK_FAILED, user_facing_task_error
 from models.auth import User
 from models.competency import CompetencyFramework
 from models.document import Document, DocumentStatus
@@ -1149,6 +1149,7 @@ async def get_task_result(
     celery_state: Optional[str] = None
     payload: Any = None
     error: Optional[str] = None
+    error_code: Optional[str] = None
     try:
         async_result = AsyncResult(job.task_id)
         celery_state = async_result.state
@@ -1156,14 +1157,14 @@ async def get_task_result(
             payload = async_result.result
         elif celery_state in ("FAILURE", "REVOKED"):
             raw_info = async_result.result
-            error = user_facing_task_error(raw_info)
+            error_code, error = user_facing_task_error(raw_info)
             # Log the real error fully server-side (with traceback if
             # available); send the user only the safe, actionable message —
             # no raw internals/PII (TF-358). Same mapper + logging pattern as
             # the WebSocket path (api/v1/websocket.py), so a task shows the
             # same message regardless of recovery path, and errors stay
             # alertable on this path too.
-            unmapped = error == GENERIC_TASK_ERROR
+            unmapped = error_code == TASK_FAILED
             logger.error(
                 "Task %s failed (%s): %r",
                 job.task_id,
@@ -1190,6 +1191,7 @@ async def get_task_result(
         status=status,
         result=payload,
         error=error,
+        error_code=error_code,
         requested_question_count=job.question_count if is_success else None,
         generated_question_count=job.generated_question_count if is_success else None,
         context_limited=bool(job.context_limited) if is_success else False,

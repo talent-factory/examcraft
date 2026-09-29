@@ -23,7 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import { useGenerationTasks } from '../contexts/GenerationTasksContext';
 import { translateError } from '../errors';
-import { contextLimitOf, progressMessageOf } from '../utils/generationTaskDisplay';
+import { contextLimitOf, errorMessageOf, progressMessageOf } from '../utils/generationTaskDisplay';
 import type { GenerationTaskState } from '../types';
 
 const AUTO_HIDE_DELAY_MS = 30_000;
@@ -59,7 +59,12 @@ const GenerationTasksBar: React.FC = () => {
   useEffect(() => {
     completedTasks.forEach((task) => {
       const isFailure = task.status === 'FAILURE' || task.status === 'REVOKED';
-      if (isFailure && !task.message && !loggedMissingMessageIds.current.has(task.taskId)) {
+      if (
+        isFailure &&
+        !task.message &&
+        !task.errorCode &&
+        !loggedMissingMessageIds.current.has(task.taskId)
+      ) {
         loggedMissingMessageIds.current.add(task.taskId);
         console.warn('[GenerationTasks] Terminal task has no error message', {
           taskId: task.taskId,
@@ -302,7 +307,7 @@ const GenerationTasksBar: React.FC = () => {
                         color="error"
                         sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                       >
-                        {task.message || t('components.generationTasks.errorOccurred')}
+                        {errorMessageOf(task, t, 'components.generationTasks.errorOccurred')}
                       </Typography>
                     </Box>
                     <IconButton

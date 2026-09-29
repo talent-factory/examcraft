@@ -45,6 +45,9 @@ class TaskResultResponse(BaseModel):
     status: TaskStatus
     result: Optional[Any] = None
     error: Optional[str] = None
+    # TF-967: same meaning as on ``schemas.task.TaskStatusMessage``.
+    error_code: Optional[str] = None
+    error_params: Optional[Dict[str, Any]] = None
     # TF-736: the job row's own record of the outcome, set on SUCCESS. Same
     # names as the keys in ``result["quality_metrics"]``, so a client reads
     # the numbers the same way whether they came from Celery or from the DB.
@@ -60,14 +63,16 @@ class TaskResultResponse(BaseModel):
 
     @model_validator(mode="after")
     def validate_status_fields(self) -> "TaskResultResponse":
-        """Hält dieselbe Status/Result/Error-Korrelation ein wie die
-        WebSocket-Schwester-Type ``schemas.task.TaskStatusMessage`` — SUCCESS
-        darf keinen ``error`` tragen, FAILURE/REVOKED kein ``result``. Ohne
-        diese Invariante wäre z. B. ein `TaskResultResponse(status=SUCCESS,
-        result=None, error="boom")` konstruierbar, was die Recovery-UI
-        (`GenerationTasksContext.tsx`) in einen widersprüchlichen Zustand
-        bringen könnte."""
-        if self.status == TaskStatus.SUCCESS and self.error is not None:
+        """Keep the same status/result/error correlation as the WebSocket
+        sibling type ``schemas.task.TaskStatusMessage``: SUCCESS carries
+        neither ``error`` nor ``error_code``, FAILURE/REVOKED carries no
+        ``result``. Without this invariant e.g.
+        ``TaskResultResponse(status=SUCCESS, result=None, error="boom")``
+        would be constructible and could put the recovery UI
+        (`GenerationTasksContext.tsx`) into a contradictory state."""
+        if self.status == TaskStatus.SUCCESS and (
+            self.error is not None or self.error_code is not None
+        ):
             raise ValueError("SUCCESS status must not have error")
         if (
             self.status in (TaskStatus.FAILURE, TaskStatus.REVOKED)

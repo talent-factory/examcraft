@@ -1,5 +1,6 @@
 import { PromptConfig } from './prompt';
 import type { SupportedLanguage } from './auth';
+import type { ErrorParams } from '../errors/AppError';
 
 export enum DocumentStatus {
   // Async-processing lifecycle (mirrors backend models.document.DocumentStatus).
@@ -325,6 +326,13 @@ export interface GenerationTaskState {
   // `progressMessageOf` and preferred over `message`.
   messageCode?: ProgressCode | null;
   messageParams?: Record<string, unknown> | null;
+  // TF-967: error code + parameters of a FAILURE/REVOKED, rendered via
+  // `errorMessageOf` in the current language. `message` then holds the text
+  // shown when the code is missing, unregistered or untranslated — usually
+  // the backend's German `error`, otherwise a generic text resolved when the
+  // failure arrived.
+  errorCode?: string | null;
+  errorParams?: ErrorParams | null;
   topic: string | null;
   questionCount: number | null;
   createdAt: string;
@@ -374,7 +382,11 @@ export interface TaskStatusMessage {
   message_code?: ProgressCode | null;
   message_params?: Record<string, unknown> | null;
   result?: RAGExamResponse | null;
+  // German fallback text of a FAILURE/REVOKED.
   error?: string | null;
+  // TF-967: error code (ADR 0005) + interpolation values; never on SUCCESS.
+  error_code?: string | null;
+  error_params?: Record<string, unknown> | null;
 }
 
 /**
@@ -389,6 +401,9 @@ export interface TaskResultResponse {
   status: string;
   result: RAGExamResponse | null;
   error: string | null;
+  // TF-967: see TaskStatusMessage.error_code.
+  error_code?: string | null;
+  error_params?: Record<string, unknown> | null;
   // TF-736: read from the job row, set on SUCCESS. Same names as in
   // `quality_metrics`; `generated_question_count` is null for jobs recorded
   // before TF-736.

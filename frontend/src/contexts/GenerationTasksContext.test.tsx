@@ -209,6 +209,29 @@ describe('GenerationTasksProvider — sticky terminal state (TF-328)', () => {
     expect(captured!.getTask('task-1')?.progress).toBe(50);
   });
 
+  it('stores the error code and params of a FAILURE message (TF-967)', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    act(() => {
+      ws.emitMessage({
+        status: 'FAILURE',
+        progress: 0,
+        error: 'Die Fragengenerierung wurde nach 120 Sekunden noch nicht gestartet.',
+        error_code: 'rag_task_pending_timeout',
+        error_params: { seconds: 120 },
+      });
+    });
+
+    await waitFor(() => expect(captured!.getTask('task-1')?.status).toBe('FAILURE'));
+    const task = captured!.getTask('task-1')!;
+    // The code is what errorMessageOf renders; the German text stays only as
+    // fallback, not as the text of record.
+    expect(task.errorCode).toBe('rag_task_pending_timeout');
+    expect(task.errorParams).toEqual({ seconds: 120 });
+  });
+
   it('still reconnects on abnormal close when task is non-terminal', async () => {
     renderProvider();
     const ws = await startTaskAndGetWs();
@@ -367,6 +390,58 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     await waitFor(() =>
       expect(captured!.getTask('task-failed')?.message).toBe('Claude timeout'),
     );
+  });
+
+  it('carries the error code of a recovered FAILURE task (TF-967)', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-failed', 'FAILURE')] });
+    mockGetTaskResult.mockResolvedValue({
+      task_id: 'task-failed',
+      status: 'FAILURE',
+      result: null,
+      error: 'Die ausgewählten Dokumente enthalten zu wenig durchsuchbaren Inhalt …',
+      error_code: 'rag_task_no_context',
+      error_params: null,
+    });
+
+    renderProvider();
+
+    await waitFor(() =>
+      expect(captured!.getTask('task-failed')?.errorCode).toBe('rag_task_no_context'),
+    );
+    expect(captured!.getTask('task-failed')?.errorParams).toBeNull();
+  });
+
+  // Same trap as the under-fill flags above: the rebuild on a silent token
+  // refresh must not drop the error code when the refetch then fails.
+  it('does not lose the recovered error code on a silent token refresh (TF-967)', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-failed', 'FAILURE')] });
+    mockGetTaskResult.mockResolvedValueOnce({
+      task_id: 'task-failed',
+      status: 'FAILURE',
+      result: null,
+      error: 'Verarbeitung fehlgeschlagen. Bitte versuch es erneut.',
+      error_code: 'rag_task_failed',
+    });
+
+    const { rerender } = renderProvider();
+    await waitFor(() =>
+      expect(captured!.getTask('task-failed')?.errorCode).toBe('rag_task_failed'),
+    );
+
+    mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(mockGetActiveTasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+
+    expect(captured!.getTask('task-failed')?.errorCode).toBe('rag_task_failed');
+    warn.mockRestore();
   });
 
   it('does not resurrect a task the user dismissed before the reload', async () => {

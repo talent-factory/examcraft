@@ -22,7 +22,14 @@ from schemas.task import (
     progress_code_fields,
 )
 from services.auth_service import AuthService
-from services.rag_errors import GENERIC_TASK_ERROR, user_facing_task_error
+from services.rag_errors import (
+    TASK_FAILED,
+    TASK_PENDING_TIMEOUT,
+    TASK_STATUS_UNAVAILABLE,
+    TASK_STREAM_ERROR,
+    user_facing_task_error,
+)
+from services.translation_service import DEFAULT_LOCALE, t
 
 logger = logging.getLogger(__name__)
 
@@ -286,8 +293,8 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                         task_id=task_id,
                         status=TaskStatus.FAILURE,
                         progress=0,
-                        error="Task-Status kann nicht abgerufen werden (Verbindungsfehler). "
-                        "Bitte versuch es später erneut.",
+                        error=t(TASK_STATUS_UNAVAILABLE, DEFAULT_LOCALE),
+                        error_code=TASK_STATUS_UNAVAILABLE,
                     )
                     await websocket.send_json(msg.model_dump())
                     await websocket.close()
@@ -328,13 +335,13 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
 
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
                 raw_info = task_data["info"]
-                user_message = user_facing_task_error(raw_info)
+                task_error = user_facing_task_error(raw_info)
                 # Log the real error fully server-side (with traceback, if
                 # available); send the user only the safe, actionable
                 # message — no raw internals/PII (TF-358). Explicitly flag
                 # unknown error classes (generic fallback) so alerting is
                 # possible for new, unmapped errors.
-                unmapped = user_message == GENERIC_TASK_ERROR
+                unmapped = task_error.code == TASK_FAILED
                 logger.error(
                     "Task %s failed (%s): %r",
                     task_id,
@@ -346,7 +353,8 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                     task_id=task_id,
                     status=TaskStatus(state),
                     progress=0,
-                    error=user_message,
+                    error=task_error.message,
+                    error_code=task_error.code,
                 )
                 await websocket.send_json(msg.model_dump())
                 await websocket.close()
@@ -372,11 +380,23 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             else:
                 pending_seconds += POLL_INTERVAL_SECONDS
                 if pending_seconds >= PENDING_TIMEOUT_SECONDS:
+                    # A task that never starts points at a stuck broker or
+                    # worker — log it with the task id so operations see it.
+                    logger.error(
+                        "Task %s still PENDING after %ss, reporting timeout to client",
+                        task_id,
+                        PENDING_TIMEOUT_SECONDS,
+                    )
+                    # Keep the task id out of user-facing text: it is an
+                    # internal detail the user can do nothing with.
+                    timeout_params = {"seconds": PENDING_TIMEOUT_SECONDS}
                     msg = TaskStatusMessage(
                         task_id=task_id,
                         status=TaskStatus.FAILURE,
                         progress=0,
-                        error=f"Task {task_id} Timeout nach {PENDING_TIMEOUT_SECONDS}s",
+                        error=t(TASK_PENDING_TIMEOUT, DEFAULT_LOCALE, **timeout_params),
+                        error_code=TASK_PENDING_TIMEOUT,
+                        error_params=timeout_params,
                     )
                     await websocket.send_json(msg.model_dump())
                     await websocket.close()
@@ -396,7 +416,8 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                 task_id=task_id,
                 status=TaskStatus.FAILURE,
                 progress=0,
-                error="Interner Server-Fehler bei der Fortschritts-Übertragung",
+                error=t(TASK_STREAM_ERROR, DEFAULT_LOCALE),
+                error_code=TASK_STREAM_ERROR,
             )
             await websocket.send_json(error_msg.model_dump())
             await websocket.close(code=1011)

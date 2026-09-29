@@ -5,6 +5,7 @@
  */
 
 import type { TFunction } from 'i18next';
+import { isAppErrorCode } from '../errors/AppError';
 import type { GenerationTaskState } from '../types';
 
 export interface ContextLimit {
@@ -68,4 +69,36 @@ export const progressMessageOf = (task: GenerationTaskState, t: TFunction): stri
       return t('contexts.generationTasks.retrying');
   }
   return task.message || null;
+};
+
+/**
+ * TF-967: the error line of a failed task in the user's language. Same order
+ * as `translateError`, with one step in between, because a pre-TF-967 backend
+ * sends only the German `error` text, and a code this build does not know
+ * still arrives with that text:
+ *
+ *   1. `errors.<code>`, if the code is registered and the key resolves;
+ *   2. `task.message` (usually the backend's `error` text);
+ *   3. the caller's `fallbackKey`.
+ *
+ * Rendered at display time from `errorCode`, never stored as a string, so a
+ * language switch also reaches an error that is already on screen.
+ */
+export const errorMessageOf = (
+  task: GenerationTaskState,
+  t: TFunction,
+  fallbackKey: string
+): string => {
+  const code = task.errorCode;
+  if (isAppErrorCode(code)) {
+    const key = `errors.${code}`;
+    const translated = t(key, task.errorParams ?? undefined);
+    if (translated !== key) return translated;
+    console.warn('[i18n] Task error without translation key:', key, '- raw:', task.message);
+  } else if (code != null) {
+    // A code from a newer backend: the raw text below is still the better
+    // sentence than the generic fallback.
+    console.warn('[i18n] Unregistered task error code:', code, '- raw:', task.message);
+  }
+  return task.message || t(fallbackKey);
 };

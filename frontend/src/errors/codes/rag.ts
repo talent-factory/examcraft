@@ -31,6 +31,28 @@
  *                                      — job row gone
  *   rag_task_queue_unavailable    503  generate-exam, retry-generation
  *
+ * TASK FAILURE CODES (TF-967). Not HTTP errors: a generation that ran and
+ * failed. They arrive as `error_code` (+ `error_params`) on the WebSocket's
+ * FAILURE/REVOKED frame (`core/backend/api/v1/websocket.py`) and on the
+ * recovery response of GET /tasks/{task_id}/result, never through
+ * `selectCode()`. `GenerationTasksContext` stores them on the task and
+ * `errorMessageOf` (utils/generationTaskDisplay.ts) renders them in the order
+ * of `translateError`, plus the backend's German `error` text as a middle
+ * step — which `translateError` deliberately never renders. They must be
+ * registered here: `errorMessageOf` only translates codes that pass
+ * `isAppErrorCode()`, and `AppErrorCode.i18n.test.ts` then keeps all four
+ * locales complete:
+ *
+ *   rag_task_failed                  any unmapped task exception (the common case)
+ *   rag_task_no_context              too little searchable document material
+ *   rag_task_pending_timeout {{seconds}}  WebSocket only — task never left PENDING
+ *   rag_task_status_unavailable      WebSocket only — result backend unreachable
+ *   rag_task_stream_error            WebSocket only — unexpected error in the stream
+ *   rag_task_unknown_question_type   question type without a template
+ *
+ * `rag_generation_failed` above is a different failure: the 500 of the
+ * synchronous start request, before any task exists.
+ *
  * Deliberately NOT registered, because no call site can reach them:
  *
  *   rag_invalid_question_type    `validateRAGRequest` allows a strict subset of
@@ -63,8 +85,14 @@ export const RAG_ERROR_CODES = [
   'rag_retry_owner_unavailable',
   'rag_tag_archived',
   'rag_tag_ids_invalid',
+  'rag_task_failed',
+  'rag_task_no_context',
   'rag_task_not_found',
+  'rag_task_pending_timeout',
   'rag_task_queue_unavailable',
+  'rag_task_status_unavailable',
+  'rag_task_stream_error',
+  'rag_task_unknown_question_type',
   'rag_validation_document_required',
   'rag_validation_invalid_difficulty',
   'rag_validation_invalid_language',

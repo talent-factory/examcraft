@@ -4,8 +4,8 @@ Structured RAG generation errors with stable codes (TF-358).
 Analogous to :mod:`services.document_errors`: instead of interpreting raw
 English error texts by substring, the exceptions carry a stable,
 machine-readable ``code``. The WebSocket endpoint (`api/v1/websocket.py`)
-maps this code to a safe, actionable German user message — robust
-against localization or rewording of the raw message.
+maps this code to a safe, actionable user message and an API error
+code — robust against localization or rewording of the raw message.
 
 Important cross-tier architecture note: this file lives in ``core/``
 (not ``premium/``), so BOTH processes can import it — the Celery worker
@@ -20,7 +20,9 @@ Codes are stable snake_case identifiers — never localize them, never
 silently reinterpret them. Extend with new codes additively.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, NamedTuple
+
+from services.translation_service import DEFAULT_LOCALE, t
 
 # ---------------------------------------------------------------------------
 # Stable, machine-readable error codes. Extend additively; never reinterpret.
@@ -74,22 +76,44 @@ class UnknownQuestionTypeError(RAGGenerationError):
 # exact same TF-358 sanitization. One of the two spots previously
 # returned ``str(exception)`` raw to the client — exactly the leak this
 # mapper is meant to prevent.
+#
+# TF-967: the mapper returns an API error code (ADR 0005) next to the
+# German text. The code is the locale key; the frontend renders it in the
+# user's language, and the German text only remains as ``error`` for
+# clients that do not know the code yet. These are public API codes and
+# deliberately differ from the internal exception codes above
+# (``NO_CONTEXT`` → ``TASK_NO_CONTEXT``).
 # ---------------------------------------------------------------------------
 
-GENERIC_TASK_ERROR = "Verarbeitung fehlgeschlagen. Bitte erneut versuchen."
-"""Generic fallback message for unknown task errors. Deliberately
-uninformative to the user, to avoid leaking internal details/PII."""
+TASK_FAILED = "rag_task_failed"
+"""Generic fallback for unknown task errors. Deliberately uninformative to
+the user, to avoid leaking internal details/PII."""
+
+TASK_NO_CONTEXT = "rag_task_no_context"
+TASK_UNKNOWN_QUESTION_TYPE = "rag_task_unknown_question_type"
+
+# Raised by the WebSocket stream itself, not mapped from a task exception.
+TASK_STATUS_UNAVAILABLE = "rag_task_status_unavailable"
+TASK_PENDING_TIMEOUT = "rag_task_pending_timeout"
+TASK_STREAM_ERROR = "rag_task_stream_error"
 
 
-def user_facing_task_error(raw_info: Any) -> str:
-    """Map a (technical) task exception to a safe, actionable German
-    user message (TF-358).
+class UserFacingTaskError(NamedTuple):
+    """API error code plus its German text, the latter for the ``error`` field."""
+
+    code: str
+    message: str
+
+
+def user_facing_task_error(raw_info: Any) -> UserFacingTaskError:
+    """Map a (technical) task exception to a safe, actionable user message
+    (TF-358) and its error code (TF-967).
 
     The real error must be logged server-side by the caller — it is
     NOT passed through to the user here. Only explicitly known error
-    classes get a concrete message; everything else falls back to a
-    generic message, so no internal details or personal data reach the
-    client.
+    classes get a concrete message; everything else falls back to
+    ``TASK_FAILED``, so no internal details or personal data reach the
+    client. Callers detect that fallback by the code, not by the text.
 
     Matching is primarily via the stable ``code`` of the RAG errors
     above — robust against rewording/localization. The substring
@@ -104,17 +128,10 @@ def user_facing_task_error(raw_info: Any) -> str:
         or "no context available" in text
         or "no relevant context found" in text
     ):
-        return (
-            "Die ausgewählten Dokumente enthalten zu wenig durchsuchbaren "
-            "Inhalt für die Fragengenerierung. Bitte zusätzliche oder "
-            "umfangreichere Dokumente auswählen oder die Anzahl der Fragen "
-            "reduzieren."
-        )
+        api_code = TASK_NO_CONTEXT
+    elif code == UNKNOWN_QUESTION_TYPE or "unknown question type" in text:
+        api_code = TASK_UNKNOWN_QUESTION_TYPE
+    else:
+        api_code = TASK_FAILED
 
-    if code == UNKNOWN_QUESTION_TYPE or "unknown question type" in text:
-        return (
-            "Der gewählte Fragetyp wird nicht unterstützt. Bitte einen anderen "
-            "Fragetyp auswählen."
-        )
-
-    return GENERIC_TASK_ERROR
+    return UserFacingTaskError(api_code, t(api_code, DEFAULT_LOCALE))
