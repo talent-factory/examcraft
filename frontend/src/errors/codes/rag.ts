@@ -40,6 +40,8 @@
  *                                is in flight
  *   rag_retry_no_request_data    generate-exam always stores `request_data`
  *   rag_service_unhealthy        `RAGService.checkHealth` has no caller
+ *   rag_task_dismiss_failed      `dismissTask` is fire-and-forget; the panel
+ *                                hides the entry either way (TF-736)
  *
  * (`rag_get_documents_failed` predates both groups and lives in
  * `documents.ts`, because `DocumentService` is its only consumer.)

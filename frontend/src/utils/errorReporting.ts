@@ -29,6 +29,7 @@
  */
 
 import { notifySessionReplayError } from './sessionReplay';
+import { isAppError } from '../errors/AppError';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ENDPOINT = `${API_BASE_URL}/api/v1/monitoring/client-errors`;
@@ -272,6 +273,23 @@ export function reportHandledError(error: unknown, context: Record<string, unkno
     url: window.location.href,
     userAgent: navigator.userAgent,
   });
+}
+
+/**
+ * Like {@link reportHandledError}, but skips expected client errors: an
+ * `AppError` with a 4xx status (validation, permissions, a deleted document)
+ * is a normal outcome the UI already explains. Network failures, timeouts
+ * and 5xx are reported — for calls whose failure the UI deliberately keeps
+ * quiet (TF-736: material check, panel dismissal), this is the only trace.
+ */
+export function reportUnexpectedError(
+  error: unknown,
+  context: Record<string, unknown> = {}
+): void {
+  if (isAppError(error) && error.status !== undefined && error.status < 500) {
+    return;
+  }
+  reportHandledError(error, context);
 }
 
 /**

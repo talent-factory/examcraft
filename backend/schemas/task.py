@@ -4,7 +4,7 @@ Verwendet im WebSocket Task Progress Endpoint
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -28,6 +28,40 @@ class TaskStatus(str, Enum):
         return self in (TaskStatus.SUCCESS, TaskStatus.FAILURE, TaskStatus.REVOKED)
 
 
+class ProgressCode(str, Enum):
+    """Progress codes the frontend translates (TF-736).
+
+    Keep in sync with ``KnownProgressCode`` in
+    ``core/frontend/src/utils/generationTaskDisplay.ts``. The schema fields
+    stay ``Optional[str]`` so a newer worker's unknown code can't turn
+    ``/active-tasks`` into a 500 — the frontend falls back to ``message``.
+    """
+
+    GENERATION_STARTED = "generation_started"
+    CONTEXT_LOADED = "context_loaded"  # params: total
+    QUESTION_GENERATED = "question_generated"  # params: current, total
+    TASK_STARTED = "task_started"
+    TASK_RETRYING = "task_retrying"
+
+
+def progress_code_fields(
+    info: Any,
+) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Read ``(code, params)`` from a Celery PROGRESS meta dict.
+
+    Tolerates anything a worker may have written: a non-string code yields
+    ``(None, None)``, non-dict params yield ``None``. Parameters never travel
+    without their code.
+    """
+    if not isinstance(info, dict):
+        return None, None
+    code = info.get("code")
+    if not isinstance(code, str) or not code:
+        return None, None
+    params = info.get("params")
+    return code, params if isinstance(params, dict) else None
+
+
 class TaskStatusMessage(BaseModel):
     """WebSocket-Message Format für Task-Fortschritt"""
 
@@ -35,6 +69,10 @@ class TaskStatusMessage(BaseModel):
     status: TaskStatus
     progress: int = Field(ge=0, le=100)
     message: Optional[str] = None
+    # TF-736: progress code plus interpolation values; the frontend renders
+    # the text in the user's language and prefers it over `message`.
+    message_code: Optional[str] = None
+    message_params: Optional[Dict[str, Any]] = None
     result: Optional[Any] = None
     error: Optional[str] = None
 

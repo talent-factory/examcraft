@@ -88,6 +88,9 @@ export * from './utils/deploymentMode';
 export * from './utils/sessionSnapshot';
 export * from './utils/ragWizardSnapshot';
 export * from './utils/competenciesTemplateVariable';
+export * from './utils/generationTaskDisplay';
+// TF-736: Premium reports failures it deliberately keeps quiet in the UI.
+export { reportHandledError, reportUnexpectedError } from './utils/errorReporting';
 
 // ============================================================================
 // Tags

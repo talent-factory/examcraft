@@ -30,6 +30,29 @@ class TestProgressTask:
             },
         )
 
+    def test_update_progress_with_code_adds_code_and_params(self):
+        """TF-736: code + params travel in the meta next to the message."""
+        from tasks.document_tasks import ProgressTask
+
+        task = ProgressTask()
+        task.update_state = MagicMock()
+
+        task.update_progress(
+            2, 5, code="question_generated", params={"current": 1, "total": 3}
+        )
+
+        task.update_state.assert_called_once_with(
+            state="PROGRESS",
+            meta={
+                "current": 2,
+                "total": 5,
+                "progress": 40,
+                "message": "",
+                "code": "question_generated",
+                "params": {"current": 1, "total": 3},
+            },
+        )
+
     def test_update_progress_calculates_percentage(self):
         """update_progress() berechnet progress korrekt"""
         from tasks.document_tasks import ProgressTask

@@ -149,6 +149,7 @@
     "rag_invalid_question_type": "Ungültiger Fragetyp",
     "rag_no_institution": "Benutzer ist keiner Institution zugeordnet",
     "rag_task_not_found": "Generierungsauftrag nicht gefunden.",
+    "rag_task_dismiss_failed": "Schliessen des Generierungsauftrags fehlgeschlagen.",
     "rag_retry_only_failed": "Nur fehlgeschlagene Aufträge können wiederholt werden.",
     "rag_retry_no_request_data": "Keine gespeicherten Parameter für Wiederholung verfügbar.",
     "rag_retry_owner_unavailable": "Der ursprüngliche Auftragsbesitzer ist nicht mehr verfügbar — Wiederholung nicht möglich.",

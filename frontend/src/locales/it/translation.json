@@ -2082,7 +2082,12 @@
       "retry": "Riprova",
       "contextLimitedTitle": "Meno domande del richiesto",
       "contextLimitedBody": "È stato possibile creare solo {{generated}} delle {{requested}} domande richieste, perché i documenti selezionati contengono troppo poco contenuto ricercabile.",
-      "contextLimitedAction": "Per ottenere più domande, seleziona documenti aggiuntivi o più ampi."
+      "contextLimitedAction": "Per ottenere più domande, seleziona documenti aggiuntivi o più ampi.",
+      "progress": {
+        "generationStarted": "Avvio della generazione delle domande...",
+        "contextLoaded": "Contesto caricato...",
+        "questionGenerated": "Domanda {{current}} di {{total}} creata..."
+      }
     },
     "questionEditor": {
       "title": "Modifica domanda #{{id}}",
@@ -2653,12 +2658,12 @@
       "next": "Avanti",
       "errorLoadingData": "Errore nel caricamento dei dati",
       "errorTopicAndDocument": "Inserisci un argomento e seleziona almeno un documento.",
-      "errorContextPreview": "Errore nell'analisi del contesto",
       "errorExamGeneration": "Errore nella generazione delle domande d'esame",
       "runningGenerations": "Generazioni in corso",
       "generation": "Generazione",
       "questionCountChip_one": "{{count}} domanda",
       "questionCountChip_other": "{{count}} domande",
+      "questionCountChipLimited": "{{generated}} di {{requested}} domande",
       "waiting": "In attesa...",
       "clickToView": "Clicca per visualizzare",
       "resultUnavailable": "Dettagli non più disponibili – le domande si trovano nella coda di revisione. Clicca per aprire.",
@@ -2691,6 +2696,9 @@
       "previewChunks": "Sezioni di testo pertinenti: {{chunks}}",
       "previewAverageSimilarity": "Similarità media: {{similarity}}",
       "previewEstimatedQuestions": "Domande stimate: {{questions}}",
+      "materialEstimateNone": "Nel materiale selezionato non è stato trovato nulla di pertinente all'argomento – la generazione si interromperebbe senza domande. Modifica l'argomento o seleziona altri documenti.",
+      "materialEstimateShortfall": "Il materiale selezionato basterà probabilmente per circa {{count}} delle {{requested}} domande desiderate. Seleziona altri documenti se te ne servono di più.",
+      "materialEstimateUnavailable": "Verifica del materiale non disponibile",
       "recommendations": "Raccomandazioni",
       "recommendedQuestionCount": "Numero di domande raccomandato:",
       "recommendedDifficulty": "Livello di difficoltà raccomandato:",
@@ -2721,6 +2729,7 @@
       "competenciesOverrideLabel": "Competenze (modificabili)",
       "competenciesOverrideHelper": "Inserito letteralmente come {{ competencies }} nella generazione.",
       "restoredStateNotice": "L'ultima configurazione è stata ripristinata.",
+      "lastRunSettingsNotice": "Le impostazioni dell'ultima generazione sono state mantenute.",
       "discardRestoredState": "Ricomincia",
       "dismissNotice": "Chiudi l'avviso",
       "reviewQueueHint": "Le domande generate finiscono automaticamente nella coda di revisione. Puoi lasciare questa pagina durante la generazione: prosegue in background.",
@@ -2734,7 +2743,7 @@
       "summaryConfig_other": "{{topic}} · {{count}} domande · {{difficulty}}",
       "summaryPreview_one": "Contesto verificato · {{count}} sezione di testo",
       "summaryPreview_other": "Contesto verificato · {{count}} sezioni di testo",
-      "previewOutdated": "L'argomento o la selezione dei documenti è cambiata — l'anteprima del contesto viene ricaricata."
+      "previewOutdated": "L'argomento, la selezione dei documenti o il numero di domande è cambiato — l'anteprima del contesto viene ricaricata."
     },
     "ragExamDisplay": {
       "questions_one": "{{count}} domanda",

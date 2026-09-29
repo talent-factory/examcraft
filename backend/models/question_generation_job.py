@@ -40,6 +40,10 @@ class QuestionGenerationJob(Base):
     context_limited = Column(
         Boolean, default=False, server_default=false(), nullable=False
     )
+    # TF-736: when the owner closed the job's entry in the generation panel.
+    # `/active-tasks` skips dismissed jobs, so a closed entry stays closed
+    # across reloads, tabs and devices. NULL = never dismissed.
+    dismissed_at = Column(DateTime(timezone=True), nullable=True)
 
     def __init__(self, **kwargs: object) -> None:
         kwargs.setdefault("status", "PENDING")

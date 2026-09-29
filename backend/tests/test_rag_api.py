@@ -420,6 +420,117 @@ class TestRAGAPI:
         assert len(data["source_documents"]) == 1
         assert data["context_length"] == 180
 
+    def test_retrieve_context_with_question_count_returns_estimate(self, auth_client):
+        """TF-736: with question_count the endpoint asks the service for the
+        generation's effective_count and returns it; max_chunks is ignored."""
+        mock_context = Mock()
+        mock_context.query = "ExamCraft AI"
+        mock_context.retrieved_chunks = [Mock()] * 6
+        mock_context.total_similarity_score = 3.0
+        mock_context.source_documents = []
+        mock_context.context_length = 600
+
+        mock_doc = Mock()
+        mock_doc.institution_id = 1
+        mock_doc.user_id = 42
+
+        with (
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_doc,
+            ),
+            patch("services.rag_service.rag_service") as mock_rag_service,
+        ):
+            mock_rag_service.estimate_question_count = AsyncMock(
+                return_value=(mock_context, 6)
+            )
+            mock_rag_service.retrieve_context = AsyncMock()
+            response = auth_client.post(
+                "/api/v1/rag/retrieve-context",
+                json={
+                    "query": "ExamCraft AI",
+                    "document_ids": [1],
+                    "max_chunks": 10,
+                    "question_count": 15,
+                    "context_chunks_per_question": 3,
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["estimated_question_count"] == 6
+        assert data["total_chunks"] == 6
+        mock_rag_service.retrieve_context.assert_not_awaited()
+        kwargs = mock_rag_service.estimate_question_count.await_args.kwargs
+        assert kwargs["question_count"] == 15
+        assert kwargs["chunks_per_question"] == 3
+        assert kwargs["document_ids"] == [1]
+        assert kwargs["min_similarity"] == 0.01
+
+    def test_retrieve_context_estimate_outage_is_an_error_not_zero(self, auth_client):
+        """TF-736: a vector search outage during the estimate answers 500, so
+        the wizard shows "check unavailable" instead of "enough for about 0
+        questions". (Premium raises VectorSearchError; core must not import
+        premium, and the endpoint treats any exception alike.)"""
+        mock_doc = Mock()
+        mock_doc.institution_id = 1
+        mock_doc.user_id = 42
+
+        with (
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_doc,
+            ),
+            patch("services.rag_service.rag_service") as mock_rag_service,
+        ):
+            mock_rag_service.estimate_question_count = AsyncMock(
+                side_effect=RuntimeError("Qdrant client not available")
+            )
+            response = auth_client.post(
+                "/api/v1/rag/retrieve-context",
+                json={
+                    "query": "ExamCraft AI",
+                    "document_ids": [1],
+                    "question_count": 15,
+                },
+            )
+
+        assert response.status_code == 500
+        assert response.json()["error_code"] == "rag_context_retrieval_failed"
+
+    def test_retrieve_context_without_question_count_has_no_estimate(self, auth_client):
+        """Without question_count the old retrieval path stays unchanged."""
+        mock_context = Mock()
+        mock_context.query = "ExamCraft AI"
+        mock_context.retrieved_chunks = []
+        mock_context.total_similarity_score = 0.0
+        mock_context.source_documents = []
+        mock_context.context_length = 0
+
+        mock_doc = Mock()
+        mock_doc.institution_id = 1
+        mock_doc.user_id = 42
+
+        with (
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_doc,
+            ),
+            patch("services.rag_service.rag_service") as mock_rag_service,
+        ):
+            mock_rag_service.retrieve_context = AsyncMock(return_value=mock_context)
+            response = auth_client.post(
+                "/api/v1/rag/retrieve-context",
+                json={"query": "ExamCraft AI", "document_ids": [1], "max_chunks": 5},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["estimated_question_count"] is None
+        assert mock_rag_service.retrieve_context.await_args.kwargs["max_chunks"] == 5
+
     def test_retrieve_context_validation_errors(self, auth_client):
         """Test context retrieval with validation errors"""
 
@@ -437,6 +548,34 @@ class TestRAGAPI:
             json={"query": "Valid Query", "min_similarity": 1.5},
         )
         assert response.status_code == 422
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            # document_ids is required and non-empty: an unfiltered search
+            # would name other users' documents in source_documents.
+            {"document_ids": None},
+            {"document_ids": []},
+            # With question_count these bounds are the only cap on the
+            # retrieval budget (max_chunks <= 20 no longer applies).
+            {"question_count": 0},
+            {"question_count": 21},
+            {"question_count": 5, "context_chunks_per_question": 0},
+            {"question_count": 5, "context_chunks_per_question": 11},
+        ],
+    )
+    def test_retrieve_context_rejects_invalid_estimate_input(self, auth_client, extra):
+        """TF-736: request validation of the estimate path."""
+        payload = {"query": "Valid Query", "document_ids": [1], **extra}
+        if payload["document_ids"] is None:
+            del payload["document_ids"]
+
+        with patch("services.rag_service.rag_service") as mock_rag_service:
+            response = auth_client.post("/api/v1/rag/retrieve-context", json=payload)
+
+        assert response.status_code == 422
+        mock_rag_service.estimate_question_count.assert_not_called()
+        mock_rag_service.retrieve_context.assert_not_called()
 
     def test_get_available_documents_success(
         self, auth_client, mock_db, mock_processed_document

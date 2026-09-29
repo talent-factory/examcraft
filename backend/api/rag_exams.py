@@ -23,7 +23,11 @@ from models.competency import CompetencyFramework
 from models.document import Document, DocumentStatus
 from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
-from schemas.task import GenerateExamTaskResponse
+from schemas.task import (
+    GenerateExamTaskResponse,
+    ProgressCode,
+    progress_code_fields,
+)
 from schemas.active_tasks import (
     ActiveTaskInfo,
     ActiveTasksResponse,
@@ -183,19 +187,38 @@ class RAGContextResponse(BaseModel):
     total_similarity_score: float
     source_documents: List[Dict[str, Any]]
     context_length: int
+    # TF-736: how many questions the material is expected to yield for the
+    # requested count — the generation's `effective_count`. Only set when the
+    # request carried `question_count`.
+    estimated_question_count: Optional[int] = None
 
 
 class ContextRetrievalRequest(BaseModel):
     """Request model for context retrieval"""
 
     query: str = Field(..., description="Search query", min_length=3, max_length=500)
-    document_ids: Optional[List[int]] = Field(None, description="Specific document IDs")
+    # Required and non-empty: without it the vector search runs unfiltered
+    # over the whole index and `source_documents` would name other users'
+    # documents — the visibility check below only covers listed IDs.
+    document_ids: List[int] = Field(
+        ..., description="Document IDs to search in", min_length=1
+    )
     max_chunks: int = Field(5, description="Maximum number of chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
         description="Minimum similarity score (low for maximum recall)",
         ge=0.0,
         le=1.0,
+    )
+    # TF-736: with `question_count`, the retrieval mirrors the generation's
+    # (chunk budget from these two values, `max_chunks` is ignored) and the
+    # response carries `estimated_question_count`. Same limits as
+    # RAGExamRequestModel.
+    question_count: Optional[int] = Field(
+        None, description="Requested number of questions", ge=1, le=20
+    )
+    context_chunks_per_question: int = Field(
+        3, description="Context chunks per question", ge=1, le=10
     )
 
 
@@ -563,36 +586,50 @@ async def retrieve_context(
     **Required:** Authenticated user
 
     - **query**: search query for context
-    - **document_ids**: optional specific documents
-    - **max_chunks**: maximum number of chunks (1-20)
+    - **document_ids**: documents to search in (required, non-empty)
+    - **max_chunks**: maximum number of chunks (1-20; ignored with question_count)
     - **min_similarity**: minimum similarity score (0.0-1.0)
+    - **question_count** / **context_chunks_per_question**: optional; the
+      retrieval then mirrors the generation and the response carries
+      `estimated_question_count` (TF-736)
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Validate document IDs if provided
-        if request.document_ids:
-            # Computed once per request, not once per document (TF-620 perf
-            # fix) — see generate_exam_from_documents for the same pattern.
-            accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
-            for doc_id in request.document_ids:
-                document = document_service.get_document_by_id(doc_id, db)
-                # Visibility check (TF-354): 404 instead of 403 — a foreign
-                # private document must not leak via the RAG path.
-                if not document or not is_document_visible_for(
-                    current_user,
-                    document,
-                    db,
-                    accessible_org_unit_ids=accessible_org_unit_ids,
-                ):
-                    raise api_error(404, "rag_document_not_found", locale)
+        # Computed once per request, not once per document (TF-620 perf
+        # fix) — see generate_exam_from_documents for the same pattern.
+        accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
+        for doc_id in request.document_ids:
+            document = document_service.get_document_by_id(doc_id, db)
+            # Visibility check (TF-354): 404 instead of 403 — a foreign
+            # private document must not leak via the RAG path.
+            if not document or not is_document_visible_for(
+                current_user,
+                document,
+                db,
+                accessible_org_unit_ids=accessible_org_unit_ids,
+            ):
+                raise api_error(404, "rag_document_not_found", locale)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
-        context = await rag_service_module.rag_service.retrieve_context(
-            query=request.query,
-            document_ids=request.document_ids,
-            max_chunks=request.max_chunks,
-            min_similarity=min_sim,
-        )
+        estimated_question_count: Optional[int] = None
+        if request.question_count is not None:
+            (
+                context,
+                estimated_question_count,
+            ) = await rag_service_module.rag_service.estimate_question_count(
+                query=request.query,
+                document_ids=request.document_ids,
+                question_count=request.question_count,
+                chunks_per_question=request.context_chunks_per_question,
+                min_similarity=min_sim,
+            )
+        else:
+            context = await rag_service_module.rag_service.retrieve_context(
+                query=request.query,
+                document_ids=request.document_ids,
+                max_chunks=request.max_chunks,
+                min_similarity=min_sim,
+            )
 
         response = RAGContextResponse(
             query=context.query,
@@ -600,10 +637,15 @@ async def retrieve_context(
             total_similarity_score=context.total_similarity_score,
             source_documents=context.source_documents,
             context_length=context.context_length,
+            estimated_question_count=estimated_question_count,
         )
 
         logger.info(
-            f"Retrieved context for query '{request.query}': {len(context.retrieved_chunks)} chunks"
+            f"Retrieved context for query '{request.query}': "
+            f"{len(context.retrieved_chunks)} chunks, "
+            f"question_count={request.question_count}, "
+            f"chunks_per_question={request.context_chunks_per_question}, "
+            f"estimated_question_count={estimated_question_count}"
         )
 
         return response
@@ -827,6 +869,15 @@ ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
 # the UI. Deliberately much shorter than ACTIVE_TASK_MAX_AGE, so hour-old
 # generations don't pop back up on every page load.
 COMPLETED_TASK_MAX_AGE = timedelta(minutes=30)
+# TF-736: window for the caller's own under-filled generations
+# (context_limited). The panel is where a returning user learns why fewer
+# questions arrived (the running-generations list reads the same data);
+# 30 minutes missed anyone who came back after lunch or a
+# meeting block. Eight hours cover a working day: a run started in the morning
+# is still explained in the afternoon, yet it is gone by the next morning.
+# Closing the entry is remembered on the row (dismissed_at), so the longer
+# window doesn't mean a notice that keeps coming back.
+CONTEXT_LIMITED_TASK_MAX_AGE = timedelta(hours=8)
 
 
 @router.get("/active-tasks", response_model=ActiveTasksResponse)
@@ -839,8 +890,11 @@ async def get_active_tasks(
 
     That is: active (non-terminal) jobs from the last ``ACTIVE_TASK_MAX_AGE``,
     plus jobs that already reached a terminal state within the last
-    ``COMPLETED_TASK_MAX_AGE`` (TF-608). The latter carry no result payload —
-    the frontend pulls it from ``GET /tasks/{task_id}/result``.
+    ``COMPLETED_TASK_MAX_AGE`` (TF-608), plus the caller's own under-filled
+    SUCCESS jobs within ``CONTEXT_LIMITED_TASK_MAX_AGE`` (TF-736). Terminal
+    jobs closed via ``POST /tasks/{task_id}/dismiss`` are skipped. Terminal
+    jobs carry no result payload — the frontend pulls it from
+    ``GET /tasks/{task_id}/result``.
 
     Normal users see only their own jobs. Superusers see jobs of all users;
     the broadening is audit-logged via AuditService.log_superuser_bypass
@@ -863,6 +917,7 @@ async def get_active_tasks(
     now = datetime.now(timezone.utc)
     cutoff = now - ACTIVE_TASK_MAX_AGE
     completed_cutoff = now - COMPLETED_TASK_MAX_AGE
+    context_limited_cutoff = now - CONTEXT_LIMITED_TASK_MAX_AGE
     recoverable = or_(
         and_(
             QuestionGenerationJob.status.notin_(TERMINAL_STATUSES),
@@ -870,18 +925,29 @@ async def get_active_tasks(
         ),
         and_(
             QuestionGenerationJob.status.in_(TERMINAL_STATUSES),
-            QuestionGenerationJob.created_at > completed_cutoff,
+            QuestionGenerationJob.dismissed_at.is_(None),
+            or_(
+                QuestionGenerationJob.created_at > completed_cutoff,
+                # TF-736: own jobs only — the superuser listing below must
+                # not fill up with every user's under-filled runs of the day.
+                and_(
+                    QuestionGenerationJob.status == "SUCCESS",
+                    QuestionGenerationJob.context_limited.is_(True),
+                    QuestionGenerationJob.user_id == current_user.id,
+                    QuestionGenerationJob.created_at > context_limited_cutoff,
+                ),
+            ),
         ),
     )
     if current_user.is_superuser:
         jobs = db.query(QuestionGenerationJob).filter(recoverable).all()
         # Audit only when the bypass actually surfaced a foreign-owned job.
-        # The frontend GenerationTasksContext polls this endpoint on a multi-
-        # second interval; emitting an audit row every poll cycle (most of
-        # which return only the superuser's own jobs) flooded the DSGVO trail
-        # with low-signal entries and obscured genuine cross-owner access
-        # events. Logging on first foreign-job detection per request keeps
-        # the security signal sharp.
+        # The frontend GenerationTasksContext calls this endpoint on every
+        # mount and every silent token refresh; emitting an audit row per call
+        # (most of which return only the superuser's own jobs) flooded the
+        # DSGVO trail with low-signal entries and obscured genuine cross-owner
+        # access events. Logging on first foreign-job detection per request
+        # keeps the security signal sharp.
         foreign_owned = [j for j in jobs if j.user_id != current_user.id]
         if foreign_owned:
             from services.audit_service import AuditService
@@ -925,6 +991,10 @@ async def get_active_tasks(
 
         progress = 0
         message = None
+        # TF-736: progress code + params instead of a German text, same as
+        # the WebSocket relays them.
+        message_code: Optional[str] = None
+        message_params: Optional[Dict[str, Any]] = None
         celery_state: Optional[str] = None
         try:
             result = AsyncResult(job.task_id)
@@ -933,10 +1003,12 @@ async def get_active_tasks(
                 current = result.info.get("current", 0)
                 total = result.info.get("total", 1)
                 progress = int((current / max(total, 1)) * 100)
-                message = result.info.get("message")
+                message = result.info.get("message") or None
+                message_code, message_params = progress_code_fields(result.info)
             elif celery_state == "STARTED":
                 progress = 0
-                message = "Gestartet..."
+                message_code = ProgressCode.TASK_STARTED.value
+                message_params = {}
         except Exception as celery_err:
             logger.warning(
                 "Failed to fetch Celery state for task %s: %s",
@@ -975,6 +1047,8 @@ async def get_active_tasks(
                 status=job.status,
                 progress=progress,
                 message=message,
+                message_code=message_code,
+                message_params=message_params,
                 created_at=job.created_at,
                 topic=job.topic,
                 question_count=job.question_count,
@@ -982,6 +1056,53 @@ async def get_active_tasks(
         )
 
     return ActiveTasksResponse(tasks=tasks)
+
+
+@router.post("/tasks/{task_id}/dismiss", status_code=204)
+async def dismiss_task(
+    task_id: str,
+    http_request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Close a finished job's entry in the generation panel (TF-736).
+
+    Sets ``dismissed_at``, so ``/active-tasks`` stops listing the job — in
+    every tab, after a new login and on other devices. Before TF-736 the
+    dismissal only lived in the tab's sessionStorage, which was enough for a
+    30-minute window but not for the 8 hours under-filled jobs now stay.
+
+    Unknown task, or a foreign job for a normal user → 404 (no existence
+    oracle). Otherwise only the owner's dismissal of a finished job is
+    recorded; everything else answers 204 without touching the row. A superuser closing a foreign job's
+    entry must not hide the notice from the user it is meant for. A job that
+    is not finished (the panel also offers "close" when it lost the
+    connection) is not hidden server-side: it may still be running, and
+    ``/active-tasks`` must bring it back once it finishes. Idempotent.
+    """
+    locale = get_request_locale(http_request, current_user)
+    job = (
+        db.query(QuestionGenerationJob)
+        .filter(QuestionGenerationJob.task_id == task_id)
+        .first()
+    )
+    # 404 for foreign jobs of normal users too — no existence oracle.
+    if job is None or (
+        job.user_id != current_user.id and not current_user.is_superuser
+    ):
+        raise api_error(404, "rag_task_not_found", locale)
+    if (
+        job.user_id == current_user.id
+        and job.status in TERMINAL_STATUSES
+        and job.dismissed_at is None
+    ):
+        job.dismissed_at = datetime.now(timezone.utc)
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Dismissing task {task_id} failed: {e}", exc_info=True)
+            raise api_error(500, "rag_task_dismiss_failed", locale)
 
 
 @router.get("/tasks/{task_id}/result", response_model=TaskResultResponse)

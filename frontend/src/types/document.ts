@@ -231,6 +231,9 @@ export interface RAGContextSummary {
     chunks_used: number;
   }>;
   context_length: number;
+  /** TF-736: only on POST /retrieve-context with `question_count` — the
+   *  number of questions the generation would create from this material. */
+  estimated_question_count?: number | null;
 }
 
 export interface RAGExamResponse {
@@ -250,13 +253,13 @@ export interface RAGExamResponse {
     total_context_length: number;
     average_similarity_score: number;
     // TF-358: requested_/generated_question_count are set on every RAG
-    // generation. context_limited(_notice) only when the question count
-    // was coupled to the available chunk material (fewer questions
-    // generated than requested). All optional (backward compat).
+    // generation. context_limited only when the question count was coupled
+    // to the available chunk material (fewer questions generated than
+    // requested); the notice text is built from the counts in the user's
+    // language (TF-736). All optional (backward compat).
     requested_question_count?: number;
     generated_question_count?: number;
     context_limited?: boolean;
-    context_limited_notice?: string;
   };
 }
 
@@ -298,12 +301,30 @@ export interface QuestionTypesResponse {
   supported_languages: SupportedLanguageOption[];
 }
 
+/**
+ * TF-736: progress codes the backend sends (`schemas.task.ProgressCode`,
+ * keep in sync). `progressMessageOf` renders them.
+ */
+export type KnownProgressCode =
+  | 'generation_started'
+  | 'context_loaded'
+  | 'question_generated'
+  | 'task_started'
+  | 'task_retrying';
+
+/** A known code, or one from a newer backend (falls back to `message`). */
+export type ProgressCode = KnownProgressCode | (string & {});
+
 /** State of a single generation task tracked by GenerationTasksContext */
 export interface GenerationTaskState {
   taskId: string;
   status: 'PENDING' | 'STARTED' | 'PROGRESS' | 'SUCCESS' | 'FAILURE' | 'REVOKED' | 'RETRY' | 'UNKNOWN';
   progress: number;
   message: string | null;
+  // TF-736: progress code + parameters from the backend; rendered via
+  // `progressMessageOf` and preferred over `message`.
+  messageCode?: ProgressCode | null;
+  messageParams?: Record<string, unknown> | null;
   topic: string | null;
   questionCount: number | null;
   createdAt: string;
@@ -322,12 +343,19 @@ export interface GenerationTaskState {
  * tasks (terminal `status`), so a generation that finished during a
  * page change stays reachable. The result doesn't travel along — it's
  * fetched separately via `GET /api/v1/rag/tasks/{task_id}/result`.
+ *
+ * Since TF-736 also the caller's own under-filled SUCCESS jobs for up to 8
+ * hours; jobs closed via `POST /tasks/{task_id}/dismiss` are left out.
  */
 export interface ActiveTaskInfo {
   task_id: string;
   status: string;
   progress: number;
   message: string | null;
+  // TF-736: see GenerationTaskState.messageCode. Optional because a
+  // pre-TF-736 backend (rolling deploy) omits them.
+  message_code?: ProgressCode | null;
+  message_params?: Record<string, unknown> | null;
   created_at: string;
   topic: string | null;
   question_count: number | null;
@@ -335,6 +363,18 @@ export interface ActiveTaskInfo {
 
 export interface ActiveTasksResponse {
   tasks: ActiveTaskInfo[];
+}
+
+/** WebSocket message of `/ws/tasks/{task_id}` (`schemas.task.TaskStatusMessage`). */
+export interface TaskStatusMessage {
+  task_id: string;
+  status: GenerationTaskState['status'];
+  progress: number;
+  message: string | null;
+  message_code?: ProgressCode | null;
+  message_params?: Record<string, unknown> | null;
+  result?: RAGExamResponse | null;
+  error?: string | null;
 }
 
 /**

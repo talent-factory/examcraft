@@ -150,6 +150,7 @@
     "rag_no_institution": "L'utilisateur n'est associé à aucune institution",
     "rag_task_queue_unavailable": "File de tâches indisponible",
     "rag_task_not_found": "Tâche de génération introuvable.",
+    "rag_task_dismiss_failed": "Échec de la fermeture de la tâche de génération.",
     "rag_retry_only_failed": "Seules les tâches échouées peuvent être relancées.",
     "rag_retry_no_request_data": "Aucun paramètre sauvegardé disponible pour la relance.",
     "rag_retry_owner_unavailable": "Le propriétaire d'origine de la tâche n'est plus disponible — relance impossible.",

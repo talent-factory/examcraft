@@ -15,7 +15,12 @@ from celery_app import celery_app
 from database import SessionLocal
 from models.auth import User
 from models.document import Document
-from schemas.task import TaskStatus, TaskStatusMessage
+from schemas.task import (
+    ProgressCode,
+    TaskStatus,
+    TaskStatusMessage,
+    progress_code_fields,
+)
 from services.auth_service import AuthService
 from services.rag_errors import GENERIC_TASK_ERROR, user_facing_task_error
 
@@ -295,11 +300,14 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             info = task_data["info"] or {}
 
             if state == TaskStatus.PROGRESS:
+                message_code, message_params = progress_code_fields(info)
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus.PROGRESS,
                     progress=info.get("progress", 0),
-                    message=info.get("message"),
+                    message=info.get("message") or None,
+                    message_code=message_code,
+                    message_params=message_params,
                 )
                 await websocket.send_json(msg.model_dump())
                 pending_seconds = 0
@@ -346,16 +354,18 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
 
             elif state in (TaskStatus.STARTED, TaskStatus.RETRY):
                 pending_seconds = 0
-                message = (
-                    "Task gestartet..."
+                # TF-736: a code instead of a German text, like PROGRESS above.
+                message_code = (
+                    ProgressCode.TASK_STARTED
                     if state == TaskStatus.STARTED
-                    else "Task wird erneut versucht..."
-                )
+                    else ProgressCode.TASK_RETRYING
+                ).value
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus.PROGRESS,
                     progress=info.get("progress", 0) if isinstance(info, dict) else 0,
-                    message=message,
+                    message_code=message_code,
+                    message_params={},
                 )
                 await websocket.send_json(msg.model_dump())
 

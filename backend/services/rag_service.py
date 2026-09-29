@@ -97,6 +97,18 @@ class RAGServicePlaceholder:
             "Context retrieval is only available in the Premium package."
         )
 
+    async def estimate_question_count(
+        self,
+        query: str,
+        document_ids: Optional[List[int]],
+        question_count: int,
+        chunks_per_question: int,
+        min_similarity: Optional[float] = None,
+    ):
+        raise NotImplementedError(
+            "Question count estimation is only available in the Premium package."
+        )
+
     async def generate_questions_from_context(
         self, context: str, num_questions: int = 5, difficulty: str = "medium"
     ) -> List[RAGQuestion]:

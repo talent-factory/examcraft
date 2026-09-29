@@ -5,7 +5,7 @@ Handles document extraction, RAG embedding, and metadata extraction
 
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from celery import Task
 from celery.exceptions import Ignore, Reject
@@ -31,14 +31,26 @@ class ProgressTask(Task):
 
     abstract = True
 
-    def update_progress(self, current: int, total: int, message: str = "") -> None:
+    def update_progress(
+        self,
+        current: int,
+        total: int,
+        message: str = "",
+        code: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Sends a progress update to the Redis result backend.
 
         Args:
             current: Current step (0-based)
             total: Total number of steps (must be > 0)
-            message: Progress message (German)
+            message: Progress message (German). Document tasks still send
+                text: no UI opens `/ws/tasks/{id}` for them, only generation
+                tasks do (GenerationTasksContext).
+            code: Progress code the frontend translates (TF-736). Set instead
+                of `message` wherever the text reaches the UI.
+            params: Interpolation values for `code`.
         """
         if total <= 0:
             logger.error(
@@ -46,15 +58,16 @@ class ProgressTask(Task):
             )
             total = 1
         current = max(0, min(current, total))
-        self.update_state(
-            state="PROGRESS",
-            meta={
-                "current": current,
-                "total": total,
-                "progress": int((current / total) * 100),
-                "message": message,
-            },
-        )
+        meta: Dict[str, Any] = {
+            "current": current,
+            "total": total,
+            "progress": int((current / total) * 100),
+            "message": message,
+        }
+        if code is not None:
+            meta["code"] = code
+            meta["params"] = params or {}
+        self.update_state(state="PROGRESS", meta=meta)
 
 
 def run_async(coro):

@@ -80,6 +80,50 @@ describe('GenerationTasksBar', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
+  // TF-736 (C4): the backend sends a progress code plus parameters instead of
+  // a German text; the panel renders it in the user's language.
+  test.each([
+    ['generation_started', {}, 'Fragengenerierung wird gestartet...'],
+    ['context_loaded', { total: 6 }, 'Kontext geladen...'],
+    ['question_generated', { current: 2, total: 6 }, 'Frage 2 von 6 erstellt...'],
+    ['task_started', {}, 'Gestartet...'],
+    ['task_retrying', {}, 'Wird wiederholt...'],
+  ])('renders progress code %s in the UI language', (messageCode, messageParams, text) => {
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [
+        makeTask({ status: 'PROGRESS', progress: 50, message: null, messageCode, messageParams }),
+      ],
+      completedTasks: [],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(screen.getByText(`50% – ${text}`)).toBeInTheDocument();
+  });
+
+  test('falls back to the plain message for an unknown progress code', () => {
+    mockUseGenerationTasks.mockReturnValue({
+      activeTasks: [
+        makeTask({
+          status: 'PROGRESS',
+          progress: 10,
+          message: 'Legacy text',
+          messageCode: 'from_a_newer_backend',
+          messageParams: {},
+        }),
+      ],
+      completedTasks: [],
+      dismissTask: mockDismissTask,
+      retryTask: mockRetryTask,
+    });
+
+    render(<GenerationTasksBar />, { wrapper: Wrapper });
+
+    expect(screen.getByText('10% – Legacy text')).toBeInTheDocument();
+  });
+
   test('shows header with active task count', () => {
     const activeTask = makeTask({ status: 'STARTED', progress: 10 });
 
@@ -359,6 +403,7 @@ describe('GenerationTasksBar', () => {
       requested_question_count: 15,
       generated_question_count: 6,
       context_limited: true,
+      // Legacy field (removed in TF-736, may linger in old Celery results): must be ignored.
       context_limited_notice: 'BACKEND-TEXT-DARF-NICHT-ERSCHEINEN',
     };
 
@@ -477,6 +522,7 @@ describe('GenerationTasksBar', () => {
           status: 'SUCCESS',
           progress: 100,
           topic: 'Nur Text',
+          // Legacy field (removed in TF-736, may linger in old Celery results): must be ignored.
           result: { quality_metrics: { context_limited_notice: 'irgendwas' } } as any,
         }),
       ]);

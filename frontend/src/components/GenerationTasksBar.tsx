@@ -23,39 +23,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useTranslation } from 'react-i18next';
 import { useGenerationTasks } from '../contexts/GenerationTasksContext';
 import { translateError } from '../errors';
+import { contextLimitOf, progressMessageOf } from '../utils/generationTaskDisplay';
 import type { GenerationTaskState } from '../types';
 
 const AUTO_HIDE_DELAY_MS = 30_000;
-
-interface ContextLimit {
-  requested: number | null;
-  generated: number | null;
-}
-
-/**
- * TF-736: requested and generated question counts of a SUCCESS that produced
- * fewer questions than asked for, because the document material ran out.
- * `null` for every other task. Decided by the `context_limited` boolean,
- * never by the presence of a notice text. The live result's quality_metrics
- * win; the job-row values from the result endpoint cover an expired Celery
- * result. Relies on `result` and `contextLimited`/`generatedQuestionCount`
- * always being refreshed together (true today — see GenerationTasksContext's
- * recovery effect) — do not update one without the other.
- */
-const contextLimitOf = (task: GenerationTaskState): ContextLimit | null => {
-  if (task.status !== 'SUCCESS') return null;
-  const metrics = task.result?.quality_metrics;
-  if (metrics?.context_limited === true) {
-    return {
-      requested: metrics.requested_question_count ?? task.questionCount,
-      generated: metrics.generated_question_count ?? null,
-    };
-  }
-  if (task.contextLimited === true) {
-    return { requested: task.questionCount, generated: task.generatedQuestionCount ?? null };
-  }
-  return null;
-};
 
 const GenerationTasksBar: React.FC = () => {
   const { t } = useTranslation();
@@ -197,6 +168,7 @@ const GenerationTasksBar: React.FC = () => {
             const isFailure = task.status === 'FAILURE' || task.status === 'REVOKED';
             const isUnknown = task.status === 'UNKNOWN';
             const contextLimit = contextLimitOf(task);
+            const progressText = progressMessageOf(task, t);
 
             return (
               <Box
@@ -272,7 +244,7 @@ const GenerationTasksBar: React.FC = () => {
                     />
                     <Typography variant="caption" color="text.secondary">
                       {task.progress ?? 0}%
-                      {task.message ? ` – ${task.message}` : ''}
+                      {progressText ? ` – ${progressText}` : ''}
                     </Typography>
                   </>
                 )}
@@ -288,8 +260,7 @@ const GenerationTasksBar: React.FC = () => {
                     </Box>
                     {/* TF-358/TF-736: fewer questions than requested because the
                         document material ran out. Built from the counts in the
-                        user's language — the backend's context_limited_notice
-                        is German only. */}
+                        user's language. */}
                     {contextLimit && (
                       <Box
                         data-testid="generation-task-context-limited"

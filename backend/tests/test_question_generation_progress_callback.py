@@ -29,8 +29,8 @@ async def test_generate_rag_exam_calls_callback_after_context():
     request = RAGExamRequest(topic="Test", question_count=2)
     callback_calls = []
 
-    def mock_callback(current, total, message):
-        callback_calls.append((current, total, message))
+    def mock_callback(current, total, code, params):
+        callback_calls.append((current, total, code, params))
 
     service = RAGService.__new__(RAGService)
 
@@ -67,8 +67,8 @@ async def test_generate_rag_exam_calls_callback_per_question():
     request = RAGExamRequest(topic="Test", question_count=question_count)
     callback_calls = []
 
-    def mock_callback(current, total, message):
-        callback_calls.append((current, total, message))
+    def mock_callback(current, total, code, params):
+        callback_calls.append((current, total, code, params))
 
     service = RAGService.__new__(RAGService)
 
@@ -95,43 +95,6 @@ async def test_generate_rag_exam_calls_callback_per_question():
     # Last question call has current = question_count + 1
     question_calls = [c for c in callback_calls if c[0] >= 2]
     assert len(question_calls) == question_count
-
-
-@pytest.mark.asyncio
-async def test_generate_rag_exam_callback_messages_are_german():
-    """Callback messages are in German"""
-    pytest.importorskip("premium.services.rag_service")
-    from premium.services.rag_service import RAGService
-    from services.rag_service import RAGExamRequest
-
-    request = RAGExamRequest(topic="Test", question_count=2)
-    messages = []
-
-    def mock_callback(current, total, message):
-        messages.append(message)
-
-    service = RAGService.__new__(RAGService)
-
-    mock_context = MagicMock()
-    mock_context.retrieved_chunks = [MagicMock(), MagicMock()]
-    mock_context.query = "Test"
-    mock_context.total_similarity_score = 0.9
-    mock_context.source_documents = []
-    mock_context.context_length = 200
-
-    mock_question = MagicMock()
-    service.retrieve_context = AsyncMock(return_value=mock_context)
-    service.generate_question = AsyncMock(return_value=mock_question)
-    service._calculate_quality_metrics = MagicMock(return_value={})
-
-    await service.generate_rag_exam(request, progress_callback=mock_callback)
-
-    assert any("Context" in m or "geladen" in m.lower() for m in messages), (
-        f"Expected German context message, got: {messages}"
-    )
-    assert any("Frage" in m for m in messages), (
-        f"Expected German question message, got: {messages}"
-    )
 
 
 @pytest.mark.asyncio

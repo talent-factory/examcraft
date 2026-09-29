@@ -2082,7 +2082,12 @@
       "retry": "Retry",
       "contextLimitedTitle": "Fewer questions than requested",
       "contextLimitedBody": "Only {{generated}} of {{requested}} requested questions could be created because the selected documents contain too little searchable content.",
-      "contextLimitedAction": "For more questions, select additional or larger documents."
+      "contextLimitedAction": "For more questions, select additional or larger documents.",
+      "progress": {
+        "generationStarted": "Starting question generation...",
+        "contextLoaded": "Context loaded...",
+        "questionGenerated": "Question {{current}} of {{total}} created..."
+      }
     },
     "questionEditor": {
       "title": "Edit Question #{{id}}",
@@ -2653,12 +2658,12 @@
       "next": "Next",
       "errorLoadingData": "Error loading data",
       "errorTopicAndDocument": "Please enter a topic and select at least one document.",
-      "errorContextPreview": "Error analyzing context",
       "errorExamGeneration": "Error generating questions",
       "runningGenerations": "Running Generations",
       "generation": "Generation",
       "questionCountChip_one": "{{count}} Question",
       "questionCountChip_other": "{{count}} Questions",
+      "questionCountChipLimited": "{{generated}} of {{requested}} questions",
       "waiting": "Waiting...",
       "clickToView": "Click to view",
       "resultUnavailable": "Details no longer available – questions are in the review queue. Click to open.",
@@ -2691,6 +2696,9 @@
       "previewChunks": "Relevant text chunks: {{chunks}}",
       "previewAverageSimilarity": "Average similarity: {{similarity}}",
       "previewEstimatedQuestions": "Estimated questions: {{questions}}",
+      "materialEstimateNone": "Nothing matching the topic was found in the selected material – the generation would stop without any questions. Adjust the topic or select other documents.",
+      "materialEstimateShortfall": "The selected material is likely enough for about {{count}} of the {{requested}} questions you want. Select additional documents if you need more.",
+      "materialEstimateUnavailable": "Material check unavailable",
       "recommendations": "Recommendations",
       "recommendedQuestionCount": "Recommended number of questions:",
       "recommendedDifficulty": "Recommended difficulty level:",
@@ -2721,6 +2729,7 @@
       "competenciesOverrideLabel": "Competencies (editable)",
       "competenciesOverrideHelper": "Injected verbatim as {{ competencies }} into generation.",
       "restoredStateNotice": "Your last configuration was restored.",
+      "lastRunSettingsNotice": "The settings from your last run were kept.",
       "discardRestoredState": "Start over",
       "dismissNotice": "Dismiss notice",
       "reviewQueueHint": "Generated questions land in the review queue automatically. You can leave this page while generation runs — it continues in the background.",
@@ -2734,7 +2743,7 @@
       "summaryConfig_other": "{{topic}} · {{count}} questions · {{difficulty}}",
       "summaryPreview_one": "Context checked · {{count}} text chunk",
       "summaryPreview_other": "Context checked · {{count}} text chunks",
-      "previewOutdated": "The topic or document selection changed — the context preview is being reloaded."
+      "previewOutdated": "The topic, document selection or number of questions changed — the context preview is being reloaded."
     },
     "ragExamDisplay": {
       "questions_one": "{{count}} Question",

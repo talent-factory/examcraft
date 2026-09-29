@@ -322,4 +322,39 @@ describe('errorReporting', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
+
+  // TF-736: for calls whose failure the UI deliberately keeps quiet.
+  describe('reportUnexpectedError', () => {
+    const originalEnv = process.env.REACT_APP_ENVIRONMENT;
+
+    beforeEach(() => {
+      process.env.REACT_APP_ENVIRONMENT = 'production';
+    });
+
+    afterEach(() => {
+      process.env.REACT_APP_ENVIRONMENT = originalEnv;
+    });
+
+    it('meldet Netzwerkfehler und 5xx', async () => {
+      jest.resetModules();
+      mockFetch.mockResolvedValue({ ok: true } as Response);
+      const { reportUnexpectedError } = await import('../errorReporting');
+      const { AppError } = await import('../../errors/AppError');
+
+      reportUnexpectedError(new TypeError('Failed to fetch'), { op: 'x' });
+      reportUnexpectedError(new AppError('rag_context_retrieval_failed', 'boom', 500));
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('meldet erwartbare 4xx-AppErrors nicht', async () => {
+      jest.resetModules();
+      const { reportUnexpectedError } = await import('../errorReporting');
+      const { AppError } = await import('../../errors/AppError');
+
+      reportUnexpectedError(new AppError('rag_document_not_found', 'gone', 404));
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
 });

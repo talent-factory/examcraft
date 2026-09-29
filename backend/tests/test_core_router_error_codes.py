@@ -101,6 +101,7 @@ PRE_EXISTING: dict[str, str] = {
     "rag_retry_no_request_data": "tests/test_rag_retry.py",
     "rag_retry_only_failed": "tests/test_rag_retry.py",
     "rag_retry_owner_unavailable": "tests/test_rag_retry.py",
+    "rag_task_dismiss_failed": "tests/test_active_tasks.py",
     "rag_task_not_found": "tests/test_rag_api.py",
     "rag_task_queue_unavailable": "tests/test_rag_api.py",
     "submissions_grade_export_blocked_draft": "tests/test_grade_export_api.py",
@@ -1215,7 +1216,7 @@ NICHT_IM_FRONTEND: dict[str, str] = {
     "specula_test_dev_only": "Diagnose-Endpunkt, kein Frontend-Pfad",
     "specula_test_queue_unavailable": "Diagnose-Endpunkt, kein Frontend-Pfad",
     # rag_*: seit TF-773 Teil D sind die erreichbaren zehn registriert (und
-    # RAGService liest den Code überhaupt erst). Diese vier erreicht keine
+    # RAGService liest den Code überhaupt erst). Diese fünf erreicht keine
     # Aufrufstelle — dieselbe Liste steht im Kopf von codes/rag.ts.
     "rag_invalid_question_type": (
         "RAGService.validateRAGRequest lässt vor dem Senden nur eine echte "
@@ -1226,6 +1227,10 @@ NICHT_IM_FRONTEND: dict[str, str] = {
     ),
     "rag_retry_no_request_data": "generate-exam speichert request_data immer",
     "rag_service_unhealthy": "RAGService.checkHealth hat keinen Aufrufer",
+    "rag_task_dismiss_failed": (
+        "dismissTask ist fire-and-forget, das Panel blendet den Eintrag "
+        "ohnehin aus (TF-736)"
+    ),
     # tags_prompt_*: TagCreateForm/TagSettingsPage senden nie kind='prompt'
     # (listTags()/createTag() ohne kind, Backend-Default 'content') — dieselbe
     # Begründung steht im Kopf von codes/tags.ts.

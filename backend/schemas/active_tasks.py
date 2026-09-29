@@ -1,7 +1,7 @@
 """Schemas for active generation task recovery."""
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -13,6 +13,9 @@ class ActiveTaskInfo(BaseModel):
     status: TaskStatus
     progress: int = Field(ge=0, le=100, default=0)
     message: Optional[str] = None
+    # TF-736: see TaskStatusMessage — code + params, rendered by the frontend.
+    message_code: Optional[str] = None
+    message_params: Optional[Dict[str, Any]] = None
     created_at: datetime
     topic: Optional[str] = None
     question_count: Optional[int] = None

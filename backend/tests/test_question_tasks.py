@@ -112,7 +112,86 @@ def test_generate_questions_task_emits_step_zero():
     first = progress_updates[0]
     assert first["current"] == 0
     assert first["progress"] == 0
-    assert "Fragengenerierung" in first["message"] or "Starte" in first["message"]
+    # TF-736: a code the frontend translates, no German text …
+    assert first["code"] == "generation_started"
+    assert first["message"] == ""
+    # … and no step total derived from the requested count: the effective
+    # count is unknown until the context is loaded (cause 3).
+    assert first["total"] == 1
+    assert first["params"] == {}
+
+
+def test_generate_questions_task_relays_service_progress_codes():
+    """TF-736: the callback handed to generate_rag_exam forwards the
+    service's (current, total, code, params) to update_progress unchanged.
+    The premium tests call the service with lambdas, so only this test
+    catches a signature break between task and service."""
+    from tasks.question_tasks import generate_questions_task
+
+    @dataclasses.dataclass
+    class FakeContextSummary:
+        query: str
+
+    progress_updates = []
+    mock_result = MagicMock()
+    mock_result.exam_id = "exam_001"
+    mock_result.topic = "Heapsort"
+    mock_result.questions = []
+    mock_result.context_summary = FakeContextSummary(query="Heapsort")
+    mock_result.generation_time = 1.0
+    mock_result.quality_metrics = {}
+
+    mock_rag_service = MagicMock()
+    mock_rag_service.generate_rag_exam = MagicMock(return_value=mock_result)
+
+    with (
+        patch("tasks.question_tasks.run_async", return_value=mock_result),
+        patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
+        patch("tasks.question_tasks._persist_questions", return_value=[]),
+        patch("tasks.question_tasks._safe_update_job_status"),
+        patch.object(
+            generate_questions_task,
+            "update_state",
+            side_effect=lambda state, meta: progress_updates.append(meta),
+        ),
+    ):
+        generate_questions_task.run(
+            {
+                "topic": "Heapsort",
+                "question_count": 15,
+                "question_types": ["single_choice"],
+                "difficulty": "medium",
+                "language": "de",
+                "document_ids": None,
+                "context_chunks_per_question": 3,
+                "prompt_config": None,
+            },
+            "42",
+        )
+        callback = mock_rag_service.generate_rag_exam.call_args.kwargs[
+            "progress_callback"
+        ]
+        callback(1, 8, "context_loaded", {"total": 6})
+        callback(2, 8, "question_generated", {"current": 1, "total": 6})
+
+    assert progress_updates[-2:] == [
+        {
+            "current": 1,
+            "total": 8,
+            "progress": 12,
+            "message": "",
+            "code": "context_loaded",
+            "params": {"total": 6},
+        },
+        {
+            "current": 2,
+            "total": 8,
+            "progress": 25,
+            "message": "",
+            "code": "question_generated",
+            "params": {"current": 1, "total": 6},
+        },
+    ]
 
 
 def test_generate_questions_task_returns_correct_format():
@@ -1946,7 +2025,6 @@ def test_underfilled_generation_persists_outcome_on_job(tf736_job_session):
         "requested_question_count": 15,
         "generated_question_count": 6,
         "context_limited": True,
-        "context_limited_notice": "Es konnten nur 6 von 15 …",
     }
 
     _run_task_with(_tf736_result(6, metrics), "tf736-task")

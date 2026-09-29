@@ -17,7 +17,9 @@ import type {
   GenerationTaskState,
   GenerationTasksContextType,
   RAGExamRequest,
+  TaskStatusMessage,
 } from '../types';
+import { reportUnexpectedError } from '../utils/errorReporting';
 
 const GenerationTasksContext = createContext<GenerationTasksContextType | undefined>(undefined);
 
@@ -29,10 +31,16 @@ const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILURE', 'REVOKED']);
 // TF-608: dismissed tasks survive the reload. Without this, the recently
 // completed jobs that `/active-tasks` has included since TF-608 would
 // reappear on every page load — exactly the notice the user just closed.
+// TF-736: the backend now remembers the dismissal as well
+// (POST /tasks/{task_id}/dismiss), which also covers new tabs, a new login
+// and other devices. This tab-local copy stays as the immediate guard: it
+// holds while the request is in flight or failed, and for entries the backend
+// deliberately doesn't mark (unfinished jobs, a superuser's foreign jobs).
 const DISMISSED_TASKS_KEY = 'dismissedGenerationTasks';
 const DISMISSED_TASKS_VERSION = 1;
-// Caps the snapshot; completed jobs are only recoverable for 30 minutes
-// anyway (COMPLETED_TASK_MAX_AGE in the backend).
+// Caps the snapshot; completed jobs are recoverable for 30 minutes, under-
+// filled ones for 8 hours (COMPLETED_TASK_MAX_AGE /
+// CONTEXT_LIMITED_TASK_MAX_AGE in the backend).
 const DISMISSED_TASKS_MAX = 50;
 
 const readDismissedTaskIds = (): string[] => {
@@ -124,7 +132,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     };
 
     ws.onmessage = (event) => {
-      let data: any;
+      let data: TaskStatusMessage;
       try {
         data = JSON.parse(event.data);
       } catch (parseErr) {
@@ -149,7 +157,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             status: 'SUCCESS',
             progress: 100,
             message: data.message || i18n.t('contexts.generationTasks.done'),
-            result: data.result,
+            result: data.result ?? null,
           },
         }));
         delete progressRef.current[taskId];
@@ -172,6 +180,9 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           status: data.status,
           progress: data.progress ?? 0,
           message: data.message,
+          // TF-736: rendered in the user's language by progressMessageOf.
+          messageCode: data.message_code ?? null,
+          messageParams: data.message_params ?? null,
         };
       }
     };
@@ -241,6 +252,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             status: task.status as GenerationTaskState['status'],
             progress: task.progress,
             message: task.message,
+            messageCode: task.message_code ?? null,
+            messageParams: task.message_params ?? null,
             topic: task.topic,
             questionCount: task.question_count,
             createdAt: task.created_at,
@@ -386,6 +399,20 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
   const dismissTask = useCallback((taskId: string) => {
     rememberDismissedTaskId(taskId);
+    // TF-736: fire-and-forget. A failed request only means the entry may come
+    // back in another tab; this tab is covered by the sessionStorage copy.
+    void (async () => {
+      try {
+        const { loadRAGService } = await import('../utils/componentLoader');
+        const RAGService = await loadRAGService();
+        await RAGService?.dismissTask(taskId);
+      } catch (err) {
+        console.warn(`[GenerationTasks] Failed to record dismissal of task ${taskId}:`, err);
+        // Otherwise invisible: the entry would just keep coming back in other
+        // tabs for up to 8 hours.
+        reportUnexpectedError(err, { op: 'generationTasks.dismiss', taskId });
+      }
+    })();
     setTasks((prev) => {
       const next = { ...prev };
       delete next[taskId];

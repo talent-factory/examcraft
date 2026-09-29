@@ -124,7 +124,9 @@ class TestGetActiveTasks:
         assert t["task_id"] == "task-abc"
         assert t["status"] == "STARTED"
         assert t["progress"] == 0
-        assert t["message"] == "Gestartet..."
+        # TF-736: a code the frontend translates, no German text.
+        assert t["message"] is None
+        assert t["message_code"] == "task_started"
         assert t["topic"] == "Test Topic"
         assert t["question_count"] == 5
 
@@ -149,6 +151,32 @@ class TestGetActiveTasks:
         task = response.json()["tasks"][0]
         assert task["progress"] == 30
         assert task["message"] == "Generiere Frage 3"
+
+    def test_progress_code_and_params_are_passed_through(self, auth_client, mock_db):
+        """TF-736: the code + params from ProgressTask.update_progress reach the
+        client unchanged — the same pair the WebSocket relays."""
+        job = _make_job("task-progress-code", status="PROGRESS")
+        self._setup_db_query(mock_db, [job])
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "PROGRESS"
+            mock_result.info = {
+                "current": 4,
+                "total": 8,
+                "message": "",
+                "code": "question_generated",
+                "params": {"current": 2, "total": 6},
+            }
+            mock_ar_cls.return_value = mock_result
+
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        task = response.json()["tasks"][0]
+        assert task["progress"] == 50
+        assert task["message"] is None
+        assert task["message_code"] == "question_generated"
+        assert task["message_params"] == {"current": 2, "total": 6}
 
     def test_progress_defaults_when_celery_unavailable(self, auth_client, mock_db):
         """If AsyncResult raises, progress=0 and message=None are returned."""
@@ -650,3 +678,94 @@ class TestPhantomJobFiltering:
         mock_try.assert_called_once_with("phantom-no-block", "FAILURE")
         mock_retry.assert_not_called()
         mock_sleep.assert_not_called()
+
+
+class TestActiveTasksProgressFields:
+    """TF-736: code/params from the Celery meta are passed on defensively."""
+
+    _setup_db_query = TestGetActiveTasks._setup_db_query
+
+    def test_malformed_progress_meta_does_not_break_the_listing(
+        self, auth_client, mock_db
+    ):
+        job = _make_job("task-odd-meta", status="PROGRESS")
+        self._setup_db_query(mock_db, [job])
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "PROGRESS"
+            # A non-string code and non-dict params must not turn the whole
+            # listing into a 500 (ActiveTaskInfo validation).
+            mock_result.info = {"current": 1, "total": 2, "code": 7, "params": []}
+            mock_ar_cls.return_value = mock_result
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        task = response.json()["tasks"][0]
+        assert task["message_code"] is None
+        assert task["message_params"] is None
+
+    def test_params_without_dict_are_dropped_but_code_kept(self, auth_client, mock_db):
+        job = _make_job("task-bad-params", status="PROGRESS")
+        self._setup_db_query(mock_db, [job])
+
+        with patch("celery.result.AsyncResult") as mock_ar_cls:
+            mock_result = Mock()
+            mock_result.state = "PROGRESS"
+            mock_result.info = {
+                "current": 1,
+                "total": 2,
+                "code": "context_loaded",
+                "params": "6",
+            }
+            mock_ar_cls.return_value = mock_result
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        task = response.json()["tasks"][0]
+        assert task["message_code"] == "context_loaded"
+        assert task["message_params"] is None
+
+
+class TestDismissTaskHttp:
+    """TF-736: POST /tasks/{task_id}/dismiss through the router — route,
+    status code, empty body and error code. Ownership rules are covered
+    against the real DB in test_active_tasks_context_limited.py."""
+
+    def _setup_job(self, mock_db, job):
+        mock_db.query.return_value.filter.return_value.first.return_value = job
+
+    def test_own_finished_job_answers_204_with_empty_body(self, auth_client, mock_db):
+        job = _make_job("task-done", status="SUCCESS")
+        job.dismissed_at = None
+        self._setup_job(mock_db, job)
+
+        response = auth_client.post("/api/v1/rag/tasks/task-done/dismiss")
+
+        assert response.status_code == 204
+        assert response.content == b""
+        assert job.dismissed_at is not None
+        mock_db.commit.assert_called_once()
+
+    def test_foreign_job_answers_404_with_error_code(self, auth_client, mock_db):
+        job = _make_job("task-foreign", status="SUCCESS", user_id=99)
+        job.dismissed_at = None
+        self._setup_job(mock_db, job)
+
+        response = auth_client.post("/api/v1/rag/tasks/task-foreign/dismiss")
+
+        assert response.status_code == 404
+        assert response.json()["error_code"] == "rag_task_not_found"
+        assert job.dismissed_at is None
+        mock_db.commit.assert_not_called()
+
+    def test_commit_failure_rolls_back_and_answers_500(self, auth_client, mock_db):
+        job = _make_job("task-db-down", status="SUCCESS")
+        job.dismissed_at = None
+        self._setup_job(mock_db, job)
+        mock_db.commit.side_effect = RuntimeError("db down")
+
+        response = auth_client.post("/api/v1/rag/tasks/task-db-down/dismiss")
+
+        assert response.status_code == 500
+        assert response.json()["error_code"] == "rag_task_dismiss_failed"
+        mock_db.rollback.assert_called_once()

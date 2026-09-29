@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
+from schemas.task import ProgressCode
 from services.claude_service import ModelUnavailableError
 from tasks.document_tasks import ProgressTask, run_async
 
@@ -759,23 +760,24 @@ def generate_questions_task(
     # Re-raised "No context available" ValueError from TF-358 is raised later in
     # the service call below; topic is known now, so tag it here.
     set_span_tag("topic", rag_request.topic)
-    # Progress in N+2 steps:
+    # Progress in N+2 steps, N = the service's EFFECTIVE count:
     #   Step 0:      task start (emitted by the task)
     #   Step 1:      context loaded (emitted via callback)
     #   Steps 2..N+1: questions 1..N (emitted via callback)
-    # IMPORTANT (TF-358): the service may cap the question count to the
-    # available chunk material and then emits against the EFFECTIVE count.
-    # The callback therefore passes through the service's `total` instead of
-    # pinning it to the originally requested count — otherwise the bar would
-    # get stuck when capping occurs. The initial total is only an estimate;
-    # the SUCCESS state in the WebSocket sets 100% at the end regardless.
-    initial_total_steps = question_count + 2
+    # The service may cap the question count to the available chunk material
+    # (TF-358); N is only known once the context is loaded. Step 0 therefore
+    # carries no count at all (0 of 1 = 0 %) instead of guessing with the
+    # requested count — that guess made the bar and the "question i of N"
+    # text disagree whenever capping occurred (TF-736, cause 3). From step 1
+    # on, every update reports against the same N.
+    # Updates carry a code plus parameters instead of a German text; the
+    # frontend renders them in the user's language (TF-736).
+    self.update_progress(0, 1, code=ProgressCode.GENERATION_STARTED.value)
 
-    # Step 0: emitted by the task itself (not by the callback)
-    self.update_progress(0, initial_total_steps, "Starte Fragengenerierung...")
-
-    def progress_callback(current: int, total: int, message: str) -> None:
-        self.update_progress(current, total, message)
+    def progress_callback(
+        current: int, total: int, code: str, params: Dict[str, Any]
+    ) -> None:
+        self.update_progress(current, total, code=code, params=params)
 
     logger.info(
         f"Starte Fragengenerierung für User {user_id}: "

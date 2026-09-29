@@ -23,6 +23,7 @@ const mockGetActiveTasks = jest.fn(() => Promise.resolve({ tasks: [] as any[] })
 const mockGetTaskResult = jest.fn((_taskId: string) =>
   Promise.resolve({ task_id: _taskId, status: 'SUCCESS', result: null, error: null }),
 );
+const mockDismissTask = jest.fn((_taskId: string) => Promise.resolve());
 
 jest.mock('../utils/componentLoader', () => ({
   loadRAGService: () => Promise.resolve({
@@ -30,6 +31,7 @@ jest.mock('../utils/componentLoader', () => ({
     getTaskResult: (taskId: string) => mockGetTaskResult(taskId),
     triggerGeneration: () => Promise.resolve({ task_id: 'task-1' }),
     retryGeneration: () => Promise.resolve({ task_id: 'task-2' }),
+    dismissTask: (taskId: string) => mockDismissTask(taskId),
   }),
 }));
 
@@ -77,6 +79,8 @@ beforeEach(() => {
   mockGetActiveTasks.mockReset();
   mockGetActiveTasks.mockResolvedValue({ tasks: [] });
   mockGetTaskResult.mockReset();
+  mockDismissTask.mockReset();
+  mockDismissTask.mockResolvedValue(undefined);
   mockGetTaskResult.mockImplementation((taskId: string) =>
     Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
   );
@@ -181,6 +185,28 @@ describe('GenerationTasksProvider — sticky terminal state (TF-328)', () => {
     // Status must remain FAILURE, progress must NOT advance to 42.
     expect(captured!.getTask('task-1')?.status).toBe('FAILURE');
     expect(captured!.getTask('task-1')?.progress).toBe(0);
+  });
+
+  it('stores the progress code and params of a PROGRESS message (TF-736)', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    act(() => {
+      ws.emitMessage({
+        status: 'PROGRESS',
+        progress: 50,
+        message: null,
+        message_code: 'question_generated',
+        message_params: { current: 2, total: 6 },
+      });
+    });
+
+    await waitFor(() =>
+      expect(captured!.getTask('task-1')?.messageCode).toBe('question_generated'),
+    );
+    expect(captured!.getTask('task-1')?.messageParams).toEqual({ current: 2, total: 6 });
+    expect(captured!.getTask('task-1')?.progress).toBe(50);
   });
 
   it('still reconnects on abnormal close when task is non-terminal', async () => {
@@ -368,5 +394,59 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     await waitFor(() => expect(mockGetActiveTasks).toHaveBeenCalledTimes(2));
     expect(captured!.getTask('task-done')).toBeUndefined();
     expect(mockGetTaskResult).not.toHaveBeenCalled();
+  });
+
+  // TF-736: sessionStorage only covers this tab. Under-filled jobs now stay
+  // listed for 8 hours, so the dismissal is also recorded server-side.
+  it('records the dismissal on the server', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-done')] });
+    renderProvider();
+    await waitFor(() => expect(captured!.getTask('task-done')).toBeDefined());
+
+    act(() => {
+      captured!.dismissTask('task-done');
+    });
+
+    await waitFor(() => expect(mockDismissTask).toHaveBeenCalledWith('task-done'));
+  });
+
+  it('still hides the task when recording the dismissal fails', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockDismissTask.mockRejectedValue(new Error('offline'));
+    mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-done')] });
+    renderProvider();
+    await waitFor(() => expect(captured!.getTask('task-done')).toBeDefined());
+
+    act(() => {
+      captured!.dismissTask('task-done');
+    });
+
+    await waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(captured!.getTask('task-done')).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('carries the progress code of a recovered running task (TF-736)', async () => {
+    mockGetActiveTasks.mockResolvedValue({
+      tasks: [
+        {
+          task_id: 'task-running',
+          status: 'PROGRESS',
+          progress: 50,
+          message: null,
+          message_code: 'question_generated',
+          message_params: { current: 2, total: 6 },
+          created_at: '2026-01-01T00:00:00Z',
+          topic: 'T',
+          question_count: 15,
+        },
+      ],
+    });
+    renderProvider();
+
+    await waitFor(() =>
+      expect(captured!.getTask('task-running')?.messageCode).toBe('question_generated'),
+    );
+    expect(captured!.getTask('task-running')?.messageParams).toEqual({ current: 2, total: 6 });
   });
 });

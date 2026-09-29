@@ -183,6 +183,77 @@ class TestWebSocketProgressUpdates:
                 second = ws.receive_json()
                 assert second["status"] == "SUCCESS"
 
+    @pytest.mark.parametrize(
+        "state, info, expected_code, expected_params",
+        [
+            (
+                "PROGRESS",
+                {
+                    "progress": 50,
+                    "message": "",
+                    "code": "question_generated",
+                    "params": {"current": 2, "total": 6},
+                },
+                "question_generated",
+                {"current": 2, "total": 6},
+            ),
+            ("STARTED", {}, "task_started", {}),
+            ("RETRY", {}, "task_retrying", {}),
+        ],
+    )
+    def test_progress_code_and_params_are_relayed(
+        self,
+        ws_app,
+        valid_token_payload,
+        mock_user,
+        mock_document,
+        state,
+        info,
+        expected_code,
+        expected_params,
+    ):
+        """TF-736: code + params reach the client; no German display text."""
+        call_count = 0
+
+        def make_result(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            r = MagicMock()
+            if call_count == 1:
+                r.state = state
+                r.info = info
+                r.result = None
+            else:
+                r.state = "SUCCESS"
+                r.info = {}
+                r.result = {"document_id": 1}
+            return r
+
+        with (
+            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.SessionLocal") as mock_session,
+            patch("api.v1.websocket.AsyncResult", side_effect=make_result),
+        ):
+            mock_auth.decode_token.return_value = valid_token_payload
+            mock_auth.is_token_revoked.return_value = False
+
+            mock_db = MagicMock()
+            mock_session.return_value = mock_db
+            mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_user
+            mock_db.query.return_value.filter.return_value.first.return_value = (
+                mock_document
+            )
+
+            client = TestClient(ws_app)
+            with client.websocket_connect("/ws/tasks/test-task-id") as ws:
+                ws.send_json({"token": "valid-token"})
+
+                first = ws.receive_json()
+                assert first["status"] == "PROGRESS"
+                assert first["message"] is None
+                assert first["message_code"] == expected_code
+                assert first["message_params"] == expected_params
+
     def test_connection_closed_on_success(
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
