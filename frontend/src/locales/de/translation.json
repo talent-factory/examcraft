@@ -2893,6 +2893,7 @@
         "noPromptsAvailable": "Keine Prompts für {{type}} verfügbar. Bitte erstelle zuerst einen Prompt in der Prompt Library.",
         "promptTemplateFor": "Prompt-Template für {{type}}",
         "useDefault": "Standard-Prompt verwenden",
+        "allQuestionTypes": "(alle Fragetypen)",
         "errorRendering": "Fehler beim Rendern der Vorschau",
         "livePreview": "Live-Vorschau (gerendert)",
         "previewHint": "Diese Vorschau zeigt den Prompt mit den eingegebenen Variablen.",

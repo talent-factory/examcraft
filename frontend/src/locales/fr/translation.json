@@ -2893,6 +2893,7 @@
         "noPromptsAvailable": "Aucun prompt disponible pour {{type}}. Crée d'abord un prompt dans la bibliothèque.",
         "promptTemplateFor": "Template de prompt pour {{type}}",
         "useDefault": "Utiliser le prompt par défaut",
+        "allQuestionTypes": "(tous les types de questions)",
         "errorRendering": "Erreur lors du rendu de l'aperçu",
         "livePreview": "Aperçu en direct (rendu)",
         "previewHint": "Cet aperçu montre le prompt avec les variables saisies.",
