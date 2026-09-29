@@ -25,6 +25,12 @@ and this project adheres to
   Default-Auflösung dient eine generische Vorlage nur als Fallback:
   Institution-spezifisch → Institution-generisch → System-spezifisch
   → System-generisch.
+- **SQLAlchemy 2.1: Datenbanktreiber explizit gepinnt (TF-938, #323):**
+  Seit SQLAlchemy 2.1.0 ist `psycopg` (v3) der Default-Treiber für
+  `postgresql://`-URLs; installiert ist nur `psycopg2`. Die URL wird
+  jetzt explizit auf `postgresql+psycopg2://` normalisiert. Aus
+  `develop` übernommen, damit Build und Deploy dieses Hotfixes nicht
+  mit `ModuleNotFoundError: psycopg` scheitern.
 
 ## [1.13.0] - 2026-09-23
 
