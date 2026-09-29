@@ -3031,7 +3031,7 @@
     "auth_password_change_failed": "Impossible de modifier le mot de passe",
     "auth_password_incorrect": "Le mot de passe actuel est incorrect",
     "auth_password_reset_failed": "Impossible de réinitialiser le mot de passe",
-    "auth_password_reset_not_implemented": "La réinitialisation du mot de passe n'est pas encore implémentée",
+    "auth_password_reset_token_invalid": "Le lien de réinitialisation du mot de passe est invalide, expiré ou déjà utilisé",
     "auth_password_reset_request_failed": "Impossible de demander la réinitialisation du mot de passe",
     "auth_password_set_failed": "Impossible de définir le mot de passe",
     "auth_permission_required": "Autorisation « {{permission}} » requise",

@@ -16,7 +16,7 @@ from sqlalchemy import (
     Index,
     ARRAY,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql import func, text
 from datetime import datetime, timezone
 import enum
@@ -751,7 +751,47 @@ class EmailVerificationToken(Base):
     )
 
     # Relationships
-    user = relationship("User", backref="verification_tokens")
+    user = relationship(
+        "User", backref=backref("verification_tokens", passive_deletes=True)
+    )
 
     def __repr__(self):
         return f"<EmailVerificationToken(id={self.id}, user_id={self.user_id}, is_used={self.is_used})>"
+
+
+class PasswordResetToken(Base):
+    """
+    Password Reset Tokens (TF-768)
+    Stores only the SHA-256 hash of the emailed token, so a DB leak does not
+    yield usable reset links. Single-use and short-lived.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # SHA-256 hex digest of the plaintext token (never store the plaintext)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    is_used = Column(Boolean, default=False, nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship(
+        "User", backref=backref("password_reset_tokens", passive_deletes=True)
+    )
+
+    def __repr__(self):
+        return f"<PasswordResetToken(id={self.id}, user_id={self.user_id}, is_used={self.is_used})>"

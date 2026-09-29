@@ -76,10 +76,6 @@ _RESERVED_ACTIONS = {
         "token rotation is high-frequency and lacks a clean user_id at the "
         "endpoint; the session is bound at login/logout"
     ),
-    "ACTION_PASSWORD_RESET": (
-        "the /password-reset endpoints are stubs (request is a no-op TODO, "
-        "confirm raises 501); wire audit when implemented"
-    ),
     "ACTION_API_ACCESS": (
         "generic per-request API-access logging is not wired; auditing is "
         "done per mutating endpoint instead"

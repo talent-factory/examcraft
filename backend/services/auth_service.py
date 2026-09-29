@@ -838,7 +838,7 @@ class AuthService:
                             session.refresh_token_jti, remaining_seconds
                         )
             except Exception as e:
-                logger.warning(f"Failed to add tokens to Redis blacklist: {str(e)}")
+                logger.error(f"Failed to add tokens to Redis blacklist: {str(e)}")
 
             count += 1
 

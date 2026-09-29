@@ -36,19 +36,18 @@
  * `auth_verification_failed` is the frontend fallback for that one endpoint.
  *
  * FRONTEND-ONLY FALLBACKS. Unlike `documents.py`, `auth.py` has no generic
- * per-operation failure code — it raises only specific ones. So twelve of the
+ * per-operation failure code — it raises only specific ones. So eleven of the
  * codes below have no backend counterpart and exist purely as the fallback for
  * one method, so that a network failure, a proxy error page or a bodyless 500
  * still produces a sentence about what the user was trying to do:
  *
  *   auth_login_failed, auth_logout_failed, auth_oauth_exchange_failed,
  *   auth_oauth_url_failed, auth_password_change_failed,
- *   auth_password_reset_failed, auth_password_reset_request_failed,
- *   auth_password_set_failed, auth_profile_load_failed,
+ *   auth_password_reset_request_failed, auth_password_set_failed, auth_profile_load_failed,
  *   auth_profile_update_failed, auth_token_refresh_failed,
  *   auth_verification_resend_failed
  *
- * `auth_registration_failed` is the thirteenth fallback but a special case: the
+ * `auth_registration_failed` is the twelfth fallback but a special case: the
  * key exists in the backend locales with exactly this meaning, yet nothing in
  * the backend ever raises it (reported as a dead key, along with
  * auth_insufficient_permissions, auth_logout_success, auth_session_expired,
@@ -100,8 +99,8 @@ export const AUTH_ERROR_CODES = [
   'auth_password_change_failed',
   'auth_password_incorrect',
   'auth_password_reset_failed',
-  'auth_password_reset_not_implemented',
   'auth_password_reset_request_failed',
+  'auth_password_reset_token_invalid',
   'auth_password_set_failed',
   'auth_permission_required',
   'auth_profile_load_failed',

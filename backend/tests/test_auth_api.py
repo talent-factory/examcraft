@@ -3,14 +3,25 @@ Tests for Auth API Endpoints
 Tests registration, login, logout, password change, etc.
 """
 
-from unittest.mock import patch
+import hashlib
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
 from database import get_db
-from models.auth import User, Role, Institution, UserStatus, UserRole
+from models.auth import (
+    AuditLog,
+    Institution,
+    PasswordResetToken,
+    Role,
+    User,
+    UserRole,
+    UserSession,
+    UserStatus,
+)
 from services.auth_service import AuthService
 
 
@@ -569,3 +580,460 @@ def test_resend_verification_logs_warning_when_email_skipped(test_client, test_u
         str(arg) for call in mock_info.call_args_list for arg in call.args
     )
     assert "Verification email resent" not in info_text
+
+
+# ============================================================================
+# Password Reset Tests (TF-768)
+# ============================================================================
+
+
+def _request_reset(test_client, email="test@example.com"):
+    """POST /password-reset with the mail send mocked; returns (response, mock)."""
+    with patch(
+        "services.email_service.EmailService.send_password_reset_email",
+        new_callable=AsyncMock,
+    ) as send_mock:
+        response = test_client.post("/api/auth/password-reset", json={"email": email})
+    return response, send_mock
+
+
+def _issue_token(test_client, email="test@example.com") -> str:
+    """Request a reset and return the plaintext token that went into the mail."""
+    response, send_mock = _request_reset(test_client, email)
+    assert response.status_code == 204
+    send_mock.assert_awaited_once()
+    return send_mock.await_args.kwargs["reset_token"]
+
+
+def _confirm(test_client, token, password="BrandNewPass456"):
+    return test_client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": token, "new_password": password},
+    )
+
+
+def test_password_reset_request_creates_hashed_token_and_sends_mail(
+    test_client, test_user, db
+):
+    token = _issue_token(test_client)
+
+    rows = db.query(PasswordResetToken).filter_by(user_id=test_user.id).all()
+    assert len(rows) == 1
+    # Only the hash is persisted, never the plaintext token
+    assert rows[0].token_hash == hashlib.sha256(token.encode()).hexdigest()
+    assert token not in rows[0].token_hash
+    assert not rows[0].is_used
+    assert rows[0].expires_at > datetime.now(timezone.utc)
+
+
+def test_password_reset_request_unknown_email_is_indistinguishable(
+    test_client, test_user, db
+):
+    known, _ = _request_reset(test_client, "test@example.com")
+    unknown, send_mock = _request_reset(test_client, "nobody@example.com")
+
+    assert known.status_code == unknown.status_code == 204
+    assert known.content == unknown.content
+    send_mock.assert_not_awaited()
+    assert db.query(PasswordResetToken).count() == 1  # only the known user's
+
+
+def test_password_reset_request_inactive_user_gets_no_token(test_client, test_user, db):
+    test_user.status = UserStatus.SUSPENDED.value
+    db.commit()
+
+    response, send_mock = _request_reset(test_client)
+
+    assert response.status_code == 204
+    send_mock.assert_not_awaited()
+    assert db.query(PasswordResetToken).count() == 0
+
+
+def test_password_reset_request_invalid_email_rejected(test_client):
+    response = test_client.post("/api/auth/password-reset", json={"email": "nope"})
+    assert response.status_code == 422
+
+
+def test_password_reset_request_invalidates_earlier_tokens(test_client, test_user, db):
+    first = _issue_token(test_client)
+    second = _issue_token(test_client)
+
+    assert _confirm(test_client, first).status_code == 400
+    assert _confirm(test_client, second).status_code == 204
+
+
+def test_password_reset_request_rate_limited_silently(test_client, test_user, db):
+    for _ in range(3):
+        _issue_token(test_client)
+
+    response, send_mock = _request_reset(test_client)
+
+    # Same 204 as always (no signal to an attacker), but nothing is issued
+    assert response.status_code == 204
+    send_mock.assert_not_awaited()
+    assert db.query(PasswordResetToken).count() == 3
+
+
+def test_password_reset_email_failure_does_not_break_request(test_client, test_user):
+    with patch(
+        "services.email_service.EmailService.send_password_reset_email",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("SubscribeFlow down"),
+    ):
+        response = test_client.post(
+            "/api/auth/password-reset", json={"email": "test@example.com"}
+        )
+    assert response.status_code == 204
+
+
+def test_password_reset_confirm_sets_password(test_client, test_user, db):
+    token = _issue_token(test_client)
+
+    response = _confirm(test_client, token)
+
+    assert response.status_code == 204
+    old = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert old.status_code == 401
+    new = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "BrandNewPass456"},
+    )
+    assert new.status_code == 200
+    row = db.query(PasswordResetToken).filter_by(user_id=test_user.id).one()
+    assert row.is_used and row.used_at is not None
+
+
+def test_password_reset_confirm_revokes_all_sessions(test_client, test_user, db):
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert login.status_code == 200
+    assert (
+        db.query(UserSession).filter_by(user_id=test_user.id, is_active=True).count()
+        >= 1
+    )
+
+    assert _confirm(test_client, _issue_token(test_client)).status_code == 204
+
+    db.expire_all()
+    assert (
+        db.query(UserSession).filter_by(user_id=test_user.id, is_active=True).count()
+        == 0
+    )
+
+
+def test_password_reset_confirm_writes_audit_log(test_client, test_user, db):
+    assert _confirm(test_client, _issue_token(test_client)).status_code == 204
+
+    entry = (
+        db.query(AuditLog)
+        .filter_by(action="password_reset", user_id=test_user.id)
+        .one()
+    )
+    assert entry.status == "success"
+
+
+def test_password_reset_confirm_token_is_single_use(test_client, test_user):
+    token = _issue_token(test_client)
+
+    assert _confirm(test_client, token).status_code == 204
+    replay = _confirm(test_client, token, "AnotherPass789")
+
+    assert replay.status_code == 400
+    assert (
+        test_client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "AnotherPass789"},
+        ).status_code
+        == 401
+    )
+
+
+def test_password_reset_confirm_expired_token_rejected(test_client, test_user, db):
+    token = _issue_token(test_client)
+    row = db.query(PasswordResetToken).filter_by(user_id=test_user.id).one()
+    row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db.commit()
+
+    assert _confirm(test_client, token).status_code == 400
+    assert (
+        test_client.post(
+            "/api/auth/login",
+            json={"email": "test@example.com", "password": "testpassword123"},
+        ).status_code
+        == 200
+    )
+
+
+def test_password_reset_confirm_unknown_token_rejected(test_client, test_user):
+    assert _confirm(test_client, "not-a-real-token").status_code == 400
+
+
+def test_password_reset_confirm_failure_modes_share_one_error(
+    test_client, test_user, db
+):
+    """Unknown / used / expired must be indistinguishable (no oracle)."""
+    used = _issue_token(test_client)
+    assert _confirm(test_client, used).status_code == 204
+    expired = _issue_token(test_client)
+    db.query(PasswordResetToken).filter_by(
+        token_hash=hashlib.sha256(expired.encode()).hexdigest()
+    ).update({"expires_at": datetime.now(timezone.utc) - timedelta(minutes=1)})
+    db.commit()
+
+    bodies = {
+        _confirm(test_client, t).content for t in (used, expired, "garbage-token")
+    }
+    assert len(bodies) == 1
+
+
+def test_password_reset_confirm_weak_password_rejected_token_kept(
+    test_client, test_user
+):
+    token = _issue_token(test_client)
+
+    assert _confirm(test_client, token, "short1A").status_code == 422
+    assert _confirm(test_client, token, "alllowercase123").status_code == 422
+    # Validation failures must not burn the token
+    assert _confirm(test_client, token).status_code == 204
+
+
+def test_password_reset_confirm_inactive_user_rejected(test_client, test_user, db):
+    token = _issue_token(test_client)
+    test_user.status = UserStatus.SUSPENDED.value
+    db.commit()
+
+    assert _confirm(test_client, token).status_code == 400
+
+
+def test_password_reset_request_pending_user_gets_no_token(test_client, test_user, db):
+    test_user.status = UserStatus.PENDING.value
+    db.commit()
+
+    response, send_mock = _request_reset(test_client)
+
+    assert response.status_code == 204
+    send_mock.assert_not_awaited()
+    assert db.query(PasswordResetToken).count() == 0
+
+
+def test_password_reset_request_oauth_only_user_gets_no_token(
+    test_client, test_user, db
+):
+    test_user.password_hash = None
+    db.commit()
+
+    response, send_mock = _request_reset(test_client)
+
+    assert response.status_code == 204
+    send_mock.assert_not_awaited()
+    assert db.query(PasswordResetToken).count() == 0
+
+
+def test_password_reset_request_rate_limit_is_per_user_and_windowed(
+    test_client, test_user, db
+):
+    for _ in range(3):
+        _issue_token(test_client)
+    # Tokens older than one hour stop counting towards the cap
+    for row in db.query(PasswordResetToken).all():
+        row.created_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    db.commit()
+
+    response, send_mock = _request_reset(test_client)
+
+    assert response.status_code == 204
+    send_mock.assert_awaited_once()
+
+
+def test_password_reset_confirm_revokes_old_access_token(test_client, test_user):
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    old_access = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {old_access}"}
+    assert test_client.get("/api/auth/me", headers=headers).status_code == 200
+
+    assert _confirm(test_client, _issue_token(test_client)).status_code == 204
+
+    assert test_client.get("/api/auth/me", headers=headers).status_code == 401
+
+
+def test_password_reset_confirm_clears_login_lockout(test_client, test_user, db):
+    test_user.failed_login_attempts = 10
+    test_user.last_failed_login = datetime.now(timezone.utc)
+    db.commit()
+
+    assert _confirm(test_client, _issue_token(test_client)).status_code == 204
+
+    db.refresh(test_user)
+    assert test_user.failed_login_attempts == 0
+    assert test_user.last_failed_login is None
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "BrandNewPass456"},
+    )
+    assert login.status_code == 200
+
+
+def test_password_reset_confirm_lost_claim_race_is_rejected(test_client, test_user, db):
+    """A concurrent confirm burns the token between our read and our claim."""
+    token = _issue_token(test_client)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    def _burn_then_allow(user):
+        db.query(PasswordResetToken).filter_by(token_hash=token_hash).update(
+            {"is_used": True}
+        )
+        db.commit()
+        return True
+
+    with patch("api.auth._can_reset_password", side_effect=_burn_then_allow):
+        response = _confirm(test_client, token)
+
+    assert response.status_code == 400
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert login.status_code == 200  # password untouched
+
+
+def test_password_reset_confirm_survives_session_revocation_failure(
+    test_client, test_user
+):
+    token = _issue_token(test_client)
+
+    with patch(
+        "api.auth.AuthService.revoke_all_user_sessions",
+        side_effect=RuntimeError("redis down"),
+    ):
+        response = _confirm(test_client, token)
+
+    # Password is already changed and the token burnt: no 500, no dead retry
+    assert response.status_code == 204
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "BrandNewPass456"},
+    )
+    assert login.status_code == 200
+
+
+def test_password_reset_confirm_weak_password_leaves_password_unchanged(
+    test_client, test_user
+):
+    token = _issue_token(test_client)
+
+    assert _confirm(test_client, token, "short1A").status_code == 422
+
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert login.status_code == 200
+
+
+def test_delete_user_with_reset_and_verification_tokens_cascades(
+    test_client, test_user, db
+):
+    """GDPR deletion: DB-level ON DELETE CASCADE must not be pre-empted by an
+    ORM ``SET user_id = NULL`` on the NOT NULL token FK."""
+    from models.auth import EmailVerificationToken
+
+    _issue_token(test_client)
+    db.add(
+        EmailVerificationToken(
+            user_id=test_user.id,
+            token="verif-token-tf768",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+    )
+    db.commit()
+    user_id = test_user.id
+
+    db.delete(test_user)
+    db.commit()
+
+    assert db.query(PasswordResetToken).filter_by(user_id=user_id).count() == 0
+    assert db.query(EmailVerificationToken).filter_by(user_id=user_id).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_send_password_reset_email_uses_template_and_confirm_url():
+    from services.email_service import EmailService
+
+    with patch.object(EmailService, "_send", new_callable=AsyncMock) as send:
+        await EmailService.send_password_reset_email(
+            email="a@example.com", first_name="Ann", reset_token="tok123"
+        )
+
+    kwargs = send.await_args.kwargs
+    assert kwargs["template_slug"] == "password-reset"
+    assert kwargs["to"] == "a@example.com"
+    assert kwargs["variables"]["first_name"] == "Ann"
+    assert kwargs["variables"]["reset_url"].endswith(
+        "/auth/reset-password/confirm?token=tok123"
+    )
+
+
+def test_password_reset_undelivered_mail_does_not_consume_rate_limit(
+    test_client, test_user, db
+):
+    """A failed send drops the token, so 3 failures do not lock the user out."""
+    with (
+        patch("database.SessionLocal", return_value=db),
+        patch.object(db, "close"),
+        patch(
+            "services.email_service.EmailService.send_password_reset_email",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("SubscribeFlow down"),
+        ),
+    ):
+        for _ in range(4):
+            response = test_client.post(
+                "/api/auth/password-reset", json={"email": "test@example.com"}
+            )
+            assert response.status_code == 204
+
+    assert db.query(PasswordResetToken).count() == 0
+
+
+def test_password_reset_skipped_send_discards_token(test_client, test_user, db):
+    with (
+        patch("database.SessionLocal", return_value=db),
+        patch.object(db, "close"),
+        patch(
+            "services.email_service.EmailService.send_password_reset_email",
+            new_callable=AsyncMock,
+            return_value={"id": "test-email-id", "status": "skipped"},
+        ),
+    ):
+        response = test_client.post(
+            "/api/auth/password-reset", json={"email": "test@example.com"}
+        )
+
+    assert response.status_code == 204
+    assert db.query(PasswordResetToken).count() == 0
+
+
+def test_password_reset_confirm_audit_failure_aborts_and_keeps_token(
+    test_client, test_user, db
+):
+    token = _issue_token(test_client)
+
+    with patch("api.auth.AuditService.log_action", return_value=None):
+        response = _confirm(test_client, token)
+
+    assert response.status_code == 500
+    login = test_client.post(
+        "/api/auth/login",
+        json={"email": "test@example.com", "password": "testpassword123"},
+    )
+    assert login.status_code == 200  # password unchanged
+    # Token was not burnt: a retry succeeds
+    assert _confirm(test_client, token).status_code == 204

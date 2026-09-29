@@ -141,6 +141,20 @@ class EmailService:
         )
 
     @staticmethod
+    async def send_password_reset_email(
+        email: str,
+        first_name: str,
+        reset_token: str,
+    ) -> Dict[str, Any]:
+        """Send password reset email via the "password-reset" SubscribeFlow template."""
+        reset_url = f"{FRONTEND_URL}/auth/reset-password/confirm?token={reset_token}"
+        return await EmailService._send(
+            template_slug="password-reset",
+            to=email,
+            variables={"first_name": first_name, "reset_url": reset_url},
+        )
+
+    @staticmethod
     async def send_welcome_email(email: str, first_name: str) -> Dict[str, Any]:
         """Send welcome email after successful verification via the "welcome" template."""
         return await EmailService._send(

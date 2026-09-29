@@ -5,7 +5,8 @@ Daten. Der Daten-Fanout läuft dabei über die bereits im Schema kodierte
 Retention-Policy:
 
   - Hart gelöscht (FK ondelete=CASCADE): Documents, UserSessions,
-    OAuthAccounts, EmailVerificationTokens, OrgUnit-Mitgliedschaften,
+    OAuthAccounts, EmailVerificationTokens, PasswordResetTokens,
+    OrgUnit-Mitgliedschaften,
     QuestionGenerationJobs, Rollen-Zuordnungen, Prompt-Wizard-Sitzungen
     (WizardSessions, Premium), Chat-Sitzungen (ChatSessions, Premium),
     persönliche Dokument-Tags (DocumentPersonalTags), Help-Center-Daten

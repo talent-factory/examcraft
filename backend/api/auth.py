@@ -3,14 +3,15 @@ Authentication API Endpoints
 Login, Logout, Register, Profile, Password Reset
 """
 
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
+import hashlib
 import logging
 import os
 import re
@@ -18,7 +19,14 @@ import json
 import secrets
 
 from database import get_db
-from models.auth import User, Role, Institution, UserStatus, UserRole
+from models.auth import (
+    User,
+    Role,
+    Institution,
+    PasswordResetToken,
+    UserStatus,
+    UserRole,
+)
 from services.auth_service import AuthService
 from services.avatar_service import AvatarService
 from services.audit_service import AuditService
@@ -887,26 +895,137 @@ async def change_password(
     return None
 
 
+# TF-768: Reset tokens live one hour; at most this many can be issued per user
+# within one hour (silently capped, so the cap itself leaks nothing).
+PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
+PASSWORD_RESET_MAX_REQUESTS_PER_HOUR = 3
+
+
+def _can_reset_password(user: Optional[User]) -> bool:
+    """Only ACTIVE accounts with a local password may reset it.
+
+    Suspended/inactive accounts must not regain access via a reset link;
+    PENDING users cannot log in anyway (they use resend-verification);
+    OAuth-only users (no password_hash) set a password via the authenticated
+    /set-password endpoint, so email control alone never grants them one."""
+    return (
+        user is not None
+        and user.status == UserStatus.ACTIVE.value
+        and user.password_hash is not None
+    )
+
+
+def _hash_reset_token(token: str) -> str:
+    """SHA-256 hex digest -- only this is persisted, never the plaintext token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _discard_undelivered_reset_token(token_hash: str) -> None:
+    """Drop a token whose mail was not delivered so it does not count towards
+    the per-user request cap (the link was never sent, nobody can use it)."""
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.token_hash == token_hash
+        ).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.error("Failed to discard undelivered reset token", exc_info=True)
+    finally:
+        db.close()
+
+
+async def _send_password_reset_email(
+    user_id: int, email: str, first_name: str, token: str
+) -> None:
+    """Send the reset mail; runs as a background task so response timing does
+    not reveal whether the address belongs to an account."""
+    from services.email_service import EmailService
+
+    try:
+        result = await EmailService.send_password_reset_email(
+            email=email, first_name=first_name, reset_token=token
+        )
+        if result.get("status") == "skipped":
+            # ERROR (not WARNING) so it reaches Sentry: the user gets a 204
+            # and will never receive a reset link.
+            logger.error(
+                f"Password reset email NOT sent for user ID {user_id}: "
+                "SUBSCRIBEFLOW_EMAILS_API_KEY not configured"
+            )
+            _discard_undelivered_reset_token(_hash_reset_token(token))
+    except Exception:
+        logger.error(
+            f"Failed to send password reset email for user ID {user_id}",
+            exc_info=True,
+        )
+        _discard_undelivered_reset_token(_hash_reset_token(token))
+
+
 @router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
 async def request_password_reset(
-    request: PasswordResetRequest, db: Session = Depends(get_db)
+    request: PasswordResetRequest,
+    http_request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
     """
     Request password reset
 
-    - Generates reset token
-    - Sends reset email (TODO: implement email sending)
-    - Always returns 204 (even if email doesn't exist - security)
+    - Generates a single-use reset token (1 hour validity, stored hashed)
+    - Invalidates any earlier unused tokens of the user
+    - Sends the reset email in the background
+    - Always 204 (even if email doesn't exist or the per-user rate limit
+      is hit -- no user enumeration)
     """
     user = db.query(User).filter(User.email == request.email).first()
 
-    if user:
-        # Generate reset token (TODO: implement token generation and email sending)
-        # For now, just log it
-        logger.info(f"Password reset requested for: {user.email}")
-        # TODO: Send email with reset link
+    if not _can_reset_password(user):
+        return None
 
-    # Always return success (don't reveal if email exists)
+    now = datetime.now(timezone.utc)
+
+    recent_requests = (
+        db.query(func.count(PasswordResetToken.id))
+        .filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.created_at > now - timedelta(hours=1),
+        )
+        .scalar()
+    )
+    if recent_requests >= PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:
+        logger.warning(f"Password reset rate limit hit for user ID {user.id}")
+        return None
+
+    for old_token in (
+        db.query(PasswordResetToken)
+        .filter(
+            PasswordResetToken.user_id == user.id,
+            ~PasswordResetToken.is_used,
+        )
+        .all()
+    ):
+        old_token.is_used = True
+        old_token.used_at = now
+
+    token = secrets.token_urlsafe(32)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=_hash_reset_token(token),
+            expires_at=now + PASSWORD_RESET_TOKEN_TTL,
+        )
+    )
+    db.commit()
+
+    background_tasks.add_task(
+        _send_password_reset_email, user.id, user.email, user.first_name, token
+    )
+    logger.info(f"Password reset requested for user ID {user.id}")
+
     return None
 
 
@@ -917,18 +1036,88 @@ async def confirm_password_reset(
     db: Session = Depends(get_db),
 ):
     """
-    Confirm password reset with token
+    Confirm password reset token
 
-    - Validates reset token
+    - Validates reset token (exists, unused, not expired -- one generic error
+      so the failure reason is not an oracle)
     - Updates password
     - Revokes all sessions
     """
     locale = get_request_locale(http_request)
-    # TODO: Implement token validation
-    # For now, just return error
-    raise api_error(
-        status.HTTP_501_NOT_IMPLEMENTED, "auth_password_reset_not_implemented", locale
+    now = datetime.now(timezone.utc)
+
+    reset_token = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == _hash_reset_token(request.token))
+        .first()
     )
+    if not reset_token or reset_token.is_used or reset_token.expires_at < now:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_password_reset_token_invalid", locale
+        )
+
+    user = db.query(User).filter(User.id == reset_token.user_id).first()
+    if not _can_reset_password(user):
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_password_reset_token_invalid", locale
+        )
+
+    # Atomically claim the token: of two concurrent confirms with the same
+    # token only one UPDATE matches ``is_used = false``.
+    claimed = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.id == reset_token.id, ~PasswordResetToken.is_used)
+        .update({"is_used": True, "used_at": now}, synchronize_session=False)
+    )
+    if claimed == 0:
+        db.rollback()
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_password_reset_token_invalid", locale
+        )
+
+    user.password_hash = AuthService.get_password_hash(request.new_password)
+    user.password_changed_at = func.now()
+    # A reset is the typical way out of a login lockout
+    user.failed_login_attempts = 0
+    user.last_failed_login = None
+
+    # Burn every other still-open token of the user
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id, ~PasswordResetToken.is_used
+    ).update({"is_used": True, "used_at": now}, synchronize_session=False)
+
+    # Audit row in the same transaction as the password change. On failure
+    # log_action rolls the whole transaction back (password + token claim) and
+    # returns None: abort loudly, the token stays usable for a retry.
+    audit_entry = AuditService.log_action(
+        db=db,
+        action=AuditService.ACTION_PASSWORD_RESET,
+        user_id=user.id,
+        resource_type=AuditService.RESOURCE_USER,
+        resource_id=str(user.id),
+        request=http_request,
+        commit=False,
+    )
+    if audit_entry is None:
+        db.rollback()  # idempotent: log_action already rolled back on failure
+        raise api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "auth_password_reset_failed", locale
+        )
+    db.commit()
+
+    # Force re-login everywhere (TF-480: revoked sessions are blacklisted).
+    # The password is already changed, so a failure here must not turn the
+    # response into a 500 (the token is burnt, a retry could not succeed).
+    try:
+        AuthService.revoke_all_user_sessions(user.id, db)
+    except Exception:
+        logger.error(
+            f"Session revocation FAILED after password reset for user ID {user.id}: "
+            "old sessions may still be valid",
+            exc_info=True,
+        )
+
+    logger.info(f"Password reset completed for user ID {user.id}")
 
     return None
 

@@ -3031,7 +3031,7 @@
     "auth_password_change_failed": "Impossibile modificare la password",
     "auth_password_incorrect": "La password attuale non è corretta",
     "auth_password_reset_failed": "Impossibile reimpostare la password",
-    "auth_password_reset_not_implemented": "Il reset della password non è ancora implementato",
+    "auth_password_reset_token_invalid": "Il link per reimpostare la password non è valido, è scaduto o è già stato utilizzato",
     "auth_password_reset_request_failed": "Impossibile richiedere il reset della password",
     "auth_password_set_failed": "Impossibile impostare la password",
     "auth_permission_required": "Autorizzazione «{{permission}}» richiesta",
