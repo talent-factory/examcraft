@@ -213,6 +213,15 @@ class GradingScheme(Base):
                 "is_default_for_institution = true AND institution_id IS NOT NULL"
             ),
         ),
+        # System schemes (``institution_id IS NULL``) are unique by name — the
+        # composite constraint above cannot catch them because NULLs never
+        # compare equal. TF-961: mirrors tf333 so create_all enforces it too.
+        Index(
+            "uq_grading_schemes_system_name",
+            "name",
+            unique=True,
+            postgresql_where="institution_id IS NULL",
+        ),
     )
 
     @validates("config")

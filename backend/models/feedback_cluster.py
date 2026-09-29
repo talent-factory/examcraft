@@ -13,7 +13,7 @@ from database import Base
 class FeedbackCluster(Base):
     __tablename__ = "feedback_clusters"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     topic_label = Column(String(100), nullable=False)
     vector_id = Column(String(36), nullable=True)
     positive_count = Column(Integer, default=0, nullable=False)

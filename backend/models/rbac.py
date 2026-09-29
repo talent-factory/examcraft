@@ -295,11 +295,12 @@ class ResourceUsage(Base):
     __tablename__ = "resource_usage"
 
     id = Column(Integer, primary_key=True, index=True)
+    # No own index: idx_resource_usage_unique below leads with this column
+    # (TF-961).
     institution_id = Column(
         Integer,
         ForeignKey("institutions.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     resource_type = Column(
         String(100), nullable=False, index=True

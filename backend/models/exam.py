@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     UniqueConstraint,
     CheckConstraint,
     JSON,
@@ -197,6 +198,19 @@ class Exam(Base):
         CheckConstraint(
             "(visibility = 'team') = (org_unit_id IS NOT NULL)",
             name="ck_exams_team_visibility_requires_org_unit",
+        ),
+        # TF-961: mirror tf398 (archive filter) and tf643 (list query sorted by
+        # updated_at) so create_all-built databases have them too.
+        Index(
+            "ix_exams_archived_at",
+            archived_at,
+            postgresql_where=archived_at.isnot(None),
+        ),
+        Index(
+            "ix_exams_inst_vis_updated",
+            institution_id,
+            visibility,
+            updated_at.desc(),
         ),
     )
 

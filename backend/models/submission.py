@@ -565,7 +565,7 @@ class MoodleFeedbackPushJob(Base):
 
     __tablename__ = "moodle_feedback_push_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     institution_id = Column(
         Integer,
         ForeignKey("institutions.id", ondelete="CASCADE"),

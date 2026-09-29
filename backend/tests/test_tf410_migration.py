@@ -54,7 +54,7 @@ _TF410_VIS_SYSTEM_SQL = """
     WHERE institution_id IN (SELECT id FROM institutions WHERE is_system)
 """
 _TF410_SINGLE_SYSTEM_INDEX_SQL = (
-    "CREATE UNIQUE INDEX uq_institutions_single_system "
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_institutions_single_system "
     "ON institutions (is_system) WHERE is_system"
 )
 _TF410_ADMIN_INVARIANT_SQL = """

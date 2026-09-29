@@ -13,9 +13,12 @@ must not leak into the test process) and then checks:
 1. The replay succeeds and ends at the single script head.
 2. Migration-embedded seeds ran (tf333's system grading schemes).
 3. The resulting schema matches the models, apart from a fixed list of known
-   deviations (``EXPECTED_DIFFS``). The list is compared for equality: a new
-   deviation fails, and so does a known one that disappeared — remove it from
-   the list in the PR that fixes it (TF-961).
+   deviations (``EXPECTED_DIFFS``, empty since TF-961). The list is compared
+   for equality: a new deviation fails, and so does a known one that
+   disappeared.
+4. Constraints that only the migration path can get wrong: prompt names are
+   unique per institution, not globally (TF-961 — ``create_all`` never built
+   the global unique index production had).
 """
 
 import importlib
@@ -31,48 +34,18 @@ from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Index, Table, create_engine, text
+from sqlalchemy import Index, Table, create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from database import Base
 from db_seed import SYSTEM_GRADING_SCHEMES
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-# Known model/migration deviations as (kind, table, object). Each group names
-# why it is tolerated; none of them may be dropped silently.
-EXPECTED_DIFFS = {
-    # TF-961 #1: the original ``unique=True`` created a UNIQUE *index*, tf346
-    # only drops the (non-existent) ``prompts_name_key`` constraint. Production
-    # has the same global unique index (verified read-only 2026-09-29).
-    ("remove_index", "prompts", "ix_prompts_name"),
-    ("add_index", "prompts", "ix_prompts_name"),
-    # TF-961 #2: b2c3d4e5f6a7 adds resource_usage.institution_id nullable and
-    # without its own index; the model wants NOT NULL + index=True.
-    ("modify_nullable", "resource_usage", "institution_id"),
-    ("add_index", "resource_usage", "ix_resource_usage_institution_id"),
-    # TF-961 #3: ``index=True`` on a primary key, never created by a migration.
-    ("add_index", "competencies", "ix_competencies_id"),
-    ("add_index", "competency_frameworks", "ix_competency_frameworks_id"),
-    ("add_index", "feedback_clusters", "ix_feedback_clusters_id"),
-    ("add_index", "moodle_feedback_push_jobs", "ix_moodle_feedback_push_jobs_id"),
-    # Indexes that only exist in migrations (partial / functional / DESC), the
-    # models do not declare them. Production has them; create_all-built
-    # databases (dev, test suite) do not. Covered by TF-961's acceptance
-    # criterion "compare_metadata reports 0 deviations".
-    ("remove_index", "audit_logs", "ix_audit_logs_user_id_created_at_desc"),
-    ("remove_index", "document_tags", "ix_document_tags_tag_id"),
-    ("remove_index", "documents", "ix_documents_inst_vis_created"),
-    ("remove_index", "documents", "ix_documents_pending_reindex"),
-    ("remove_index", "exams", "ix_exams_archived_at"),
-    ("remove_index", "exams", "ix_exams_inst_vis_updated"),
-    ("remove_index", "grading_schemes", "uq_grading_schemes_system_name"),
-    ("remove_index", "institutions", "uq_institutions_single_system"),
-    ("remove_index", "org_units", "ix_org_units_unique_root_name"),
-    ("remove_index", "org_units", "ix_org_units_unique_sibling_name"),
-    ("remove_index", "question_reviews", "ix_question_reviews_inst_vis_created"),
-    ("remove_index", "tags", "uix_global_tag_name_lower"),
-    ("remove_index", "tags", "uix_tag_name_lower_institution"),
-}
+# Known model/migration deviations as (kind, table, object). Empty since
+# TF-961 reconciled all of them; an entry needs a comment saying why it is
+# tolerated and a ticket that removes it again.
+EXPECTED_DIFFS: set[tuple[str, str, str]] = set()
 
 
 def _import_all_models() -> None:
@@ -103,6 +76,41 @@ def _diff_key(diff) -> tuple[str, str, str]:
         str(getattr(getattr(obj, "table", None), "name", "")),
         str(getattr(obj, "name", obj)),
     )
+
+
+def _insert_prompt(conn, institution_id: int, name: str) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO prompts (id, name, content, category, version, institution_id)"
+            " VALUES (gen_random_uuid(), :name, 'x', 'template', 1, :inst)"
+        ),
+        {"name": name, "inst": institution_id},
+    )
+
+
+def _assert_prompt_names_unique_per_institution(conn) -> None:
+    """Two institutions may share a prompt name, one institution may not (TF-961).
+
+    Production had a global UNIQUE ``ix_prompts_name`` that only the migration
+    path produced, so this can only be checked on the replayed schema.
+    """
+    institution_ids = [
+        conn.execute(
+            text(
+                "INSERT INTO institutions (name, slug, is_active, subscription_tier,"
+                " max_users, max_documents, max_questions_per_month)"
+                " VALUES (:slug, :slug, true, 'free', 1, 5, 20) RETURNING id"
+            ),
+            {"slug": f"tf961-{uuid.uuid4().hex[:8]}"},
+        ).scalar_one()
+        for _ in range(2)
+    ]
+    for institution_id in institution_ids:
+        _insert_prompt(conn, institution_id, "Gleicher Name")
+
+    with pytest.raises(IntegrityError, match="ux_prompts_institution_name"):
+        with conn.begin_nested():
+            _insert_prompt(conn, institution_ids[0], "gleicher name")
 
 
 @pytest.fixture
@@ -170,6 +178,12 @@ def test_upgrade_head_from_empty_database(empty_db_url):
                 },
             )
             actual = {_diff_key(d) for d in compare_metadata(ctx, Base.metadata)}
+
+        # prompts is created by the baseline, so it exists even core-only.
+        if "prompts" in inspect(engine).get_table_names():
+            with engine.connect() as conn, conn.begin() as tx:
+                _assert_prompt_names_unique_per_institution(conn)
+                tx.rollback()
     finally:
         engine.dispose()
 

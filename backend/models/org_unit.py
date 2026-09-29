@@ -13,6 +13,8 @@ from sqlalchemy import (
     String,
     DateTime,
     ForeignKey,
+    Index,
+    text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -79,6 +81,27 @@ class OrgUnit(Base):
         "UserOrgUnit", back_populates="org_unit", cascade="all, delete-orphan"
     )
     role = relationship("Role")
+
+    # Sibling names are unique within their parent (the service-layer 409
+    # pre-check is SELECT-then-INSERT and thus race-prone). Two indexes because
+    # NULLs never compare equal: the root level (parent_org_unit_id IS NULL)
+    # needs its own partial index. TF-961: mirrors orgunits_foundation.
+    __table_args__ = (
+        Index(
+            "ix_org_units_unique_sibling_name",
+            "institution_id",
+            "parent_org_unit_id",
+            "name",
+            unique=True,
+        ),
+        Index(
+            "ix_org_units_unique_root_name",
+            "institution_id",
+            "name",
+            unique=True,
+            postgresql_where=text("parent_org_unit_id IS NULL"),
+        ),
+    )
 
     def __repr__(self):
         return (

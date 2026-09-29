@@ -103,8 +103,8 @@ class Institution(Base):
 
     # TF-410: marks the single platform-wide "system" institution that owns
     # system-visible prompts (and other global seed data). Exactly one row may
-    # have ``is_system = true`` — enforced by a partial unique index in the
-    # migration. Replaces the old "lowest id" seed convention.
+    # have ``is_system = true`` — enforced by ``uq_institutions_single_system``
+    # below. Replaces the old "lowest id" seed convention.
     is_system = Column(Boolean, default=False, nullable=False, index=True)
 
     # Subscription Info (TF-116 monetization strategy)
@@ -191,6 +191,16 @@ class Institution(Base):
     )
     org_units = relationship(
         "OrgUnit", back_populates="institution", cascade="all, delete-orphan"
+    )
+
+    # TF-961: mirrors tf410 so create_all-built databases enforce it too.
+    __table_args__ = (
+        Index(
+            "uq_institutions_single_system",
+            "is_system",
+            unique=True,
+            postgresql_where=text("is_system"),
+        ),
     )
 
     def __repr__(self):
@@ -524,6 +534,15 @@ class AuditLog(Base):
     user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])
     impersonator = relationship("User", foreign_keys=[impersonator_user_id])
 
+    # TF-961: mirrors tf337 (per-user activity feed, newest first).
+    __table_args__ = (
+        Index(
+            "ix_audit_logs_user_id_created_at_desc",
+            user_id,
+            created_at.desc(),
+        ),
+    )
+
     def __repr__(self):
         return (
             f"<AuditLog(id={self.id}, action='{self.action}', status='{self.status}')>"
@@ -555,7 +574,7 @@ class ImpersonationSession(Base):
     api/gdpr.py) — the row survives with a NULL actor/target instead of
     blocking the delete. A CHECK constraint still requires the two to differ
     whenever both are set (no self-impersonation), and a partial-unique
-    index (migration-only, not expressible in the ORM layer) allows at most
+    index (see ``__table_args__``) allows at most
     one *active* (``ended_at IS NULL``) session per admin at a time — no
     nested impersonation, per the TF-739 epic's scope rules.
     """

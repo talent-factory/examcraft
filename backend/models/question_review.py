@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     JSON,
     CheckConstraint,
     UniqueConstraint,
@@ -181,8 +182,8 @@ class QuestionReview(Base):
     # TF-396: archive axis (orthogonal to review_status).
     # archived_at IS NULL  => active; set => archived (hidden from bank/lists,
     # but retained in exams). Restoring = archived_at back to NULL,
-    # review_status stays unchanged.
-    archived_at = Column(DateTime, nullable=True, index=True)
+    # review_status stays unchanged. Partial index, see __table_args__.
+    archived_at = Column(DateTime, nullable=True)
     archived_by = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -242,6 +243,20 @@ class QuestionReview(Base):
         CheckConstraint(
             "(visibility = 'team') = (org_unit_id IS NOT NULL)",
             name="ck_question_reviews_team_visibility_requires_org_unit",
+        ),
+        # TF-961: mirrors tf396 (only archived rows are indexed; the active
+        # ones are the vast majority) and tf642 (Fragenpool list query, newest
+        # first).
+        Index(
+            "ix_question_reviews_archived_at",
+            archived_at,
+            postgresql_where=archived_at.isnot(None),
+        ),
+        Index(
+            "ix_question_reviews_inst_vis_created",
+            institution_id,
+            visibility,
+            created_at.desc(),
         ),
     )
 

@@ -16,7 +16,9 @@ from sqlalchemy import (
     Enum,
     Boolean,
     ForeignKey,
+    Index,
     false,
+    text,
 )
 from sqlalchemy.sql import func
 import enum
@@ -138,6 +140,19 @@ class Document(Base):
         CheckConstraint(
             "(visibility = 'team') = (org_unit_id IS NOT NULL)",
             name="ck_documents_team_visibility_requires_org_unit",
+        ),
+        # TF-961: mirror tf354 (list query, newest first) and tf352 (Celery
+        # re-index sweep) so create_all-built databases have them too.
+        Index(
+            "ix_documents_inst_vis_created",
+            "institution_id",
+            "visibility",
+            text("created_at DESC"),
+        ),
+        Index(
+            "ix_documents_pending_reindex",
+            "pending_reindex",
+            postgresql_where=text("pending_reindex = true"),
         ),
     )
 

@@ -141,6 +141,9 @@ class DocumentTag(Base):
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
+    # TF-961: mirrors tf355 (reverse lookup by tag; the PK leads with document_id).
+    __table_args__ = (Index("ix_document_tags_tag_id", "tag_id"),)
+
 
 class DocumentPersonalTag(Base):
     """Per-user (personal) document↔tag assignment (TF-399).
