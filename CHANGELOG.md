@@ -9,6 +9,20 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-09-29
+
+### Fixed
+
+- **Celery: sporadische `PGRES_TUPLES_OK`-Fehler (TF-963):** Seit
+  v1.13.1 schlugen Celery-Tasks (u. a. die Maintenance-Watchdogs)
+  sporadisch mit `psycopg2.DatabaseError: error with status
+  PGRES_TUPLES_OK and no message from the libpq` fehl. Jeder
+  geforkte Worker-Prozess erhält jetzt über `worker_process_init`
+  einen eigenen Datenbank-Pool (`engine.dispose(close=False)`),
+  statt den Pool samt offener Verbindungen vom Parent zu erben.
+  SQLAlchemy ist auf `<2.1` begrenzt (zurück auf 2.0.x, wie bis
+  v1.13.0), `psycopg2-binary` auf `<2.10`.
+
 ## [1.13.1] - 2026-09-29
 
 ### Fixed
