@@ -95,6 +95,16 @@ in `AppError.ts` grows by one import line.
      UI or a frontend bug, and the English ones are passthrough codes with no
      locale key at all. Each file states which, and why.
 
+   `portfolioAssessments.ts` and `portfolioTemplates.ts` (TF-987) mix the
+   premium portfolio routers' codes with one fallback per `portfolioApi`
+   operation. The portfolio *job* codes (`portfolio_ingestion_*`,
+   `portfolio_github_*`, `portfolio_classification_*`,
+   `portfolio_grading_*`) are deliberately not here: they arrive inside a
+   successful response's `job.error_log`/`warnings`, never as an
+   `error_code`; their list is `PORTFOLIO_JOB_CODES` in `types/portfolio.ts`,
+   rendered by `components/portfolio/portfolioJobMessages.ts` and covered by
+   their own four-locale test.
+
 ## What belongs in the registry
 
 Two kinds of code, and the distinction matters when reading `documents.ts`:

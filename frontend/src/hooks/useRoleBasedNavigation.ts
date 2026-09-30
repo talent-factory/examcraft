@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
+import { isFullDeployment } from '../utils/deploymentMode';
 
 export interface NavigationItem {
   label: string;
@@ -22,6 +23,11 @@ export interface NavigationItem {
   excludedRoles?: UserRole[];
   excludeSuperuser?: boolean;
   requiredPermissions?: string[];
+  /**
+   * Hide in a core deployment. For premium features whose permission core's
+   * RBAC can still grant: the entry would only lead to a "not available" page.
+   */
+  requireFullDeployment?: boolean;
   children?: NavigationItem[];
 }
 
@@ -122,6 +128,27 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
             icon: '👥',
             requiredPermissions: ['students:manage'],
           },
+          {
+            // TF-987: opt-in permission, no default role has it. Templates
+            // live under /portfolio/templates (next entry), not in the admin
+            // panel, which RoleGuard limits to admins.
+            label: t('nav.sidebar.portfolio'),
+            path: '/portfolio',
+            icon: '📁',
+            requiredPermissions: ['portfolio_assessments:read'],
+            requireFullDeployment: true,
+          },
+          {
+            // Own entry so a role with only the template permission can
+            // reach /portfolio/templates (also required by
+            // test_permission_consistency: every route permission has a nav
+            // item).
+            label: t('nav.sidebar.portfolioTemplates'),
+            path: '/portfolio/templates',
+            icon: '🧩',
+            requiredPermissions: ['portfolio_templates:read'],
+            requireFullDeployment: true,
+          },
         ],
       },
       {
@@ -193,6 +220,7 @@ export const useRoleBasedNavigation = (): RoleBasedNavigation => {
     const result: NavigationItem[] = [];
     for (const item of items) {
       if (item.requireSuperuser && !user?.is_superuser) continue;
+      if (item.requireFullDeployment && !isFullDeployment()) continue;
       if (item.excludeSuperuser && user?.is_superuser) continue;
       if (item.excludedRoles && item.excludedRoles.some(role => hasRole(role))) continue;
 

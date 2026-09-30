@@ -33,6 +33,10 @@ import AuswertungenKlassenDetail from './pages/AuswertungenKlassenDetail';
 import AuswertungenStudierende from './pages/AuswertungenStudierende';
 import AuswertungenStudiDetail from './pages/AuswertungenStudiDetail';
 import MoodleConnectionPage from './pages/MoodleConnectionPage';
+import { PortfolioGate } from './components/portfolio/PortfolioGate';
+import PortfolioAssessmentsPage from './pages/portfolio/PortfolioAssessmentsPage';
+import PortfolioAssessmentDetailPage from './pages/portfolio/PortfolioAssessmentDetailPage';
+import PortfolioTemplatesPage from './pages/portfolio/PortfolioTemplatesPage';
 import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
@@ -51,8 +55,9 @@ const PromptLibrary = loadPromptLibraryWithUpload();
 // Load Premium Document Chat (falls back to unavailable message)
 const DocumentChatPage = loadDocumentChat();
 
-// Create a QueryClient instance for TanStack Query
-const queryClient = new QueryClient({
+// Create a QueryClient instance for TanStack Query. Exported only so tests
+// that render AppWithAuth can clear its cache between cases.
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
@@ -257,6 +262,51 @@ export const AppWithAuth: React.FC = () => {
                     <PermissionGuard requiredPermissions={['students:manage']}>
                       <AppLayout>
                         <AuswertungenStudiDetail />
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              {/* TF-987: portfolio permissions are opt-in, no default role has
+                  them. PortfolioGate keeps core deployments from calling the
+                  premium API and shows UpgradePrompt below Professional. */}
+              <Route
+                path="/portfolio"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['portfolio_assessments:read']}>
+                      <AppLayout>
+                        <PortfolioGate>
+                          <PortfolioAssessmentsPage />
+                        </PortfolioGate>
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/portfolio/templates"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['portfolio_templates:read']}>
+                      <AppLayout>
+                        <PortfolioGate>
+                          <PortfolioTemplatesPage />
+                        </PortfolioGate>
+                      </AppLayout>
+                    </PermissionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/portfolio/:id"
+                element={
+                  <ProtectedRoute>
+                    <PermissionGuard requiredPermissions={['portfolio_assessments:read']}>
+                      <AppLayout>
+                        <PortfolioGate>
+                          <PortfolioAssessmentDetailPage />
+                        </PortfolioGate>
                       </AppLayout>
                     </PermissionGuard>
                   </ProtectedRoute>

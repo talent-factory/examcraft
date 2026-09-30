@@ -37,8 +37,11 @@ export interface UpgradePromptProps {
   featureDescriptionKey?: string;
   /** Required subscription tier */
   requiredTier: 'starter' | 'professional' | 'enterprise';
-  /** Current user's subscription tier */
-  currentTier: 'free' | 'starter' | 'professional' | 'enterprise';
+  /**
+   * Current user's subscription tier. Omit when it is unknown (features not
+   * loaded): the "your plan" chip is then left out instead of claiming Free.
+   */
+  currentTier?: 'free' | 'starter' | 'professional' | 'enterprise';
   /** Custom upgrade URL (optional) */
   upgradeUrl?: string;
   /** Callback when upgrade button is clicked (optional) */
@@ -81,7 +84,7 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
   onUpgrade,
 }) => {
   const { t } = useTranslation();
-  const currentConfig = TIER_CONFIG[currentTier];
+  const currentConfig = currentTier ? TIER_CONFIG[currentTier] : undefined;
   const requiredConfig = TIER_CONFIG[requiredTier];
   const featureName = t(featureNameKey);
   const featureDescription = featureDescriptionKey ? t(featureDescriptionKey) : undefined;
@@ -133,21 +136,25 @@ export const UpgradePrompt: React.FC<UpgradePromptProps> = ({
 
       {/* Tier Comparison */}
       <Stack direction="row" spacing={2} justifyContent="center" sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="caption" color="text.secondary" display="block">
-            {t('components.upgradePrompt.yourPlan')}
-          </Typography>
-          <Chip
-            label={currentConfig.label}
-            sx={{
-              bgcolor: `${currentConfig.color}20`,
-              color: currentConfig.color,
-              fontWeight: 'bold',
-            }}
-          />
-        </Box>
+        {currentConfig && (
+          <>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                {t('components.upgradePrompt.yourPlan')}
+              </Typography>
+              <Chip
+                label={currentConfig.label}
+                sx={{
+                  bgcolor: `${currentConfig.color}20`,
+                  color: currentConfig.color,
+                  fontWeight: 'bold',
+                }}
+              />
+            </Box>
 
-        <ArrowForwardIcon sx={{ alignSelf: 'center', color: 'text.secondary' }} />
+            <ArrowForwardIcon sx={{ alignSelf: 'center', color: 'text.secondary' }} />
+          </>
+        )}
 
         <Box>
           <Typography variant="caption" color="text.secondary" display="block">

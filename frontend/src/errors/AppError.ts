@@ -16,6 +16,8 @@ import { MOODLE_CONNECTIONS_ERROR_CODES } from './codes/moodleConnections';
 import { MOODLE_FEEDBACK_PUSH_ERROR_CODES } from './codes/moodleFeedbackPush';
 import { MOODLE_ROUNDTRIP_ERROR_CODES } from './codes/moodleRoundtrip';
 import { ORG_UNITS_ERROR_CODES } from './codes/orgUnits';
+import { PORTFOLIO_ASSESSMENTS_ERROR_CODES } from './codes/portfolioAssessments';
+import { PORTFOLIO_TEMPLATES_ERROR_CODES } from './codes/portfolioTemplates';
 import { PROMPTS_ERROR_CODES } from './codes/prompts';
 import { RAG_ERROR_CODES } from './codes/rag';
 import { RBAC_ERROR_CODES } from './codes/rbac';
@@ -74,6 +76,8 @@ export const APP_ERROR_CODES = [
   ...MOODLE_FEEDBACK_PUSH_ERROR_CODES,
   ...MOODLE_ROUNDTRIP_ERROR_CODES,
   ...ORG_UNITS_ERROR_CODES,
+  ...PORTFOLIO_ASSESSMENTS_ERROR_CODES,
+  ...PORTFOLIO_TEMPLATES_ERROR_CODES,
   ...PROMPTS_ERROR_CODES,
   ...RAG_ERROR_CODES,
   ...RBAC_ERROR_CODES,
