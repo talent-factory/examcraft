@@ -306,7 +306,7 @@ export const PortfolioAssessmentCreateDialog: React.FC<PortfolioAssessmentCreate
 
           <PortfolioMutationError
             error={createMutation.error}
-            message={translateError(createMutation.error, t, 'errors.portfolio_assessment_create_failed')}
+            message={createMutation.error ? translateError(createMutation.error, t, 'errors.portfolio_assessment_create_failed') : ''}
           />
         </Stack>
       </DialogContent>

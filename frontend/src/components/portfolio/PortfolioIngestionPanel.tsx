@@ -118,7 +118,7 @@ const GithubTokenForm: React.FC<GithubTokenFormProps> = ({ replacing, onSaved })
       <Box sx={{ mt: 1 }}>
         <PortfolioMutationError
           error={saveMutation.error}
-          message={translateError(saveMutation.error, t, 'errors.portfolio_assessment_github_credential_save_failed')}
+          message={saveMutation.error ? translateError(saveMutation.error, t, 'errors.portfolio_assessment_github_credential_save_failed') : ''}
         />
       </Box>
     </Box>
@@ -337,11 +337,11 @@ export const PortfolioIngestionPanel: React.FC<PortfolioIngestionPanelProps> = (
 
         <PortfolioMutationError
           error={uploadMutation.error}
-          message={translateError(uploadMutation.error, t, 'errors.portfolio_assessment_upload_failed')}
+          message={uploadMutation.error ? translateError(uploadMutation.error, t, 'errors.portfolio_assessment_upload_failed') : ''}
         />
         <PortfolioMutationError
           error={ingestMutation.error}
-          message={translateError(ingestMutation.error, t, 'errors.portfolio_assessment_ingest_failed')}
+          message={ingestMutation.error ? translateError(ingestMutation.error, t, 'errors.portfolio_assessment_ingest_failed') : ''}
         />
       </Stack>
     </Paper>

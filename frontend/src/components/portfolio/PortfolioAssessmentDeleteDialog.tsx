@@ -83,7 +83,7 @@ export const PortfolioAssessmentDeleteDialog: React.FC<PortfolioAssessmentDelete
           </DialogContentText>
           <PortfolioMutationError
             error={deleteMutation.error}
-            message={translateError(deleteMutation.error, t, 'errors.portfolio_assessment_delete_failed')}
+            message={deleteMutation.error ? translateError(deleteMutation.error, t, 'errors.portfolio_assessment_delete_failed') : ''}
           />
         </Stack>
       </DialogContent>
