@@ -438,6 +438,27 @@ class TestRAGAPI:
         )
         assert response.status_code == 422
 
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            # document_ids is required and non-empty: an unfiltered search
+            # would name other users' documents in source_documents.
+            {"document_ids": None},
+            {"document_ids": []},
+        ],
+    )
+    def test_retrieve_context_rejects_missing_document_ids(self, auth_client, extra):
+        """TF-969: document_ids is required and must not be empty."""
+        payload = {"query": "Valid Query", "document_ids": [1], **extra}
+        if payload["document_ids"] is None:
+            del payload["document_ids"]
+
+        with patch("services.rag_service.rag_service") as mock_rag_service:
+            response = auth_client.post("/api/v1/rag/retrieve-context", json=payload)
+
+        assert response.status_code == 422
+        mock_rag_service.retrieve_context.assert_not_called()
+
     def test_get_available_documents_success(
         self, auth_client, mock_db, mock_processed_document
     ):

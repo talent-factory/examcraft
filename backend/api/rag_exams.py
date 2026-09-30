@@ -189,7 +189,12 @@ class ContextRetrievalRequest(BaseModel):
     """Request model for context retrieval"""
 
     query: str = Field(..., description="Search query", min_length=3, max_length=500)
-    document_ids: Optional[List[int]] = Field(None, description="Specific document IDs")
+    # Required and non-empty: without it the vector search runs unfiltered
+    # over the whole index and `source_documents` would name other users'
+    # documents — the visibility check below only covers listed IDs.
+    document_ids: List[int] = Field(
+        ..., description="Document IDs to search in", min_length=1
+    )
     max_chunks: int = Field(5, description="Maximum number of chunks", ge=1, le=20)
     min_similarity: Optional[float] = Field(
         0.01,
@@ -563,28 +568,26 @@ async def retrieve_context(
     **Required:** Authenticated user
 
     - **query**: search query for context
-    - **document_ids**: optional specific documents
+    - **document_ids**: documents to search in (required, non-empty)
     - **max_chunks**: maximum number of chunks (1-20)
     - **min_similarity**: minimum similarity score (0.0-1.0)
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Validate document IDs if provided
-        if request.document_ids:
-            # Computed once per request, not once per document (TF-620 perf
-            # fix) — see generate_exam_from_documents for the same pattern.
-            accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
-            for doc_id in request.document_ids:
-                document = document_service.get_document_by_id(doc_id, db)
-                # Visibility check (TF-354): 404 instead of 403 — a foreign
-                # private document must not leak via the RAG path.
-                if not document or not is_document_visible_for(
-                    current_user,
-                    document,
-                    db,
-                    accessible_org_unit_ids=accessible_org_unit_ids,
-                ):
-                    raise api_error(404, "rag_document_not_found", locale)
+        # Computed once per request, not once per document (TF-620 perf
+        # fix) — see generate_exam_from_documents for the same pattern.
+        accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
+        for doc_id in request.document_ids:
+            document = document_service.get_document_by_id(doc_id, db)
+            # Visibility check (TF-354): 404 instead of 403 — a foreign
+            # private document must not leak via the RAG path.
+            if not document or not is_document_visible_for(
+                current_user,
+                document,
+                db,
+                accessible_org_unit_ids=accessible_org_unit_ids,
+            ):
+                raise api_error(404, "rag_document_not_found", locale)
 
         min_sim = request.min_similarity if request.min_similarity is not None else 0.01
         context = await rag_service_module.rag_service.retrieve_context(
