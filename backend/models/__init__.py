@@ -6,6 +6,10 @@ Premium features (Chat, Prompts) are available in the Premium package.
 """
 
 from models.document import Document
+
+# Imported for mapper/metadata registration: question_reviews.generation_job_id
+# has an FK to this table, so create_all() fails without it (TF-964).
+from models.question_generation_job import QuestionGenerationJob
 from models.question_review import (
     QuestionReview,
     ReviewComment,
@@ -64,6 +68,7 @@ from models.submission import (
 
 __all__ = [
     "Document",
+    "QuestionGenerationJob",
     "QuestionReview",
     "ReviewComment",
     "ReviewHistory",

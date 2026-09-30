@@ -6,10 +6,11 @@ Automatically persists generated questions to question_reviews (status: pending)
 
 import contextlib
 import dataclasses
+import enum
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, NoReturn, Optional
 
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
@@ -89,6 +90,19 @@ _JOB_STATUS_UPDATE_BACKOFFS: tuple[int, ...] = (2, 5, 10)
 JobTerminalStatus = Literal["SUCCESS", "FAILURE", "REVOKED"]
 
 
+class JobStatusWrite(enum.Enum):
+    """Outcome of ``_safe_update_job_status``.
+
+    KEPT_SUCCESS is not an error: the row already says SUCCESS and is left
+    alone (TF-964). The watchdog must not count it as reconciled nor mirror
+    a FAILURE into Celery's backend for it.
+    """
+
+    WRITTEN = "written"
+    KEPT_SUCCESS = "kept_success"
+    FAILED = "failed"
+
+
 # Time estimation lookup table (minutes) based on question type and difficulty
 TIME_ESTIMATES = {
     ("single_choice", "easy"): 1,
@@ -114,7 +128,7 @@ except ImportError as _import_err:
     RAGService = None  # type: ignore[assignment,misc]
 
 
-def _try_update_job_status(task_id: str, status: str) -> None:
+def _try_update_job_status(task_id: str, status: str) -> bool:
     """Single-attempt status update.
 
     Opens a fresh SessionLocal so SQLAlchemy's pool_pre_ping (configured globally
@@ -123,16 +137,43 @@ def _try_update_job_status(task_id: str, status: str) -> None:
     whose internal transaction state may be poisoned by a prior exception.
     Raises JobNotFoundError if no matching row exists. Lets DB exceptions bubble;
     the retry loop in _update_job_status decides whether to retry.
+
+    A SUCCESS row is never changed (TF-964): SUCCESS is committed together
+    with the questions, so it is the truth about the job. A later FAILURE
+    write — the task raising after that commit on its last retry, or the
+    watchdog / ``/active-tasks`` mirroring Celery's FAILURE after they
+    loaded the row as PENDING and the task committed SUCCESS meanwhile —
+    would show a finished job as failed and offer a retry that generates
+    it twice.
+
+    Returns True if the status was written, False if a SUCCESS row was
+    kept.
     """
     from database import SessionLocal
 
     session = SessionLocal()
     try:
-        job = session.query(QuestionGenerationJob).filter_by(task_id=task_id).first()
+        # Locked like in _save_generation: a writer that loaded the row as
+        # PENDING waits for the task's SUCCESS commit and then sees it.
+        job = (
+            session.query(QuestionGenerationJob)
+            .filter_by(task_id=task_id)
+            .with_for_update()
+            .first()
+        )
         if job is None:
             raise JobNotFoundError(task_id, status)
+        if job.status == "SUCCESS" and status != "SUCCESS":
+            logger.warning(
+                "Not overwriting SUCCESS with %s for task %s — the job's "
+                "questions are already saved",
+                status,
+                task_id,
+            )
+            return False
         job.status = status
         session.commit()
+        return True
     except Exception:
         session.rollback()
         raise
@@ -140,7 +181,7 @@ def _try_update_job_status(task_id: str, status: str) -> None:
         session.close()
 
 
-def _update_job_status(task_id: str, status: str) -> None:
+def _update_job_status(task_id: str, status: str) -> bool:
     """Update QuestionGenerationJob.status to terminal state, with retries.
 
     Calls `_try_update_job_status` up to `len(_JOB_STATUS_UPDATE_BACKOFFS) + 1`
@@ -156,12 +197,15 @@ def _update_job_status(task_id: str, status: str) -> None:
     fields) on final failure. The Celery task wraps its calls in
     `_safe_update_job_status` to ensure a status-update failure never overrides
     the actual task outcome.
+
+    Returns what `_try_update_job_status` returned: False if a SUCCESS row
+    was kept.
     """
     attempts = len(_JOB_STATUS_UPDATE_BACKOFFS) + 1
     last_err: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            _try_update_job_status(task_id, status)
+            written = _try_update_job_status(task_id, status)
             if attempt > 1:
                 logger.info(
                     "Recovered job status update for task %s on attempt %d/%d",
@@ -169,7 +213,7 @@ def _update_job_status(task_id: str, status: str) -> None:
                     attempt,
                     attempts,
                 )
-            return
+            return written
         except (SQLAlchemyError, OSError) as err:
             last_err = err
             log = logger.error if attempt == attempts else logger.warning
@@ -185,7 +229,7 @@ def _update_job_status(task_id: str, status: str) -> None:
     raise JobStatusUpdateError(task_id, status, attempts, last_err) from last_err
 
 
-def _safe_update_job_status(task_id: str, status: str) -> bool:
+def _safe_update_job_status(task_id: str, status: str) -> JobStatusWrite:
     """Best-effort status update used by Celery task body and the TF-329
     watchdog. Swallows `JobStatusUpdateError` and `JobNotFoundError` after
     logging at CRITICAL so a status-write failure never overrides the actual
@@ -193,14 +237,17 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
     failed, or the row vanished).
 
     Returns:
-        True if the row was updated, False on any swallowed failure. Callers
-        like the watchdog need this signal to keep their counters honest —
-        previously the watchdog incremented ``reconciled`` unconditionally,
-        so beat-health metrics looked green during a real DB outage.
+        ``WRITTEN`` if the row was updated, ``KEPT_SUCCESS`` if it already
+        said SUCCESS and was left alone (TF-964), ``FAILED`` on any swallowed
+        failure. Callers like the watchdog need this signal to keep their
+        counters honest — previously the watchdog incremented ``reconciled``
+        unconditionally, so beat-health metrics looked green during a real
+        DB outage.
     """
     try:
-        _update_job_status(task_id, status)
-        return True
+        if _update_job_status(task_id, status):
+            return JobStatusWrite.WRITTEN
+        return JobStatusWrite.KEPT_SUCCESS
     except JobStatusUpdateError:
         logger.critical(
             "Could not persist %s status for task %s after retries — "
@@ -209,7 +256,7 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
             task_id,
             exc_info=True,
         )
-        return False
+        return JobStatusWrite.FAILED
     except JobNotFoundError:
         logger.critical(
             "Cannot update status to %s for task %s: no QuestionGenerationJob row "
@@ -218,135 +265,239 @@ def _safe_update_job_status(task_id: str, status: str) -> bool:
             task_id,
             exc_info=True,
         )
-        return False
+        return JobStatusWrite.FAILED
 
 
-# Single retry for a transient outcome-write blip, 1s later. This write
-# isn't status-critical like _update_job_status (hence far fewer attempts
-# than _JOB_STATUS_UPDATE_BACKOFFS), but a bare zero-retry attempt turns any
-# transient DB hiccup into a permanent, invisible-to-the-user loss of the
-# under-fill notice — worth one bounded extra attempt.
-_GENERATION_OUTCOME_BACKOFF_S: float = 1.0
+# TF-964: the Nth redelivery of a job's message (N = _MAX_REDELIVERIES) is
+# rejected without running, i.e. the original run plus at most N-1
+# redelivered runs. A redelivery happens whenever the worker is lost
+# mid-task (see reject_on_worker_lost on the task): an OOM kill of the
+# prefork child, but also a worker restart during a deploy. Guards against a
+# loop where every attempt is killed the same way.
+_MAX_REDELIVERIES = 3
 
 
-def _try_record_generation_outcome(
-    task_id: str, generated_question_count: int, context_limited: bool
-) -> None:
-    """Single-attempt outcome write. Opens a fresh SessionLocal per attempt
-    for the same pool_pre_ping reason as `_try_update_job_status`. Raises
-    JobNotFoundError if no matching row exists (not retriable — a
-    data-integrity issue, not a transient one). Lets other exceptions
-    (SQLAlchemyError, OSError, ...) bubble for the retry loop in
-    `_safe_record_generation_outcome` to decide.
-    """
-    from database import SessionLocal
-
-    session = SessionLocal()
-    try:
-        job = session.query(QuestionGenerationJob).filter_by(task_id=task_id).first()
-        if job is None:
-            raise JobNotFoundError(task_id, "SUCCESS")
-        job.generated_question_count = generated_question_count
-        job.context_limited = context_limited
-        session.commit()
-    except Exception:
-        # A broken connection can fail the rollback too; that must not
-        # escape either.
-        with contextlib.suppress(Exception):
-            session.rollback()
-        raise
-    finally:
-        session.close()
+class GenerationRejected(RuntimeError):
+    """Stored in Celery's result backend when a generation is given up
+    without running (TF-964), see ``_reject_generation``."""
 
 
-def _safe_record_generation_outcome(
-    task_id: str, generated_question_count: int, quality_metrics: Any
-) -> bool:
-    """Persist how many questions a SUCCESS run produced and whether the
-    count was limited by the document material (TF-736).
-
-    Without this, the only record of an under-filled generation is the
-    Celery result, which expires. Deliberately a separate write from the
-    SUCCESS status: the status is what the UI and the TF-329 watchdog depend
-    on, and it must not be lost because these informational columns failed.
-    Note this failure mode isn't limited to this write: since the ORM model
-    declares these columns, ANY query against QuestionGenerationJob —
-    including `_try_update_job_status`'s — fails on an unmigrated DB. That's
-    a deploy-ordering requirement (migration before worker rollout), not
-    something this function can work around; `AUTO_MIGRATE=true` in
-    production covers the normal case.
-
-    Unlike `_safe_update_job_status` this swallows every exception, not just
-    the DB/row-missing ones — a finished generation must never end as
-    FAILURE because of this write. One retry after `_GENERATION_OUTCOME_BACKOFF_S`
-    for transient (SQLAlchemyError/OSError) failures; JobNotFoundError is not
-    retried, matching `_safe_update_job_status`'s split between transient and
-    data-integrity failures. Even after both attempts fail, the Celery result
-    still carries the same numbers until it expires.
-
-    Returns:
-        True if the row was updated, False on any swallowed failure.
-    """
-    context_limited = (
+def _is_context_limited(quality_metrics: Any) -> bool:
+    return (
         isinstance(quality_metrics, dict)
         and quality_metrics.get("context_limited") is True
     )
-    attempts = 2
-    for attempt in range(1, attempts + 1):
-        try:
-            _try_record_generation_outcome(
-                task_id, generated_question_count, context_limited
-            )
-            return True
-        except JobNotFoundError:
+
+
+def _reject_generation(task_id: str, reason: str) -> NoReturn:
+    """Drop the message without requeue and mark the Celery result FAILURE.
+
+    Celery's ``Reject`` writes nothing to the result backend
+    (``handle_reject`` in celery/app/trace.py only logs). With
+    ``task_track_started`` the result would stay STARTED, and the progress
+    WebSocket would report a running task forever. Best-effort, like the
+    watchdog's mirror: the DB row already carries the outcome.
+    """
+    try:
+        celery_app.backend.mark_as_failure(task_id, GenerationRejected(reason))
+    except Exception:
+        logger.error(
+            "Could not mark rejected task %s as FAILURE in Celery's backend "
+            "— the progress view may keep showing it as running",
+            task_id,
+            exc_info=True,
+        )
+    raise Reject(reason, requeue=False)
+
+
+def _check_job_at_start(
+    task_id: str, redelivered: bool
+) -> tuple[bool, Optional[Dict[str, Any]]]:
+    """Idempotency guard, run before anything is generated (TF-964).
+
+    The task can run more than once for the same job: RabbitMQ redelivers
+    the message with the same task_id when the worker is lost
+    (``task_acks_late`` + ``reject_on_worker_lost``), and an autoretry
+    re-runs it after an exception. If the job already committed its
+    questions, running again would generate and store a second set and
+    charge the quota twice.
+
+    Returns ``(True, result)`` when the job has finished: SUCCESS or
+    questions linked to it. ``result`` is rebuilt from the DB; it is None if
+    no questions are linked (job finished before TF-964, without questions,
+    or its questions were deleted since). Returns ``(False, None)`` when the
+    task should generate.
+
+    Rejects the message without requeue (see ``_reject_generation``) when
+    the job is already FAILURE or REVOKED: nothing re-runs such a job — a
+    retry creates a new job with a new task_id — so this is a stale message,
+    e.g. one the watchdog gave up on while it waited in the queue. Running
+    it would add a second set next to the user's retry.
+
+    Counts redeliveries on the row. Once ``_MAX_REDELIVERIES`` is reached
+    without saved questions, the job goes to FAILURE and the message is
+    rejected the same way, so it can't loop.
+    """
+    from database import SessionLocal
+    from services.generation_job_result import build_job_result, linked_question_ids
+
+    db = SessionLocal()
+    try:
+        job = db.query(QuestionGenerationJob).filter_by(task_id=task_id).first()
+        if job is None:
             logger.critical(
-                "Cannot persist generation outcome for task %s: no "
-                "QuestionGenerationJob row found (data-integrity issue — "
-                "possible row deletion or stale task_id)",
+                "No QuestionGenerationJob row for task %s at start "
+                "(redelivered=%s) — idempotency and redelivery limit are off "
+                "for this run",
                 task_id,
-                exc_info=True,
+                redelivered,
             )
-            return False
-        except (SQLAlchemyError, OSError):
-            if attempt < attempts:
+            return False, None
+
+        if job.status == "SUCCESS" or linked_question_ids(db, job):
+            if job.status != "SUCCESS":
                 logger.warning(
-                    "Generation outcome write attempt %d/%d failed for task "
-                    "%s, retrying",
-                    attempt,
-                    attempts,
+                    "Generation job for task %s had status %s despite linked "
+                    "questions — repaired to SUCCESS",
                     task_id,
-                    exc_info=True,
+                    job.status,
                 )
-                time.sleep(_GENERATION_OUTCOME_BACKOFF_S)
-                continue
-            logger.critical(
-                "Could not persist generation outcome for task %s "
-                "(generated_question_count=%s) after %d attempts — the "
-                "under-fill notice will be lost once the Celery result "
-                "expires",
+                job.status = "SUCCESS"
+                db.commit()
+            logger.info(
+                "Generation job for task %s already finished — not generating "
+                "again (redelivered=%s), returning the stored result",
                 task_id,
-                generated_question_count,
-                attempts,
-                exc_info=True,
+                redelivered,
             )
-            return False
-        except Exception:
-            # Programmer errors (TypeError, AttributeError, ...) are not
-            # transient — retrying would just waste `_GENERATION_OUTCOME_BACKOFF_S`
-            # before failing the same way again. Still never re-raised: this
-            # function's whole contract is that a finished generation must
-            # never end as FAILURE because of this write.
-            logger.critical(
-                "Unexpected (non-retriable) error persisting generation "
-                "outcome for task %s (generated_question_count=%s) — the "
-                "under-fill notice will be lost once the Celery result "
-                "expires",
+            return True, build_job_result(db, job)
+
+        if job.status in ("FAILURE", "REVOKED"):
+            status = job.status
+            db.rollback()
+            logger.warning(
+                "Generation job for task %s is already %s — dropping the "
+                "stale message without generating (redelivered=%s)",
                 task_id,
-                generated_question_count,
-                exc_info=True,
+                status,
+                redelivered,
             )
-            return False
-    return False  # unreachable — satisfies static type checkers
+            _reject_generation(
+                task_id, f"Task {task_id} verworfen: Auftrag ist bereits {status}."
+            )
+
+        if redelivered:
+            job.redelivery_count += 1
+            if job.redelivery_count >= _MAX_REDELIVERIES:
+                job.status = "FAILURE"
+                db.commit()
+                logger.error(
+                    "Generation job for task %s redelivered %d times without "
+                    "saved questions — giving up (FAILURE, no requeue)",
+                    task_id,
+                    job.redelivery_count,
+                )
+                _reject_generation(
+                    task_id,
+                    f"Task {task_id} nach {job.redelivery_count} erneuten "
+                    "Zustellungen verworfen.",
+                )
+            db.commit()
+            logger.warning(
+                "Generation job for task %s redelivered (%d/%d)",
+                task_id,
+                job.redelivery_count,
+                _MAX_REDELIVERIES,
+            )
+        return False, None
+    except Exception:
+        with contextlib.suppress(Exception):
+            db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _save_generation(
+    task_id: str,
+    result: Any,
+    rag_request: Any,
+    user_id: int,
+    institution_id: Optional[int],
+) -> Optional[List[int]]:
+    """Store the questions and finish the job in ONE commit (TF-964).
+
+    Questions (linked via ``generation_job_id``), ``generated_question_count``,
+    ``context_limited`` and ``status = "SUCCESS"`` are written together:
+    either all of it is there and ``_check_job_at_start`` stops any re-run,
+    or none of it and a re-run is a legitimate first attempt.
+
+    The job row is locked for the save. If it is no longer PENDING — a
+    second delivery of the same message ran in parallel and saved first, or
+    the job was given up meanwhile — nothing is saved and None is returned;
+    the caller asks ``_check_job_at_start`` what the job's outcome is. If
+    the row is missing, the questions are committed unlinked (logged
+    CRITICAL); idempotency is off for that run.
+
+    Rolls back and re-raises on failure; the task's retry policy applies.
+    """
+    from database import SessionLocal
+    from services.generation_job_result import linked_question_ids
+
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(QuestionGenerationJob)
+            .filter_by(task_id=task_id)
+            .with_for_update()
+            .first()
+        )
+        if job is not None and (
+            job.status != "PENDING" or linked_question_ids(db, job)
+        ):
+            logger.error(
+                "Generation job for task %s is %s at save time — another run "
+                "finished or gave it up meanwhile; discarding this run's "
+                "questions",
+                task_id,
+                job.status,
+            )
+            db.rollback()
+            return None
+        review_question_ids = _persist_questions(
+            questions=result.questions,
+            exam_id=result.exam_id,
+            topic=rag_request.topic,
+            language=rag_request.language,
+            user_id=user_id,
+            institution_id=institution_id,
+            tag_ids=rag_request.tag_ids or [],
+            framework_id=rag_request.framework_id,
+            db=db,
+            generation_job_id=job.id if job is not None else None,
+        )
+        if job is not None:
+            # TF-736: the outcome survives the Celery result's expiry.
+            job.generated_question_count = len(result.questions)
+            job.context_limited = _is_context_limited(result.quality_metrics)
+            job.status = "SUCCESS"
+        else:
+            logger.critical(
+                "No QuestionGenerationJob row for task %s — questions are "
+                "saved without a job link (data-integrity issue — possible "
+                "row deletion or stale task_id)",
+                task_id,
+            )
+        db.commit()
+        return review_question_ids
+    except Exception:
+        # A broken connection can fail the rollback too; the original error
+        # is the one that matters.
+        with contextlib.suppress(Exception):
+            db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def _coerce_ln_level(value) -> Optional[int]:
@@ -373,6 +524,7 @@ def _persist_questions(
     tag_ids: Optional[List[int]] = None,
     framework_id: Optional[int] = None,
     db: Optional["Session"] = None,
+    generation_job_id: Optional[int] = None,
 ) -> List[int]:
     """
     Persists generated questions to question_reviews with status 'pending'.
@@ -382,11 +534,15 @@ def _persist_questions(
         framework_id: Competency framework (TF-400). Its competencies are
             preloaded ONCE as a {code: id} map to resolve competency_code →
             competency_id per question (no N+1). None → no resolution.
-        db: Optional injected session (for tests only). If None, the function
-            opens its own session via SessionLocal and closes it in the
-            finally block. An injected session is NOT closed — its lifecycle
-            belongs to the caller. Production behavior remains unchanged
-            (db is only set in tests).
+        db: Optional injected session. If None, the function opens its own
+            session via SessionLocal, commits and closes it. An injected
+            session belongs to the caller: the rows are only flushed, the
+            caller commits them (TF-964: generate_questions_task commits the
+            questions together with the job's SUCCESS), and the session is
+            neither rolled back nor closed here.
+        generation_job_id: The QuestionGenerationJob that creates these
+            questions (TF-964). Linking them is what lets a redelivered or
+            retried task see that its job already produced its questions.
 
     Returns:
         List of generated QuestionReview IDs
@@ -537,6 +693,7 @@ def _persist_questions(
                 # (keeps the tier boundary clean); None for question sources
                 # without provenance.
                 generation_metadata=getattr(question, "generation_metadata", None),
+                generation_job_id=generation_job_id,
             )
             db.add(question_review)
             reviews.append(question_review)
@@ -675,18 +832,20 @@ def _persist_questions(
                 sorted(unmatched_filenames)[:5],
             )
 
-        db.commit()
+        if owns_session:
+            db.commit()
+        else:
+            db.flush()
         return review_ids
     except Exception:
-        # Only roll back a session we opened ourselves — an injected session
-        # belongs to the caller; a rollback() would unexpectedly drag its
-        # transaction along. In production owns_session=True always holds, so
-        # rollback behavior on errors stays unchanged.
+        # Only roll back a session we opened ourselves. An injected session
+        # belongs to the caller (e.g. _save_generation, which rolls back the
+        # questions together with the job update).
         if owns_session:
             db.rollback()
         raise
     finally:
-        # An injected test session belongs to the caller — do not close it.
+        # An injected session belongs to the caller — do not close it.
         if owns_session:
             db.close()
 
@@ -711,13 +870,20 @@ def _persist_questions(
     retry_backoff=30,
     retry_backoff_max=300,
     retry_jitter=True,
+    # TF-964: with task_acks_late=True (celery_app.py) alone, a task whose
+    # worker process dies (OOM kill of the prefork child) is acknowledged
+    # and marked FAILURE, and the user's retry generates a second set of
+    # questions. With this flag the message is requeued instead, and
+    # _check_job_at_start decides on redelivery: return the saved result,
+    # generate (nothing was saved), or give up after _MAX_REDELIVERIES.
+    reject_on_worker_lost=True,
 )
 def generate_questions_task(
     self,
     request_data: Dict[str, Any],
     user_id: str,
     institution_id: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Asynchronous question generation with per-question progress updates.
 
@@ -727,7 +893,9 @@ def generate_questions_task(
         institution_id: Institution ID for multi-tenancy (optional)
 
     Returns:
-        Dict with exam_id, topic, questions, generation_time, quality_metrics, review_question_ids
+        Dict with exam_id, topic, questions, generation_time, quality_metrics, review_question_ids,
+        or None if the job had already finished and no questions are linked to
+        rebuild its result from (TF-964, see _check_job_at_start).
     """
     # TF-359/TF-865: tag the current OTel span so a generation failure carries
     # the task context the on-call needs to triage. Celery instrumentation
@@ -747,6 +915,13 @@ def generate_questions_task(
             "Premium RAGService nicht verfügbar (Core-Deployment). Task wird nicht wiederholt.",
             requeue=False,
         )
+
+    # TF-964: a redelivery or an autoretry after the commit below must not
+    # generate a second set of questions.
+    redelivered = bool((self.request.delivery_info or {}).get("redelivered"))
+    finished, stored_result = _check_job_at_start(self.request.id, redelivered)
+    if finished:
+        return stored_result
 
     from services.rag_service import RAGExamRequest
 
@@ -797,39 +972,30 @@ def generate_questions_task(
             f"({question_count} Fragen in {result.generation_time:.1f}s)"
         )
 
-        # Persist questions to question_reviews (status: pending). If
-        # persistence fails, we treat the task as FAILURE instead of
+        # Persist questions to question_reviews (status: pending) and mark
+        # the job SUCCESS in one commit (TF-964, see _save_generation). If
+        # that fails, we treat the task as FAILURE instead of
         # SUCCESS-with-warning: from the user's perspective, a "successful"
         # generation with no retrievable review queue is indistinguishable
-        # from a pipeline failure. Also, the watchdog would no longer pick up
-        # the job (terminal SUCCESS), so the inconsistency would persist.
-        # Re-raising lets Celery retry the task — if retry budget remains —
-        # otherwise the task goes FAILURE through the generic except below.
-        review_question_ids: List[int] = _persist_questions(
-            questions=result.questions,
-            exam_id=result.exam_id,
-            topic=rag_request.topic,
-            language=rag_request.language,
+        # from a pipeline failure. Re-raising lets Celery retry the task — if
+        # retry budget remains — otherwise the task goes FAILURE through the
+        # generic except below.
+        review_question_ids = _save_generation(
+            self.request.id,
+            result,
+            rag_request,
             user_id=int(user_id),
             institution_id=institution_id,
-            tag_ids=rag_request.tag_ids or [],
-            framework_id=rag_request.framework_id,
         )
+        if review_question_ids is None:
+            # TF-964: another delivery of this message saved first, or the
+            # job was given up meanwhile. Report that outcome instead of
+            # this run's (discarded) questions; a given-up job rejects here.
+            _, stored_result = _check_job_at_start(self.request.id, False)
+            return stored_result
         logger.info(
             f"Fragen persistiert: {len(review_question_ids)} Reviews für Exam {result.exam_id}"
         )
-
-        # TF-736: before the status, so a reader that sees SUCCESS on the row
-        # also sees the counts. Never raises (see the helper).
-        outcome_persisted = _safe_record_generation_outcome(
-            self.request.id, len(result.questions), result.quality_metrics
-        )
-        if not outcome_persisted:
-            # Already logged CRITICAL inside the helper; tag the span too so
-            # a failed outcome write is searchable/aggregatable in Specula
-            # next to this task's other tags, not only in the log stream.
-            set_span_tag("generation_outcome_persisted", "false")
-        _safe_update_job_status(self.request.id, "SUCCESS")
 
         # Premium RAGQuestion/RAGContext are @dataclass — use .model_dump() if switching to Pydantic
         return {

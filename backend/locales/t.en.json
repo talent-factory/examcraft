@@ -150,6 +150,7 @@
     "rag_no_institution": "User is not associated with an institution",
     "rag_task_not_found": "Generation task not found.",
     "rag_task_dismiss_failed": "Closing the generation task failed.",
+    "rag_retry_already_succeeded": "This generation already succeeded. The questions are in the review queue.",
     "rag_retry_only_failed": "Only failed tasks can be retried.",
     "rag_retry_no_request_data": "No stored parameters available for retry.",
     "rag_retry_owner_unavailable": "The original task owner is no longer available — retry not possible.",

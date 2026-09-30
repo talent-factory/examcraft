@@ -94,6 +94,20 @@ def _wire_job(mock_db, job):
     mock_db.query.return_value.filter.return_value.first.return_value = job
 
 
+@pytest.fixture(autouse=True)
+def _no_linked_questions():
+    """TF-964: for a SUCCESS job whose Celery result is gone, the endpoint
+    rebuilds the result from the questions linked to the job. The MagicMock
+    DB here can't answer that query; these jobs stand for ones without
+    linked questions (from before TF-964), which keep ``result=None``. The
+    rebuild itself is tested against real rows in
+    ``test_generation_job_result.py``."""
+    with patch(
+        "services.generation_job_result.build_job_result", return_value=None
+    ) as build:
+        yield build
+
+
 EXAM_RESULT = {
     "exam_id": "exam-42",
     "topic": "Heapsort",

@@ -3316,6 +3316,7 @@
     "rag_generation_failed": "Generazione delle domande fallita",
     "rag_get_documents_failed": "Impossibile recuperare i documenti",
     "rag_no_institution": "L'utente non è associato a nessuna istituzione",
+    "rag_retry_already_succeeded": "Questa generazione è già riuscita. Le domande si trovano nella coda di revisione.",
     "rag_retry_owner_unavailable": "Il proprietario originale dell'attività non è più disponibile — nuovo tentativo non possibile.",
     "rag_tag_archived": "Il tag «{{name}}» è archiviato.",
     "rag_tag_ids_invalid": "ID tag non validi.",

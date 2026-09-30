@@ -44,6 +44,10 @@ class QuestionGenerationJob(Base):
     # `/active-tasks` skips dismissed jobs, so a closed entry stays closed
     # across reloads, tabs and devices. NULL = never dismissed.
     dismissed_at = Column(DateTime(timezone=True), nullable=True)
+    # TF-964: how often the broker redelivered this job's message (worker
+    # lost mid-task). Bounds the redelivery loop in generate_questions_task;
+    # autoretries are not counted here, they have their own max_retries.
+    redelivery_count = Column(Integer, default=0, server_default="0", nullable=False)
 
     def __init__(self, **kwargs: object) -> None:
         kwargs.setdefault("status", "PENDING")

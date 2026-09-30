@@ -444,6 +444,27 @@ async def retry_generation(
             request=http_request,
         )
 
+        # TF-964: questions linked to this job were committed together with
+        # its SUCCESS, so the run has finished even if the panel still shows
+        # Celery's FAILURE (worker lost after the commit). Retrying would
+        # generate the set again and charge the quota twice. Jobs from before
+        # TF-964 have no link recorded and are not detected here. A linked
+        # job that is not SUCCESS breaks that invariant; it is repaired and
+        # logged.
+        from services.generation_job_result import linked_question_ids
+
+        if linked_question_ids(db, original_job):
+            if original_job.status != "SUCCESS":
+                logger.warning(
+                    "Generation job for task %s had status %s despite linked "
+                    "questions — repaired to SUCCESS",
+                    task_id,
+                    original_job.status,
+                )
+                original_job.status = "SUCCESS"
+                db.commit()
+            raise api_error(409, "rag_retry_already_succeeded", locale)
+
         if original_job.status not in ("FAILURE", "REVOKED"):
             raise api_error(400, "rag_retry_only_failed", locale)
 
@@ -1123,6 +1144,11 @@ async def get_task_result(
     there; otherwise from the DB. This prevents an expired result entry
     (``result_expires``) from reverting a finished job back to PENDING
     in the UI.
+
+    Exception (TF-964): a job whose row says SUCCESS is finished, even if
+    Celery says FAILURE/REVOKED (worker lost after the commit) or has
+    forgotten the task. The result is then rebuilt from the job row and its
+    linked questions, in the same shape as the Celery result.
     """
     locale = get_request_locale(http_request, current_user)
     job = (
@@ -1155,7 +1181,7 @@ async def get_task_result(
         celery_state = async_result.state
         if celery_state == "SUCCESS":
             payload = async_result.result
-        elif celery_state in ("FAILURE", "REVOKED"):
+        elif celery_state in ("FAILURE", "REVOKED") and job.status != "SUCCESS":
             raw_info = async_result.result
             error_code, error = user_facing_task_error(raw_info)
             # Log the real error fully server-side (with traceback if
@@ -1172,6 +1198,16 @@ async def get_task_result(
                 raw_info,
                 exc_info=raw_info if isinstance(raw_info, BaseException) else None,
             )
+        elif celery_state in ("FAILURE", "REVOKED"):
+            # TF-964: the row's SUCCESS wins below, but the error after the
+            # commit must stay visible to ops.
+            logger.warning(
+                "Task %s: Celery=%s, DB=SUCCESS — reporting SUCCESS from the "
+                "DB; Celery info: %r",
+                job.task_id,
+                celery_state,
+                async_result.result,
+            )
     except Exception as celery_err:
         # Broker/result backend unreachable: the DB status remains the
         # source of truth, the result is just missing. No 5xx — the bar
@@ -1180,7 +1216,13 @@ async def get_task_result(
             "Failed to fetch Celery result for task %s: %s", job.task_id, celery_err
         )
 
-    status = celery_state if celery_state in TERMINAL_STATUSES else job.status
+    if job.status == "SUCCESS" and celery_state != "SUCCESS":
+        from services.generation_job_result import build_job_result
+
+        status = "SUCCESS"
+        payload = build_job_result(db, job)
+    else:
+        status = celery_state if celery_state in TERMINAL_STATUSES else job.status
     # TF-736: the DB row keeps the counts after the Celery result expired, so
     # an under-filled generation stays explainable after a reload. Always
     # populated for SUCCESS regardless of whether the Celery result is still

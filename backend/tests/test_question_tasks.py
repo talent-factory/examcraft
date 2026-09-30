@@ -5,15 +5,31 @@ Tests task dispatch, progress steps, and the return format.
 
 import dataclasses
 import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 # Mock system-level dependencies before any project imports
 if "magic" not in sys.modules:
     sys.modules["magic"] = MagicMock()
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_job_row():
+    """TF-964: the task opens SessionLocal at start (idempotency guard) and
+    for the single SUCCESS commit. Tests that don't bring a DB get a stub
+    session that finds no job row, so both run through as before. Tests
+    that need a real or failing session patch ``database.SessionLocal``
+    themselves; their patch is applied later and wins."""
+    session = MagicMock()
+    query = session.query.return_value.filter_by.return_value
+    query.first.return_value = None
+    query.with_for_update.return_value.first.return_value = None
+    with patch("database.SessionLocal", return_value=session):
+        yield session
 
 
 def test_generate_questions_task_importable():
@@ -300,9 +316,7 @@ def test_update_job_status_succeeds_first_attempt():
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
         mock_job = MagicMock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_job
-        )
+        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = mock_job
 
         from tasks.question_tasks import _update_job_status
 
@@ -323,9 +337,7 @@ def test_update_job_status_recovers_on_second_attempt():
 
     healthy_session = MagicMock()
     healthy_job = MagicMock()
-    healthy_session.query.return_value.filter_by.return_value.first.return_value = (
-        healthy_job
-    )
+    healthy_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = healthy_job
 
     with (
         patch("database.SessionLocal", side_effect=[failing_session, healthy_session]),
@@ -378,7 +390,7 @@ def test_update_job_status_propagates_job_not_found_immediately():
     ):
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
 
         try:
             _update_job_status("ghost", "SUCCESS")
@@ -424,9 +436,7 @@ def test_try_update_job_status_sets_status_and_commits():
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
         mock_job = MagicMock()
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_job
-        )
+        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = mock_job
 
         from tasks.question_tasks import _try_update_job_status
 
@@ -444,7 +454,7 @@ def test_try_update_job_status_raises_when_job_missing():
     with patch("database.SessionLocal") as mock_session_cls:
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        mock_session.query.return_value.filter_by.return_value.first.return_value = None
+        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
 
         try:
             _try_update_job_status("ghost", "SUCCESS")
@@ -490,13 +500,19 @@ def test_safe_update_job_status_swallows_job_status_update_error_and_logs(mocker
     (the CI-pinned version) leaves caplog.records empty here; the direct mock
     is version-independent.
     """
-    from tasks.question_tasks import JobStatusUpdateError, _safe_update_job_status
+    from tasks.question_tasks import (
+        JobStatusUpdateError,
+        JobStatusWrite,
+        _safe_update_job_status,
+    )
 
     mock_logger = mocker.patch("tasks.question_tasks.logger")
     err = JobStatusUpdateError("task-x", "FAILURE", 4, RuntimeError("simulated cause"))
 
     with patch("tasks.question_tasks._update_job_status", side_effect=err):
-        _safe_update_job_status("task-x", "FAILURE")  # no exception
+        outcome = _safe_update_job_status("task-x", "FAILURE")  # no exception
+
+    assert outcome is JobStatusWrite.FAILED
 
     mock_logger.critical.assert_called_once()
     call = mock_logger.critical.call_args
@@ -535,8 +551,11 @@ def test_safe_update_job_status_passes_through_on_success():
     mock_update.assert_called_once_with("task-1", "SUCCESS")
 
 
-def test_generate_questions_task_uses_safe_update_on_success():
-    """Success path goes through _safe_update_job_status (not _update_job_status directly)."""
+def test_generate_questions_task_writes_success_in_the_save_commit():
+    """TF-964: on success, SUCCESS is written inside ``_save_generation``'s
+    single commit together with the questions — not afterwards through
+    ``_safe_update_job_status``, whose separate commit was the window in
+    which a crash left saved questions on a PENDING job."""
     from tasks.question_tasks import generate_questions_task
 
     @dataclasses.dataclass
@@ -588,15 +607,15 @@ def test_generate_questions_task_uses_safe_update_on_success():
     with (
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
-        patch("tasks.question_tasks._persist_questions", return_value=[1]),
+        patch("tasks.question_tasks._save_generation", return_value=[1]) as mock_save,
         patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
     ):
         generate_questions_task.update_state = MagicMock()
-        generate_questions_task.run(request_data, "42")
+        result = generate_questions_task.run(request_data, "42")
 
-    mock_safe.assert_called_once()
-    args, _ = mock_safe.call_args
-    assert args[1] == "SUCCESS"
+    mock_save.assert_called_once()
+    mock_safe.assert_not_called()
+    assert result["review_question_ids"] == [1]
 
 
 def test_generate_questions_task_uses_safe_update_on_reject():
@@ -708,6 +727,15 @@ def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
             raise AssertionError("expected RuntimeError")
         except RuntimeError:
             pass
+        finally:
+            # Task.retry() stores max_retries=0 as `override_max_retries` on
+            # the task; called directly it re-raises before Celery's autoretry
+            # wrapper deletes it again. Left behind, the wrapper copies 0 into
+            # retry_kwargs on the next autoretry in this process, and every
+            # later test runs as if on its final retry.
+            vars(generate_questions_task._get_current_object()).pop(
+                "override_max_retries", None
+            )
 
     mock_safe.assert_called_once()
     args, _ = mock_safe.call_args
@@ -724,7 +752,7 @@ def test_update_job_status_recovers_on_fourth_attempt():
 
     healthy = MagicMock()
     healthy_job = MagicMock()
-    healthy.query.return_value.filter_by.return_value.first.return_value = healthy_job
+    healthy.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = healthy_job
 
     with (
         patch("database.SessionLocal", side_effect=[*failing, healthy]),
@@ -1615,6 +1643,8 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
         institution_id=1,
         tag_ids=[5, 7],
         framework_id=None,
+        db=ANY,
+        generation_job_id=None,
     )
 
 
@@ -2048,123 +2078,6 @@ def test_complete_generation_persists_unlimited_outcome(tf736_job_session):
     assert job.generated_question_count == job.question_count == 15
 
 
-def test_outcome_write_failure_keeps_task_success_and_logs_critical(mocker):
-    """TF-736 test case 9: a SQLAlchemyError while recording the outcome, on
-    both attempts, must neither turn the finished generation into a FAILURE
-    nor keep the SUCCESS status from being written — only a CRITICAL log
-    after the retry is exhausted."""
-    from sqlalchemy.exc import OperationalError
-
-    from tasks.question_tasks import _GENERATION_OUTCOME_BACKOFF_S
-
-    mock_logger = mocker.patch("tasks.question_tasks.logger")
-    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
-    mock_span_tag = mocker.patch("tasks.question_tasks.set_span_tag")
-    failing_session = MagicMock()
-    failing_session.query.side_effect = OperationalError(
-        "UPDATE question_generation_jobs", {}, Exception("column does not exist")
-    )
-    metrics = {"generated_question_count": 6, "context_limited": True}
-
-    with (
-        patch("database.SessionLocal", return_value=failing_session),
-        patch("tasks.question_tasks._safe_update_job_status") as mock_status,
-    ):
-        result = _run_task_with(_tf736_result(6, metrics), "tf736-fail")
-
-    assert result["exam_id"] == "rag_exam_tf736"
-    mock_status.assert_called_once_with("tf736-fail", "SUCCESS")
-    # Two attempts (initial + one retry), each opening/closing its own session.
-    assert failing_session.rollback.call_count == 2
-    assert failing_session.close.call_count == 2
-    mock_sleep.assert_called_once_with(_GENERATION_OUTCOME_BACKOFF_S)
-    mock_logger.warning.assert_called_once()
-    mock_logger.critical.assert_called_once()
-    # Surfaced on the span too, so a failed outcome write is searchable in
-    # Specula next to the task's other tags, not only in the log stream.
-    mock_span_tag.assert_any_call("generation_outcome_persisted", "false")
-    call = mock_logger.critical.call_args
-    rendered = call.args[0] % call.args[1:]
-    assert "tf736-fail" in rendered
-    assert call.kwargs.get("exc_info") is True
-
-
-def test_outcome_write_recovers_on_retry(mocker):
-    """A transient failure on the first attempt must not prevent the second,
-    successful attempt from persisting the outcome."""
-    from sqlalchemy.exc import OperationalError
-
-    from tasks.question_tasks import (
-        _GENERATION_OUTCOME_BACKOFF_S,
-        _safe_record_generation_outcome,
-    )
-
-    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
-    ok_session = MagicMock()
-    job = MagicMock()
-    ok_session.query.return_value.filter_by.return_value.first.return_value = job
-
-    failing_session = MagicMock()
-    failing_session.query.side_effect = OperationalError(
-        "UPDATE question_generation_jobs", {}, Exception("connection reset")
-    )
-
-    with patch("database.SessionLocal", side_effect=[failing_session, ok_session]):
-        ok = _safe_record_generation_outcome(
-            "tf736-retry", 6, {"context_limited": True}
-        )
-
-    assert ok is True
-    mock_sleep.assert_called_once_with(_GENERATION_OUTCOME_BACKOFF_S)
-    assert job.generated_question_count == 6
-    assert job.context_limited is True
-    ok_session.commit.assert_called_once()
-
-
-def test_record_outcome_does_not_retry_programmer_errors(mocker):
-    """A programmer error (AttributeError/TypeError/...) is not transient —
-    must be swallowed (this function never raises), logged distinctly from
-    a DB/OS error, and NOT retried. Mirrors
-    test_update_job_status_does_not_retry_programmer_errors's contract."""
-    from tasks.question_tasks import _safe_record_generation_outcome
-
-    mock_logger = mocker.patch("tasks.question_tasks.logger")
-    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
-    failing_session = MagicMock()
-    failing_session.query.side_effect = AttributeError("simulated programmer error")
-
-    with patch("database.SessionLocal", return_value=failing_session):
-        ok = _safe_record_generation_outcome("tf736-bug", 6, {"context_limited": True})
-
-    assert ok is False
-    mock_sleep.assert_not_called()
-    mock_logger.warning.assert_not_called()
-    mock_logger.critical.assert_called_once()
-    rendered = (
-        mock_logger.critical.call_args.args[0] % mock_logger.critical.call_args.args[1:]
-    )
-    assert "Unexpected (non-retriable)" in rendered
-
-
-def test_record_outcome_missing_row_is_swallowed_and_logged(mocker):
-    """No job row → CRITICAL, no exception, no retry (same contract as the
-    status write — a missing row is a data-integrity issue, not transient)."""
-    from tasks.question_tasks import _safe_record_generation_outcome
-
-    mock_logger = mocker.patch("tasks.question_tasks.logger")
-    mock_sleep = mocker.patch("tasks.question_tasks.time.sleep")
-    session = MagicMock()
-    session.query.return_value.filter_by.return_value.first.return_value = None
-
-    with patch("database.SessionLocal", return_value=session):
-        ok = _safe_record_generation_outcome("ghost", 6, {"context_limited": True})
-
-    assert ok is False
-    session.commit.assert_not_called()
-    mock_logger.critical.assert_called_once()
-    mock_sleep.assert_not_called()
-
-
 def test_underfilled_generation_with_zero_generated_questions(tf736_job_session):
     """Boundary: 0 of 15 generated must persist generated_question_count=0,
     not be treated as falsy/None (contextLimitOf on the frontend relies on
@@ -2181,3 +2094,607 @@ def test_underfilled_generation_with_zero_generated_questions(tf736_job_session)
     assert job.status == "SUCCESS"
     assert job.generated_question_count == 0
     assert job.context_limited is True
+
+
+# === TF-964: no second set of questions after a crash between save and SUCCESS ===
+
+
+@dataclasses.dataclass
+class _TF964Question:
+    question_text: str
+    question_type: str = "single_choice"
+    options: list = dataclasses.field(default_factory=lambda: ["a", "b", "c", "d"])
+    correct_answer: str = "a"
+    explanation: str = "weil"
+    difficulty: str = "medium"
+    source_chunks: list = dataclasses.field(default_factory=lambda: ["chunk-1"])
+    source_documents: list = dataclasses.field(default_factory=list)
+    confidence_score: float = 0.8
+
+
+def _tf964_result(count: int = 3):
+    @dataclasses.dataclass
+    class FakeContextSummary:
+        query: str
+
+    result = MagicMock()
+    result.exam_id = "rag_exam_tf964"
+    result.topic = "Idempotenz"
+    result.questions = [
+        _TF964Question(question_text=f"Frage {i}?") for i in range(count)
+    ]
+    result.context_summary = FakeContextSummary(query="Idempotenz")
+    result.generation_time = 1.0
+    result.quality_metrics = {"requested_question_count": 3}
+    return result
+
+
+_TF964_TASK_ID = "tf964-task"
+
+
+@pytest.fixture
+def tf964_job_session(test_db):
+    """A real job row plus a SessionLocal bound to the test transaction —
+    same construction as ``tf736_job_session`` — so the guard, the real
+    ``_persist_questions`` and the single commit all hit rows the test can
+    count."""
+    from sqlalchemy.orm import sessionmaker
+
+    from models.auth import Institution, User
+    from models.question_generation_job import QuestionGenerationJob
+
+    institution = Institution(
+        name="TF-964 University",
+        slug="tf964-uni",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    test_db.add(institution)
+    test_db.flush()
+    user = User(
+        email="tf964@example.com",
+        first_name="TF",
+        last_name="964",
+        institution_id=institution.id,
+        status="active",
+    )
+    test_db.add(user)
+    test_db.flush()
+    test_db.add(
+        QuestionGenerationJob(
+            task_id=_TF964_TASK_ID,
+            user_id=user.id,
+            topic="Idempotenz",
+            question_count=3,
+        )
+    )
+    test_db.commit()
+
+    bound = sessionmaker(
+        bind=test_db.get_bind(), join_transaction_mode="create_savepoint"
+    )
+    with patch("database.SessionLocal", bound):
+        yield test_db, bound, user, institution
+
+
+def _run_tf964(user, institution, *, redelivered=False, retries=0, rag=None):
+    """Runs the task body as the worker would for ``_TF964_TASK_ID``.
+    Returns (task result, RAGService mock)."""
+    from tasks.question_tasks import generate_questions_task
+
+    rag = rag if rag is not None else MagicMock()
+    generate_questions_task.update_state = MagicMock()
+    generate_questions_task.push_request(
+        id=_TF964_TASK_ID,
+        retries=retries,
+        delivery_info={"redelivered": redelivered},
+    )
+    try:
+        with (
+            patch("tasks.question_tasks.run_async", return_value=_tf964_result()),
+            patch("tasks.question_tasks.RAGService", rag),
+        ):
+            result = generate_questions_task.run(
+                _TF736_REQUEST, str(user.id), institution_id=institution.id
+            )
+    finally:
+        generate_questions_task.pop_request()
+    return result, rag
+
+
+def _tf964_job(session):
+    from models.question_generation_job import QuestionGenerationJob
+
+    session.expire_all()
+    return session.query(QuestionGenerationJob).filter_by(task_id=_TF964_TASK_ID).one()
+
+
+def _tf964_review_count(session):
+    from models.question_review import QuestionReview
+
+    return (
+        session.query(QuestionReview)
+        .filter(QuestionReview.exam_id == "rag_exam_tf964")
+        .count()
+    )
+
+
+def test_single_commit_links_questions_and_finishes_job(tf964_job_session):
+    """The first run stores the questions linked to the job, together with
+    SUCCESS and the TF-736 outcome."""
+    from models.question_review import QuestionReview
+
+    session, _, user, institution = tf964_job_session
+
+    result, _ = _run_tf964(user, institution)
+
+    job = _tf964_job(session)
+    assert job.status == "SUCCESS"
+    assert job.generated_question_count == 3
+    assert job.redelivery_count == 0
+    linked = (
+        session.query(QuestionReview.id)
+        .filter(QuestionReview.generation_job_id == job.id)
+        .order_by(QuestionReview.id)
+        .all()
+    )
+    assert [row[0] for row in linked] == result["review_question_ids"]
+    assert len(linked) == 3
+
+
+@pytest.mark.parametrize(
+    "second_run",
+    [
+        pytest.param({"redelivered": True}, id="redelivery"),
+        pytest.param({"retries": 1}, id="autoretry"),
+    ],
+)
+def test_second_run_after_commit_does_not_generate_again(tf964_job_session, second_run):
+    """Acceptance «Weg B»: the worker dies after the commit (here: the task
+    raises after ``_save_generation``, which is what an autoretry after the
+    commit looks like), then the same task_id runs again — as a RabbitMQ
+    redelivery or as Celery's autoretry. The second run must not call
+    ``generate_rag_exam`` and must not add rows; it returns the stored
+    result instead."""
+    session, _, user, institution = tf964_job_session
+
+    with patch(
+        "tasks.question_tasks.dataclasses.asdict",
+        side_effect=RuntimeError("worker lost after commit"),
+    ):
+        with pytest.raises(RuntimeError):
+            _run_tf964(user, institution)
+    assert _tf964_job(session).status == "SUCCESS"
+    assert _tf964_review_count(session) == 3
+
+    result, rag = _run_tf964(user, institution, **second_run)
+
+    assert rag.return_value.generate_rag_exam.call_count == 0
+    assert _tf964_review_count(session) == 3
+    job = _tf964_job(session)
+    assert job.status == "SUCCESS"
+    assert len(result["review_question_ids"]) == 3
+    assert [q["question_text"] for q in result["questions"]] == [
+        "Frage 0?",
+        "Frage 1?",
+        "Frage 2?",
+    ]
+
+
+def test_redelivery_without_saved_questions_generates_and_counts(tf964_job_session):
+    """A redelivery before anything was saved is a legitimate first attempt:
+    it generates, and the redelivery is counted on the row."""
+    session, _, user, institution = tf964_job_session
+
+    _, rag = _run_tf964(user, institution, redelivered=True)
+
+    assert rag.return_value.generate_rag_exam.call_count == 1
+    job = _tf964_job(session)
+    assert job.redelivery_count == 1
+    assert job.status == "SUCCESS"
+    assert _tf964_review_count(session) == 3
+
+
+def test_autoretry_is_not_counted_as_redelivery(tf964_job_session):
+    """Autoretries have their own budget (max_retries=4) and must not use up
+    the redelivery limit."""
+    session, _, user, institution = tf964_job_session
+
+    _run_tf964(user, institution, retries=2)
+
+    assert _tf964_job(session).redelivery_count == 0
+
+
+def test_third_redelivery_without_questions_fails_job_and_rejects(tf964_job_session):
+    """Acceptance «Obergrenze»: on the 3rd redelivery without saved
+    questions the job goes to FAILURE and the message is rejected without
+    requeue — no generation, no endless loop."""
+    from celery.exceptions import Reject
+
+    from tasks.question_tasks import _MAX_REDELIVERIES
+
+    session, bound, user, institution = tf964_job_session
+    assert _MAX_REDELIVERIES == 3
+    db = bound()
+    job = db.query(type(_tf964_job(session))).filter_by(task_id=_TF964_TASK_ID).one()
+    job.redelivery_count = 2
+    db.commit()
+    db.close()
+
+    with (
+        patch("tasks.question_tasks.celery_app.backend.mark_as_failure") as mark,
+        pytest.raises(Reject) as excinfo,
+    ):
+        _run_tf964(user, institution, redelivered=True)
+
+    assert excinfo.value.requeue is False
+    job = _tf964_job(session)
+    assert job.status == "FAILURE"
+    assert job.redelivery_count == 3
+    assert _tf964_review_count(session) == 0
+    _assert_marked_failure(mark)
+
+
+def _assert_marked_failure(mark):
+    """Celery's Reject writes nothing to the result backend; without this
+    mirror the result stays STARTED and the progress WebSocket shows a
+    running task forever."""
+    from tasks.question_tasks import GenerationRejected
+
+    mark.assert_called_once()
+    assert mark.call_args.args[0] == _TF964_TASK_ID
+    assert isinstance(mark.call_args.args[1], GenerationRejected)
+
+
+def _set_tf964_status(session, bound, status):
+    db = bound()
+    job = db.query(type(_tf964_job(session))).filter_by(task_id=_TF964_TASK_ID).one()
+    job.status = status
+    db.commit()
+    db.close()
+
+
+@pytest.mark.parametrize("status", ["FAILURE", "REVOKED"])
+@pytest.mark.parametrize("redelivered", [False, True])
+def test_stale_message_for_given_up_job_is_rejected(
+    tf964_job_session, status, redelivered
+):
+    """A job that is already FAILURE/REVOKED is never re-run — a retry gets
+    a new job and task_id. A message that still arrives for it (e.g. one the
+    watchdog gave up on while it waited in the queue) must not generate a
+    second set next to the user's retry."""
+    from celery.exceptions import Reject
+
+    session, bound, user, institution = tf964_job_session
+    _set_tf964_status(session, bound, status)
+    rag = MagicMock()
+
+    with (
+        patch("tasks.question_tasks.celery_app.backend.mark_as_failure") as mark,
+        pytest.raises(Reject) as excinfo,
+    ):
+        _run_tf964(user, institution, redelivered=redelivered, rag=rag)
+
+    assert excinfo.value.requeue is False
+    assert rag.return_value.generate_rag_exam.call_count == 0
+    assert _tf964_review_count(session) == 0
+    assert _tf964_job(session).status == status
+    _assert_marked_failure(mark)
+
+
+def test_reject_still_raised_when_celery_backend_is_down(tf964_job_session):
+    """Mirroring into Celery's backend is best-effort; the message is still
+    dropped."""
+    from celery.exceptions import Reject
+
+    session, bound, user, institution = tf964_job_session
+    _set_tf964_status(session, bound, "FAILURE")
+
+    with (
+        patch(
+            "tasks.question_tasks.celery_app.backend.mark_as_failure",
+            side_effect=ConnectionError("redis down"),
+        ),
+        pytest.raises(Reject),
+    ):
+        _run_tf964(user, institution)
+
+
+def _run_tf964_with_parallel_save(user, institution, parallel):
+    """Runs the task while ``parallel`` acts on the job in the middle of the
+    generation — like a second delivery of the same message on another
+    worker (RabbitMQ consumer_timeout, broker reconnect)."""
+    from tasks.question_tasks import generate_questions_task
+
+    def generate(_coro):
+        parallel()
+        return _tf964_result()
+
+    generate_questions_task.update_state = MagicMock()
+    generate_questions_task.push_request(
+        id=_TF964_TASK_ID, retries=0, delivery_info={"redelivered": False}
+    )
+    try:
+        with (
+            patch("tasks.question_tasks.run_async", side_effect=generate),
+            patch("tasks.question_tasks.RAGService", MagicMock()),
+        ):
+            return generate_questions_task.run(
+                _TF736_REQUEST, str(user.id), institution_id=institution.id
+            )
+    finally:
+        generate_questions_task.pop_request()
+
+
+def test_parallel_run_that_saved_first_wins(tf964_job_session):
+    """Two deliveries of the same message both pass the start check. The
+    one that saves second finds the job SUCCESS under its row lock, stores
+    nothing and returns the first run's result."""
+    from tasks.question_tasks import _save_generation
+
+    session, _, user, institution = tf964_job_session
+    first_ids = []
+
+    def other_worker_saves():
+        request = MagicMock(topic="T", language="de", tag_ids=[], framework_id=None)
+        first_ids.extend(
+            _save_generation(
+                _TF964_TASK_ID, _tf964_result(), request, user.id, institution.id
+            )
+        )
+
+    result = _run_tf964_with_parallel_save(user, institution, other_worker_saves)
+
+    assert _tf964_review_count(session) == 3
+    assert _tf964_job(session).status == "SUCCESS"
+    assert result["review_question_ids"] == first_ids
+
+
+def test_parallel_give_up_discards_the_run(tf964_job_session):
+    """The job is given up while the run generates (e.g. the redelivery
+    limit hit on another delivery): the run stores nothing and the message
+    is rejected."""
+    from celery.exceptions import Reject
+
+    session, bound, user, institution = tf964_job_session
+
+    with (
+        patch("tasks.question_tasks.celery_app.backend.mark_as_failure") as mark,
+        pytest.raises(Reject),
+    ):
+        _run_tf964_with_parallel_save(
+            user, institution, lambda: _set_tf964_status(session, bound, "FAILURE")
+        )
+
+    assert _tf964_review_count(session) == 0
+    assert _tf964_job(session).status == "FAILURE"
+    _assert_marked_failure(mark)
+
+
+@pytest.mark.parametrize(
+    ("update", "expected"),
+    [
+        pytest.param({"return_value": True}, "WRITTEN", id="written"),
+        pytest.param({"return_value": False}, "KEPT_SUCCESS", id="kept-success"),
+        pytest.param(
+            {"side_effect": RuntimeError("never raised as such")},
+            None,
+            id="unexpected-error-propagates",
+        ),
+    ],
+)
+def test_safe_update_job_status_reports_outcome(update, expected):
+    """The watchdog tells a kept SUCCESS row from a written one (TF-964):
+    only a real write counts as reconciled and is mirrored into Celery."""
+    from tasks.question_tasks import JobStatusWrite, _safe_update_job_status
+
+    with patch("tasks.question_tasks._update_job_status", **update):
+        if expected is None:
+            with pytest.raises(RuntimeError):
+                _safe_update_job_status("task-1", "FAILURE")
+        else:
+            outcome = _safe_update_job_status("task-1", "FAILURE")
+            assert outcome is JobStatusWrite[expected]
+
+
+def test_second_redelivery_still_generates(tf964_job_session):
+    """Boundary below the limit: the 2nd redelivery still runs."""
+    session, bound, user, institution = tf964_job_session
+    db = bound()
+    job = db.query(type(_tf964_job(session))).filter_by(task_id=_TF964_TASK_ID).one()
+    job.redelivery_count = 1
+    db.commit()
+    db.close()
+
+    _, rag = _run_tf964(user, institution, redelivered=True)
+
+    assert rag.return_value.generate_rag_exam.call_count == 1
+    assert _tf964_job(session).redelivery_count == 2
+
+
+@pytest.fixture
+def tf964_committed(test_engine):
+    """Job, user and institution committed for real, on their own
+    connection — not inside ``test_db``'s outer transaction.
+
+    The atomicity test needs this: with every session sharing one connection
+    through savepoints, a rolled-back session also discards savepoints that
+    other sessions opened and released after it began. A separate commit for
+    the questions would then vanish in the test although it survives in
+    production, and the test could not tell one commit from three. Rows are
+    deleted afterwards."""
+    from sqlalchemy.orm import sessionmaker
+
+    from models.auth import Institution, User
+    from models.question_generation_job import QuestionGenerationJob
+    from models.question_review import QuestionReview, ReviewHistory
+
+    factory = sessionmaker(bind=test_engine)
+    db = factory()
+    institution = Institution(
+        name="TF-964 Atomic",
+        slug="tf964-atomic",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    db.add(institution)
+    db.flush()
+    user = User(
+        email="tf964-atomic@example.com",
+        first_name="TF",
+        last_name="964",
+        institution_id=institution.id,
+        status="active",
+    )
+    db.add(user)
+    db.flush()
+    db.add(
+        QuestionGenerationJob(
+            task_id=_TF964_TASK_ID,
+            user_id=user.id,
+            topic="Idempotenz",
+            question_count=3,
+        )
+    )
+    db.commit()
+    ids = SimpleNamespace(id=user.id), SimpleNamespace(id=institution.id)
+    try:
+        with patch("database.SessionLocal", factory):
+            yield factory, *ids
+    finally:
+        db.rollback()
+        review_ids = [
+            row[0]
+            for row in db.query(QuestionReview.id).filter(
+                QuestionReview.institution_id == institution.id
+            )
+        ]
+        if review_ids:
+            db.query(ReviewHistory).filter(
+                ReviewHistory.question_id.in_(review_ids)
+            ).delete(synchronize_session=False)
+            db.query(QuestionReview).filter(QuestionReview.id.in_(review_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(QuestionGenerationJob).filter_by(task_id=_TF964_TASK_ID).delete()
+        db.query(User).filter_by(id=user.id).delete()
+        db.query(Institution).filter_by(id=institution.id).delete()
+        db.commit()
+        db.close()
+
+
+def test_failed_save_commit_leaves_neither_questions_nor_success(tf964_committed):
+    """Acceptance «Atomarität»: if the commit that writes SUCCESS fails, the
+    questions are rolled back with it. The task raises so the autoretry can
+    run it again — as a legitimate first attempt, since nothing was saved.
+
+    Only the commit carrying the job's SUCCESS fails, not every commit: with
+    separate commits for questions and status (the pre-TF-964 design), the
+    questions' own commit goes through and this test turns red."""
+    from sqlalchemy.exc import OperationalError
+
+    from models.question_generation_job import QuestionGenerationJob
+
+    factory, user, institution = tf964_committed
+
+    def session_failing_the_success_commit():
+        db = factory()
+        real_commit = db.commit
+
+        def commit():
+            writes_success = any(
+                isinstance(obj, QuestionGenerationJob) and obj.status == "SUCCESS"
+                for obj in db.dirty
+            )
+            if writes_success:
+                raise OperationalError("COMMIT", {}, Exception("connection lost"))
+            real_commit()
+
+        db.commit = commit
+        return db
+
+    with (
+        patch("database.SessionLocal", session_failing_the_success_commit),
+        # Old-design status writes retry with backoffs; don't wait for them.
+        patch("tasks.question_tasks.time.sleep"),
+    ):
+        with pytest.raises(OperationalError):
+            _run_tf964(user, institution)
+
+    check = factory()
+    try:
+        job = _tf964_job(check)
+        assert job.status != "SUCCESS"
+        assert job.generated_question_count is None
+        assert _tf964_review_count(check) == 0
+    finally:
+        check.close()
+
+
+def test_missing_job_row_saves_questions_unlinked_and_logs_critical(mocker):
+    """No job row (data-integrity issue): the questions are still saved —
+    losing a finished generation would be worse — and it is logged CRITICAL,
+    like the status writes do."""
+    from tasks.question_tasks import _save_generation
+
+    mock_logger = mocker.patch("tasks.question_tasks.logger")
+    session = MagicMock()
+    session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
+    request = MagicMock(topic="T", language="de", tag_ids=[], framework_id=None)
+
+    with (
+        patch("database.SessionLocal", return_value=session),
+        patch(
+            "tasks.question_tasks._persist_questions", return_value=[7]
+        ) as mock_persist,
+    ):
+        ids = _save_generation("ghost", _tf964_result(1), request, 1, None)
+
+    assert ids == [7]
+    assert mock_persist.call_args.kwargs["generation_job_id"] is None
+    session.commit.assert_called_once()
+    mock_logger.critical.assert_called_once()
+
+
+def test_failure_after_commit_on_last_retry_keeps_success(tf964_job_session):
+    """The task raises after its commit on the last retry: the generic
+    except writes FAILURE — which must not replace the committed SUCCESS,
+    or the panel offers a retry that generates the set a second time."""
+    from tasks.question_tasks import generate_questions_task
+
+    session, _, user, institution = tf964_job_session
+
+    with (
+        patch.dict(generate_questions_task.retry_kwargs, {"max_retries": 0}),
+        patch(
+            "tasks.question_tasks.dataclasses.asdict",
+            side_effect=RuntimeError("worker lost after commit"),
+        ),
+    ):
+        with pytest.raises(RuntimeError):
+            _run_tf964(user, institution)
+
+    assert _tf964_job(session).status == "SUCCESS"
+    assert _tf964_review_count(session) == 3
+
+
+@pytest.mark.parametrize("status", ["FAILURE", "REVOKED", "PENDING"])
+def test_try_update_job_status_never_downgrades_success(tf964_job_session, status):
+    """Every status writer (task, watchdog, /active-tasks phantom sync) goes
+    through _try_update_job_status; a SUCCESS row stays SUCCESS."""
+    from tasks.question_tasks import _try_update_job_status
+
+    session, bound, _, _ = tf964_job_session
+    db = bound()
+    job = db.query(type(_tf964_job(session))).filter_by(task_id=_TF964_TASK_ID).one()
+    job.status = "SUCCESS"
+    db.commit()
+    db.close()
+
+    assert _try_update_job_status(_TF964_TASK_ID, status) is False
+
+    assert _tf964_job(session).status == "SUCCESS"

@@ -178,6 +178,23 @@ class QuestionReview(Base):
 
     # Exam Association
     exam_id = Column(String(100), nullable=True, index=True)  # RAG Exam ID
+    # TF-964: the generation job that created this question. Written in the
+    # same commit as the job's SUCCESS, so a job with linked questions has
+    # finished — a redelivered or retried task checks this before generating
+    # again. NULL for older rows, for questions not created by a job, and
+    # after the job row was deleted (ON DELETE SET NULL, e.g. GDPR deletion).
+    # The FK is named like in the migration, so create_all builds the same
+    # constraint name.
+    generation_job_id = Column(
+        Integer,
+        ForeignKey(
+            "question_generation_jobs.id",
+            ondelete="SET NULL",
+            name="fk_question_reviews_generation_job_id",
+        ),
+        nullable=True,
+        index=True,
+    )
 
     # TF-396: archive axis (orthogonal to review_status).
     # archived_at IS NULL  => active; set => archived (hidden from bank/lists,

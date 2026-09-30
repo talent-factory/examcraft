@@ -21,6 +21,9 @@
  *   rag_generation_failed         500  generate-exam, retry-generation
  *   rag_no_institution            403  generate-exam, retry-generation, and
  *                                      available-documents via DocumentService
+ *   rag_retry_already_succeeded   409  retry-generation — the job already saved
+ *                                      its questions (TF-964); the panel still
+ *                                      showed it as failed
  *   rag_retry_owner_unavailable   400  retry-generation — a superuser retrying
  *                                      another user's task
  *   rag_tag_archived {{name}}     422  generate-exam — a tag archived after it
@@ -82,6 +85,7 @@ export const RAG_ERROR_CODES = [
   'rag_document_not_processed',
   'rag_generation_failed',
   'rag_no_institution',
+  'rag_retry_already_succeeded',
   'rag_retry_owner_unavailable',
   'rag_tag_archived',
   'rag_tag_ids_invalid',

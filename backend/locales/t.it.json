@@ -151,6 +151,7 @@
     "rag_task_queue_unavailable": "Coda delle attività non disponibile",
     "rag_task_not_found": "Attività di generazione non trovata.",
     "rag_task_dismiss_failed": "Chiusura dell'attività di generazione non riuscita.",
+    "rag_retry_already_succeeded": "Questa generazione è già riuscita. Le domande si trovano nella coda di revisione.",
     "rag_retry_only_failed": "Solo le attività fallite possono essere riprovate.",
     "rag_retry_no_request_data": "Nessun parametro salvato disponibile per il nuovo tentativo.",
     "rag_retry_owner_unavailable": "Il proprietario originale dell'attività non è più disponibile — nuovo tentativo non possibile.",

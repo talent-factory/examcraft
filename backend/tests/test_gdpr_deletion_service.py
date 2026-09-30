@@ -263,6 +263,42 @@ def test_delete_user_and_gdpr_data_anonymizes_question_review(test_db):
     assert persisted.reviewed_by is None
 
 
+def test_delete_user_keeps_generated_question_and_clears_job_link(test_db):
+    """TF-964: question_reviews.generation_job_id points to the user's
+    generation job. Deleting the user removes the job (CASCADE); the
+    question stays, anonymized, and its job link is cleared (SET NULL)
+    instead of blocking the deletion or taking the question along."""
+    institution = _make_institution(test_db, "gdpr-del-svc-link")
+    user = _make_user(test_db, institution, "link@gdpr-del-svc-link.ch")
+
+    job = QuestionGenerationJob(
+        task_id="task-gdpr-del-svc-link", user_id=user.id, status="SUCCESS"
+    )
+    test_db.add(job)
+    test_db.flush()
+    question = QuestionReview(
+        question_text="Was ist 1+1?",
+        question_type="single_choice",
+        difficulty="easy",
+        topic="Mathe",
+        institution_id=institution.id,
+        created_by=user.id,
+        generation_job_id=job.id,
+    )
+    test_db.add(question)
+    test_db.commit()
+    job_id, question_id = job.id, question.id
+
+    delete_user_and_gdpr_data(test_db, user, action="account_deleted_immediately")
+    test_db.expire_all()
+
+    assert test_db.get(QuestionGenerationJob, job_id) is None
+    persisted = test_db.get(QuestionReview, question_id)
+    assert persisted is not None
+    assert persisted.created_by is None
+    assert persisted.generation_job_id is None
+
+
 def test_delete_user_and_gdpr_data_writes_audit_entry_with_given_action(test_db):
     institution = _make_institution(test_db, "gdpr-del-svc-action")
     user = _make_user(test_db, institution, "action@gdpr-del-svc-action.ch")

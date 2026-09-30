@@ -110,6 +110,9 @@ def create_tables():
             OAuthAccount,
         )
         from models.document import Document, DocumentStatus  # noqa: F401
+
+        # TF-964: question_reviews.generation_job_id references this table.
+        from models.question_generation_job import QuestionGenerationJob  # noqa: F401
         from models.question_review import (  # noqa: F401
             QuestionReview,
             ReviewStatus,

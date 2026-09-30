@@ -19,7 +19,7 @@ from models.auth import ImpersonationSession
 from models.question_generation_job import QuestionGenerationJob
 from models.submission import ImportJob, MoodleFeedbackPushJob
 from services.auth_service import AuthService, IMPERSONATION_TOKEN_EXPIRE_MINUTES
-from tasks.question_tasks import _safe_update_job_status
+from tasks.question_tasks import JobStatusWrite, _safe_update_job_status
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +108,14 @@ def reconcile_stuck_jobs() -> dict:
 
     Returns:
         dict with counters:
-        ``{reconciled, lost, skipped_in_progress, skipped_unexpected, errors}``.
+        ``{reconciled, lost, skipped_in_progress, skipped_succeeded,
+        skipped_unexpected, errors}``.
         Counter semantics:
           - ``reconciled``: actual DB status updates that were persisted.
           - ``lost``: subset of ``reconciled`` for broker-lost jobs.
           - ``skipped_in_progress``: still running, nothing to do.
+          - ``skipped_succeeded``: the task committed SUCCESS after the row
+            was loaded as PENDING; the row is kept (TF-964).
           - ``skipped_unexpected``: Celery state outside the known
             vocabulary (a typo in a custom state, a compatibility break
             on upgrade, …) — not reconciled, but visible in the counter
@@ -127,6 +130,7 @@ def reconcile_stuck_jobs() -> dict:
         "reconciled": 0,
         "lost": 0,
         "skipped_in_progress": 0,
+        "skipped_succeeded": 0,
         "skipped_unexpected": 0,
         "errors": 0,
     }
@@ -160,8 +164,11 @@ def reconcile_stuck_jobs() -> dict:
                     job.task_id,
                     celery_state,
                 )
-                if _safe_update_job_status(job.task_id, celery_state):
+                write = _safe_update_job_status(job.task_id, celery_state)
+                if write is JobStatusWrite.WRITTEN:
                     counters["reconciled"] += 1
+                elif write is JobStatusWrite.KEPT_SUCCESS:
+                    counters["skipped_succeeded"] += 1
                 else:
                     counters["errors"] += 1
             elif celery_state == "PENDING":
@@ -173,10 +180,14 @@ def reconcile_stuck_jobs() -> dict:
                     "Watchdog: task %s lost from broker (celery=PENDING) — marking FAILURE",
                     job.task_id,
                 )
-                if _safe_update_job_status(job.task_id, "FAILURE"):
+                write = _safe_update_job_status(job.task_id, "FAILURE")
+                if write is JobStatusWrite.WRITTEN:
                     _notify_celery_backend_failure(job.task_id)
                     counters["lost"] += 1
                     counters["reconciled"] += 1
+                elif write is JobStatusWrite.KEPT_SUCCESS:
+                    # Finished meanwhile: don't mirror a FAILURE into Celery.
+                    counters["skipped_succeeded"] += 1
                 else:
                     counters["errors"] += 1
             elif celery_state in _IN_PROGRESS_STATES:
@@ -207,6 +218,7 @@ def reconcile_stuck_jobs() -> dict:
             counters["reconciled"]
             or counters["lost"]
             or counters["errors"]
+            or counters["skipped_succeeded"]
             or counters["skipped_unexpected"]
         ):
             logger.info(

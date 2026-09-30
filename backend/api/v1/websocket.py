@@ -9,6 +9,7 @@ from typing import Dict
 
 from celery.result import AsyncResult
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
 from celery_app import celery_app
@@ -241,6 +242,78 @@ def _get_task_result(task_id: str) -> dict:
         return {"state": "PENDING", "info": None, "result": None, "_redis_error": True}
 
 
+def _stored_success_result(task_id: str) -> tuple[bool, dict | None]:
+    """Whether the task's generation job is SUCCESS in the DB, plus its
+    result rebuilt from there (TF-964). The result is None if no questions
+    are linked to the job (see build_job_result).
+
+    The job row is authoritative: a task whose worker was lost after the
+    questions were committed can end as FAILURE in Celery, or its Celery
+    entry can expire. Blocking DB I/O — invoke via run_in_executor.
+    Document tasks have no job row and always get ``(False, None)``.
+    """
+    from models.question_generation_job import QuestionGenerationJob
+    from services.generation_job_result import build_job_result
+
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(QuestionGenerationJob)
+            .filter(QuestionGenerationJob.task_id == task_id)
+            .first()
+        )
+        if job is None or job.status != "SUCCESS":
+            return False, None
+        return True, build_job_result(db, job)
+    finally:
+        db.close()
+
+
+async def _send_stored_success(
+    websocket: WebSocket, task_id: str, celery_state: str, celery_info: object
+) -> bool:
+    """Send SUCCESS from the DB if the job finished there (TF-964).
+
+    Returns True if it did (and closed the socket); the caller then stops.
+    A failed DB lookup returns False, so the caller reports Celery's state
+    as before instead of an internal error that hides the task's own.
+    """
+    loop = asyncio.get_running_loop()
+    try:
+        succeeded, stored_result = await loop.run_in_executor(
+            None, lambda: _stored_success_result(task_id)
+        )
+    except SQLAlchemyError:
+        logger.warning(
+            "DB lookup of generation job for task %s failed — reporting "
+            "Celery's state %s",
+            task_id,
+            celery_state,
+            exc_info=True,
+        )
+        return False
+    if not succeeded:
+        return False
+    # The task (or its worker) failed after the commit: the user sees the
+    # saved result, but the post-commit error must stay visible to ops.
+    logger.warning(
+        "Task %s: Celery=%s, DB=SUCCESS — reporting SUCCESS from the DB; "
+        "Celery info: %r",
+        task_id,
+        celery_state,
+        celery_info,
+    )
+    msg = TaskStatusMessage(
+        task_id=task_id,
+        status=TaskStatus.SUCCESS,
+        progress=100,
+        result=stored_result,
+    )
+    await websocket.send_json(msg.model_dump())
+    await websocket.close()
+    return True
+
+
 @router.websocket("/ws/tasks/{task_id}")
 async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
     """
@@ -334,6 +407,11 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                 return
 
             elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
+                # TF-964: SUCCESS in the DB wins over Celery's FAILURE.
+                if await _send_stored_success(
+                    websocket, task_id, state, task_data["info"]
+                ):
+                    return
                 raw_info = task_data["info"]
                 task_error = user_facing_task_error(raw_info)
                 # Log the real error fully server-side (with traceback, if
@@ -380,6 +458,10 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             else:
                 pending_seconds += POLL_INTERVAL_SECONDS
                 if pending_seconds >= PENDING_TIMEOUT_SECONDS:
+                    # TF-964: an expired Celery entry reads as PENDING; a
+                    # job that finished in the DB is not a timeout.
+                    if await _send_stored_success(websocket, task_id, "PENDING", None):
+                        return
                     # A task that never starts points at a stuck broker or
                     # worker — log it with the task id so operations see it.
                     logger.error(

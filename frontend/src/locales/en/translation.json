@@ -3316,6 +3316,7 @@
     "rag_generation_failed": "Question generation failed",
     "rag_get_documents_failed": "Failed to retrieve documents",
     "rag_no_institution": "User is not associated with an institution",
+    "rag_retry_already_succeeded": "This generation already succeeded. The questions are in the review queue.",
     "rag_retry_owner_unavailable": "The original task owner is no longer available — retry not possible.",
     "rag_tag_archived": "Tag '{{name}}' is archived.",
     "rag_tag_ids_invalid": "Invalid tag IDs.",

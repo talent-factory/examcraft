@@ -8,6 +8,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from tasks.question_tasks import JobStatusWrite
+
 # Mock system-level dependencies (matches test_question_tasks.py pattern)
 if "magic" not in sys.modules:
     sys.modules["magic"] = MagicMock()
@@ -53,7 +57,8 @@ def test_reconcile_syncs_success_state_to_db():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -78,7 +83,8 @@ def test_reconcile_syncs_failure_state_to_db():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -102,7 +108,8 @@ def test_reconcile_syncs_revoked_state_to_db():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -128,7 +135,8 @@ def test_reconcile_marks_pending_with_no_celery_state_as_failure():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
         patch("tasks.maintenance_tasks._notify_celery_backend_failure") as mock_notify,
     ):
@@ -184,6 +192,7 @@ def test_reconcile_returns_zero_counts_when_no_stuck_jobs():
         "reconciled": 0,
         "lost": 0,
         "skipped_in_progress": 0,
+        "skipped_succeeded": 0,
         "skipped_unexpected": 0,
         "errors": 0,
     }
@@ -211,7 +220,8 @@ def test_reconcile_continues_after_individual_job_error():
             "tasks.maintenance_tasks.AsyncResult", side_effect=async_result_side_effect
         ),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -240,7 +250,8 @@ def test_reconcile_counts_db_write_failure_as_error_not_reconciled():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=False
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.FAILED,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -266,7 +277,10 @@ def test_reconcile_skips_celery_backend_notify_when_db_write_fails():
     with (
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
-        patch("tasks.maintenance_tasks._safe_update_job_status", return_value=False),
+        patch(
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.FAILED,
+        ),
         patch("tasks.maintenance_tasks._notify_celery_backend_failure") as mock_notify,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -386,7 +400,8 @@ def test_reconcile_unknown_state_increments_skipped_unexpected_counter():
         patch("tasks.maintenance_tasks.SessionLocal", return_value=mock_session),
         patch("tasks.maintenance_tasks.AsyncResult", return_value=mock_async_result),
         patch(
-            "tasks.maintenance_tasks._safe_update_job_status", return_value=True
+            "tasks.maintenance_tasks._safe_update_job_status",
+            return_value=JobStatusWrite.WRITTEN,
         ) as mock_safe,
     ):
         from tasks.maintenance_tasks import reconcile_stuck_jobs
@@ -753,3 +768,130 @@ def test_reaper_won_query_excludes_row_closed_by_a_different_invocation(test_db)
     )
 
     assert [row.id for row in won] == [won_by_this_run.id]
+
+
+# === TF-964: the watchdog never turns a SUCCESS row into FAILURE ===
+
+
+def _tf964_watchdog_job(test_db, status):
+    from models.auth import Institution, User
+    from models.question_generation_job import QuestionGenerationJob
+
+    inst = Institution(
+        name="TF-964 Watchdog",
+        slug="tf964-watchdog",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    test_db.add(inst)
+    test_db.flush()
+    user = User(
+        email="watchdog@tf964.ch",
+        first_name="W",
+        last_name="D",
+        institution_id=inst.id,
+        status="active",
+    )
+    test_db.add(user)
+    test_db.flush()
+    job = QuestionGenerationJob(
+        task_id="tf964-watchdog",
+        user_id=user.id,
+        status=status,
+        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    test_db.add(job)
+    test_db.commit()
+    return job
+
+
+def _bound(test_db):
+    from sqlalchemy.orm import sessionmaker
+
+    return sessionmaker(
+        bind=test_db.get_bind(), join_transaction_mode="create_savepoint"
+    )
+
+
+def test_reconcile_leaves_success_row_alone_despite_celery_failure(test_db):
+    """Worker lost after the commit: Celery says FAILURE, the row SUCCESS.
+    The watchdog only looks at PENDING rows and leaves this one alone."""
+    from tasks.maintenance_tasks import reconcile_stuck_jobs
+
+    job = _tf964_watchdog_job(test_db, "SUCCESS")
+    bound = _bound(test_db)
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", bound),
+        patch("database.SessionLocal", bound),
+        patch("tasks.maintenance_tasks.AsyncResult") as async_result,
+    ):
+        async_result.return_value.state = "FAILURE"
+        counters = reconcile_stuck_jobs()
+
+    assert counters["reconciled"] == 0
+    test_db.expire_all()
+    assert job.status == "SUCCESS"
+
+
+@pytest.mark.parametrize("celery_state", ["FAILURE", "PENDING"])
+def test_reconcile_does_not_downgrade_success_committed_meanwhile(
+    test_db, celery_state
+):
+    """Race: the watchdog loaded the row as PENDING, then the task commits
+    SUCCESS before the watchdog writes FAILURE (Celery's FAILURE, or its
+    own "lost from broker" FAILURE for a Celery PENDING). The write goes
+    through _try_update_job_status, which re-reads the row and keeps
+    SUCCESS. The watchdog then neither counts it as reconciled nor
+    mirrors a FAILURE into Celery's backend.
+
+    The status is read right after that write: the watchdog's own session
+    holds a savepoint until it closes, and closing rolls back everything
+    nested in it — including this test's simulated task commit."""
+    import tasks.question_tasks as question_tasks
+    from tasks.maintenance_tasks import reconcile_stuck_jobs
+
+    job = _tf964_watchdog_job(test_db, "PENDING")
+    job_cls, task_id = type(job), job.task_id
+    bound = _bound(test_db)
+    status_after_write = []
+
+    def celery_state_after_task_committed(_task_id):
+        db = bound()
+        db.query(job_cls).filter_by(task_id=task_id).update({"status": "SUCCESS"})
+        db.commit()
+        db.close()
+        return MagicMock(state=celery_state)
+
+    real_try_update = question_tasks._try_update_job_status
+
+    def try_update_and_read_back(tid, status):
+        written = real_try_update(tid, status)
+        db = bound()
+        status_after_write.append(db.query(job_cls).filter_by(task_id=tid).one().status)
+        db.close()
+        return written
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", bound),
+        patch("database.SessionLocal", bound),
+        patch(
+            "tasks.maintenance_tasks.AsyncResult",
+            side_effect=celery_state_after_task_committed,
+        ),
+        patch(
+            "tasks.question_tasks._try_update_job_status",
+            side_effect=try_update_and_read_back,
+        ),
+        patch("tasks.maintenance_tasks._notify_celery_backend_failure") as notify,
+    ):
+        counters = reconcile_stuck_jobs()
+
+    assert status_after_write == ["SUCCESS"]
+    assert counters["skipped_succeeded"] == 1
+    assert counters["reconciled"] == 0
+    assert counters["lost"] == 0
+    assert counters["errors"] == 0
+    notify.assert_not_called()

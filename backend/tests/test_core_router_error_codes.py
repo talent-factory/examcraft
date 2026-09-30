@@ -190,6 +190,7 @@ COVERED: dict[str, str] = {
     "rag_tag_ids_invalid": "tests/test_rag_api.py::test_generate_rag_exam_with_missing_tag_id_returns_422",
     "rag_tag_archived": "tests/test_rag_api.py::test_generate_rag_exam_with_archived_tag_returns_422",
     "rag_service_unhealthy": "test_rag_service_unhealthy",
+    "rag_retry_already_succeeded": "test_rag_retry_already_succeeded",
     # -- specula_test.py
     "specula_test_dev_only": "test_specula_dev_only",
     "specula_test_queue_unavailable": (
@@ -949,6 +950,44 @@ def test_rag_service_unhealthy() -> None:
     )
     assert isinstance(err.detail, str)
     assert err.error_params == {"service": "RAG Service", "status": "unhealthy"}
+
+
+def test_rag_retry_already_succeeded(test_db: Session) -> None:
+    """TF-964: a job with linked questions is not generated a second time."""
+    from models.question_generation_job import QuestionGenerationJob
+
+    inst = _institution(test_db, "rag-409")
+    user = _user(test_db, inst.id, "rag-409@test.ch")
+    job = QuestionGenerationJob(
+        task_id="rag-409-task",
+        user_id=user.id,
+        status="SUCCESS",
+        request_data={"topic": "T", "question_count": 1},
+    )
+    test_db.add(job)
+    test_db.flush()
+    test_db.add(
+        QuestionReview(
+            question_text="Frage?",
+            question_type="true_false",
+            correct_answer="wahr",
+            difficulty="easy",
+            topic="T",
+            institution_id=inst.id,
+            generation_job_id=job.id,
+        )
+    )
+    test_db.commit()
+
+    resp = _client(test_db, user).post("/api/v1/rag/retry-generation/rag-409-task")
+
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["error_code"] == "rag_retry_already_succeeded"
+    assert body["detail"] == (
+        "Diese Generierung war bereits erfolgreich. "
+        "Die Fragen liegen in der Review-Queue."
+    )
 
 
 def test_specula_dev_only(monkeypatch) -> None:
