@@ -16,6 +16,7 @@ import pytest
 
 from api.rag_exams import retry_generation
 from models.auth import AuditLog, Institution, User, UserStatus
+from models.document import Document, DocumentStatus, DocumentVisibility
 from models.question_generation_job import QuestionGenerationJob
 
 
@@ -50,13 +51,31 @@ def stage(test_db):
     )
     test_db.add(owner)
     test_db.flush()
+    # Retry re-checks the stored documents for the job owner (TF-969).
+    doc = Document(
+        filename="retry-audit.pdf",
+        original_filename="retry-audit.pdf",
+        file_path="/tmp/retry-audit.pdf",
+        file_size=10,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=inst.id,
+        user_id=owner.id,
+        visibility=DocumentVisibility.PRIVATE,
+    )
+    test_db.add(doc)
+    test_db.flush()
     job = QuestionGenerationJob(
         task_id="rag-task-original",
         user_id=owner.id,
         topic="Audit-Coverage",
         question_count=7,
         status="FAILURE",
-        request_data={"question_count": 7, "topic": "Audit-Coverage"},
+        request_data={
+            "question_count": 7,
+            "topic": "Audit-Coverage",
+            "document_ids": [doc.id],
+        },
     )
     test_db.add(job)
     test_db.commit()

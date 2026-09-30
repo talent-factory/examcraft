@@ -153,6 +153,7 @@
     "rag_task_dismiss_failed": "Échec de la fermeture de la tâche de génération.",
     "rag_retry_already_succeeded": "Cette génération a déjà réussi. Les questions se trouvent dans la file de révision.",
     "rag_retry_only_failed": "Seules les tâches échouées peuvent être relancées.",
+    "rag_retry_documents_unavailable": "Relance impossible : les documents de cette tâche sont manquants ou ne sont plus disponibles. Veuillez lancer une nouvelle génération avec une nouvelle sélection de documents.",
     "rag_retry_no_request_data": "Aucun paramètre sauvegardé disponible pour la relance.",
     "rag_retry_owner_unavailable": "Le propriétaire d'origine de la tâche n'est plus disponible — relance impossible.",
     "rag_retry_started": "La génération de questions est relancée",

@@ -24,6 +24,10 @@
  *   rag_retry_already_succeeded   409  retry-generation — the job already saved
  *                                      its questions (TF-964); the panel still
  *                                      showed it as failed
+ *   rag_retry_documents_unavailable
+ *                                 400  retry-generation — a stored document is
+ *                                      gone, unshared or unprocessed, or the job
+ *                                      predates required document_ids (TF-969)
  *   rag_retry_owner_unavailable   400  retry-generation — a superuser retrying
  *                                      another user's task
  *   rag_tag_archived {{name}}     422  generate-exam — a tag archived after it
@@ -86,6 +90,7 @@ export const RAG_ERROR_CODES = [
   'rag_generation_failed',
   'rag_no_institution',
   'rag_retry_already_succeeded',
+  'rag_retry_documents_unavailable',
   'rag_retry_owner_unavailable',
   'rag_tag_archived',
   'rag_tag_ids_invalid',

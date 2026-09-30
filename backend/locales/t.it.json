@@ -153,6 +153,7 @@
     "rag_task_dismiss_failed": "Chiusura dell'attività di generazione non riuscita.",
     "rag_retry_already_succeeded": "Questa generazione è già riuscita. Le domande si trovano nella coda di revisione.",
     "rag_retry_only_failed": "Solo le attività fallite possono essere riprovate.",
+    "rag_retry_documents_unavailable": "Nuovo tentativo non possibile: i documenti di questa attività mancano o non sono più disponibili. Avviare una nuova generazione con una nuova selezione di documenti.",
     "rag_retry_no_request_data": "Nessun parametro salvato disponibile per il nuovo tentativo.",
     "rag_retry_owner_unavailable": "Il proprietario originale dell'attività non è più disponibile — nuovo tentativo non possibile.",
     "rag_retry_started": "La generazione delle domande viene riprovata",

@@ -98,6 +98,7 @@ PRE_EXISTING: dict[str, str] = {
     "rag_get_documents_failed": "tests/test_rag_api.py",
     "rag_invalid_question_type": "tests/test_rag_api.py",
     "rag_no_institution": "tests/test_rag_api.py",
+    "rag_retry_documents_unavailable": "tests/test_rag_exams_owner.py",
     "rag_retry_no_request_data": "tests/test_rag_retry.py",
     "rag_retry_only_failed": "tests/test_rag_retry.py",
     "rag_retry_owner_unavailable": "tests/test_rag_retry.py",

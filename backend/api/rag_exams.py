@@ -68,8 +68,11 @@ class RAGExamRequestModel(BaseModel):
     topic: str = Field(
         ..., description="Topic of the exam", min_length=3, max_length=200
     )
-    document_ids: Optional[List[int]] = Field(
-        None, description="Specific document IDs (optional)"
+    # Required and non-empty (TF-969): without it the generation's vector
+    # search runs unfiltered over the whole index and foreign chunk text
+    # reaches the prompt — the visibility check below only covers listed IDs.
+    document_ids: List[int] = Field(
+        ..., description="Document IDs to generate from", min_length=1
     )
     question_count: int = Field(5, description="Number of questions", ge=1, le=20)
     question_types: Optional[List[str]] = Field(
@@ -222,6 +225,28 @@ class ContextRetrievalRequest(BaseModel):
     )
 
 
+def _documents_usable_by(
+    user: User, document_ids: Optional[List[int]], db: Session
+) -> bool:
+    """True if ``document_ids`` is non-empty and every document exists, is
+    visible to ``user`` and is processed — the same conditions
+    ``generate_rag_exam`` enforces on a fresh request (TF-969)."""
+    if not document_ids:
+        return False
+    accessible_org_unit_ids = get_accessible_org_unit_ids_for(user, db)
+    for doc_id in document_ids:
+        document = document_service.get_document_by_id(doc_id, db)
+        if (
+            not document
+            or not is_document_visible_for(
+                user, document, db, accessible_org_unit_ids=accessible_org_unit_ids
+            )
+            or document.status != DocumentStatus.PROCESSED
+        ):
+            return False
+    return True
+
+
 # API Endpoints
 @router.post("/generate-exam", response_model=GenerateExamTaskResponse)
 async def generate_rag_exam(
@@ -237,7 +262,7 @@ async def generate_rag_exam(
     **Required Permission:** `create_questions` (Dozent, Assistant, Admin)
 
     - **topic**: topic of the exam (3-200 characters)
-    - **document_ids**: optional specific documents
+    - **document_ids**: documents to generate from (required, non-empty)
     - **question_count**: number of questions (1-20, default: 5)
     - **question_types**: question types (single_choice, open_ended, true_false)
     - **difficulty**: difficulty level (easy, medium, hard)
@@ -246,28 +271,26 @@ async def generate_rag_exam(
     """
     locale = get_request_locale(http_request, current_user)
     try:
-        # Validate document IDs if provided
-        if request.document_ids:
-            # Computed once per request, not once per document (TF-620 perf
-            # fix) — is_document_visible_for's team-visibility branch would
-            # otherwise re-run the hierarchical Org-Unit membership lookup
-            # for every id in a client-supplied document_ids list.
-            accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
-            for doc_id in request.document_ids:
-                document = document_service.get_document_by_id(doc_id, db)
-                # Visibility check (TF-354): 404 instead of 403 — a foreign
-                # private document must not leak via the RAG path.
-                if not document or not is_document_visible_for(
-                    current_user,
-                    document,
-                    db,
-                    accessible_org_unit_ids=accessible_org_unit_ids,
-                ):
-                    raise api_error(404, "rag_document_not_found", locale)
+        # Computed once per request, not once per document (TF-620 perf
+        # fix) — is_document_visible_for's team-visibility branch would
+        # otherwise re-run the hierarchical Org-Unit membership lookup
+        # for every id in a client-supplied document_ids list.
+        accessible_org_unit_ids = get_accessible_org_unit_ids_for(current_user, db)
+        for doc_id in request.document_ids:
+            document = document_service.get_document_by_id(doc_id, db)
+            # Visibility check (TF-354): 404 instead of 403 — a foreign
+            # private document must not leak via the RAG path.
+            if not document or not is_document_visible_for(
+                current_user,
+                document,
+                db,
+                accessible_org_unit_ids=accessible_org_unit_ids,
+            ):
+                raise api_error(404, "rag_document_not_found", locale)
 
-                # Check whether the document is processed
-                if document.status != DocumentStatus.PROCESSED:
-                    raise api_error(400, "rag_document_not_processed", locale)
+            # Check whether the document is processed
+            if document.status != DocumentStatus.PROCESSED:
+                raise api_error(400, "rag_document_not_processed", locale)
 
         # Validate question types
         valid_types = ["single_choice", "multiple_choice", "open_ended", "true_false"]
@@ -491,6 +514,21 @@ async def retry_generation(
 
         if not owner_user.institution:
             raise api_error(403, "rag_no_institution", locale)
+
+        # TF-969: re-check the stored documents at replay time, for the job's
+        # owner. A job stored before document_ids became required lacks them,
+        # and replaying it would search the whole index; a document may also
+        # have been deleted or unshared since the original run.
+        if not _documents_usable_by(
+            owner_user, original_job.request_data.get("document_ids"), db
+        ):
+            logger.warning(
+                "Retry of task %s rejected: stored document_ids missing or no "
+                "longer usable by owner %s",
+                task_id,
+                owner_user.id,
+            )
+            raise api_error(400, "rag_retry_documents_unavailable", locale)
 
         question_count = original_job.request_data.get("question_count", 5)
         SubscriptionLimits.check_question_limit(

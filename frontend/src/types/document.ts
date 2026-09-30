@@ -183,7 +183,8 @@ export interface AvailableDocumentsResponse {
 
 export interface RAGExamRequest {
   topic: string;
-  document_ids?: number[];
+  /** Required and non-empty — the backend answers 422 otherwise (TF-969). */
+  document_ids: number[];
   question_count: number;
   question_types: string[];
   difficulty: string;

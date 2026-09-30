@@ -3317,6 +3317,7 @@
     "rag_get_documents_failed": "Dokumente konnten nicht abgerufen werden",
     "rag_no_institution": "Benutzer ist keiner Institution zugeordnet",
     "rag_retry_already_succeeded": "Diese Generierung war bereits erfolgreich. Die Fragen liegen in der Review-Queue.",
+    "rag_retry_documents_unavailable": "Wiederholung nicht möglich: Die Dokumente dieses Auftrags fehlen oder sind nicht mehr verfügbar. Bitte die Generierung mit einer neuen Dokumentauswahl starten.",
     "rag_retry_owner_unavailable": "Der ursprüngliche Auftragsbesitzer ist nicht mehr verfügbar — Wiederholung nicht möglich.",
     "rag_tag_archived": "Tag «{{name}}» ist archiviert.",
     "rag_tag_ids_invalid": "Ungültige Tag-IDs.",

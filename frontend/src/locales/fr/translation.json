@@ -3317,6 +3317,7 @@
     "rag_get_documents_failed": "Échec de la récupération des documents",
     "rag_no_institution": "L'utilisateur n'est associé à aucune institution",
     "rag_retry_already_succeeded": "Cette génération a déjà réussi. Les questions se trouvent dans la file de révision.",
+    "rag_retry_documents_unavailable": "Relance impossible : les documents de cette tâche sont manquants ou ne sont plus disponibles. Veuillez lancer une nouvelle génération avec une nouvelle sélection de documents.",
     "rag_retry_owner_unavailable": "Le propriétaire d'origine de la tâche n'est plus disponible — relance impossible.",
     "rag_tag_archived": "Le tag « {{name}} » est archivé.",
     "rag_tag_ids_invalid": "Identifiants de tag invalides.",
