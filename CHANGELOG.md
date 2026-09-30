@@ -9,6 +9,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.4] - 2026-09-30
+
+### Security
+
+- **Wissenssuche nur noch in eigenen Dokumenten (TF-980):** Die
+  semantische Suche über die MCP-Schnittstelle lehnt Dokumente ab, die
+  nicht dem Benutzer gehören, statt sie stillschweigend zu ignorieren.
+  Eine leere Dokumentauswahl liefert keine Treffer mehr, statt über alle
+  Dokumente zu suchen.
+
 ## [1.13.3] - 2026-09-30
 
 ### Security
