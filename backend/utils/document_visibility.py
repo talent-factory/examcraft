@@ -22,6 +22,12 @@ colleague's uploads. These helpers add the owner + ``visibility`` dimension:
   endpoints, TF-399) must pass ``allow_read_all_bypass=False`` so the bypass
   never doubles as an edit permission by accident.
 - SuperUsers bypass the filter (status quo, deliberately preserved).
+- Feature-owned documents (``Document.managed_by`` set, TF-986 — e.g. the
+  files of a portfolio submission) are hidden from everyone, SuperUsers
+  included: they are internal artifacts of their module, which reads and
+  deletes them itself, not user documents. ``api.documents`` DELETE and
+  ``/process`` check ``managed_by`` separately (they do not route through
+  here).
 
 All document-read paths (list, single-doc endpoints, RAG document selection)
 must route through here rather than duplicating the predicate — a single source
@@ -49,6 +55,7 @@ def filter_documents_for_user(query: Query, user: User, db: Session) -> Query:
     institution-shared rows within the user's institution OR team-shared rows
     scoped to an Org-Unit the user has (hierarchical) access to.
     """
+    query = query.filter(Document.managed_by.is_(None))
     if user.is_superuser:
         return query
 
@@ -111,7 +118,11 @@ def is_document_visible_for(
     endpoints, where "visible" also grants a state-changing action (attaching/
     detaching a ``user``-scope tag, TF-399) and the bypass is meant to be
     strictly read-only (ADR-0004). SuperUser still bypasses regardless.
+
+    Feature-owned documents (``managed_by`` set, TF-986) are never visible.
     """
+    if document.managed_by is not None:
+        return False
     if user.is_superuser:
         return True
     if (

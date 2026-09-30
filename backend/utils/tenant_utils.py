@@ -211,8 +211,15 @@ class SubscriptionLimits:
         if institution.max_documents == -1:
             return
 
+        # Feature-owned documents (managed_by, TF-986) are not library
+        # uploads and do not count against the document limit.
         document_count = (
-            db.query(Document).filter(Document.institution_id == institution.id).count()
+            db.query(Document)
+            .filter(
+                Document.institution_id == institution.id,
+                Document.managed_by.is_(None),
+            )
+            .count()
         )
 
         if document_count >= institution.max_documents:
@@ -322,8 +329,15 @@ class SubscriptionLimits:
         )
 
         # Documents
+        # Feature-owned documents (managed_by, TF-986) are not library
+        # uploads and do not count against the document limit.
         document_count = (
-            db.query(Document).filter(Document.institution_id == institution.id).count()
+            db.query(Document)
+            .filter(
+                Document.institution_id == institution.id,
+                Document.managed_by.is_(None),
+            )
+            .count()
         )
 
         # Questions this month

@@ -124,7 +124,16 @@ def get_dashboard_stats(
         .count()
     )
 
-    docs = db.query(Document).filter(Document.institution_id == institution_id).count()
+    docs = (
+        db.query(Document)
+        .filter(
+            Document.institution_id == institution_id,
+            # TF-986: feature-owned documents (portfolio files) are not
+            # library documents.
+            Document.managed_by.is_(None),
+        )
+        .count()
+    )
 
     validated = (
         db.query(QuestionReview)

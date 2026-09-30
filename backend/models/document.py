@@ -220,6 +220,17 @@ class Document(Base):
         default=False,
     )
 
+    # Feature-owned document marker (TF-986): set when a feature module
+    # creates the row as an internal artifact rather than a user upload (e.g.
+    # the files of a portfolio submission). Such rows keep the normal
+    # ownership/visibility columns, but the generic document surfaces hide
+    # them: every read path through ``utils.document_visibility`` (list,
+    # RAG/chat selection, single-document endpoints), DELETE/process by id in
+    # ``api.documents``, the MCP document tools and the document quota. The
+    # owning module manages and deletes them itself. Account deletion and
+    # GDPR export still include them. NULL = regular user document.
+    managed_by = Column(String(50), nullable=True)
+
     # Extracted metadata from document processing
     doc_metadata = Column(JSON, nullable=True)
 

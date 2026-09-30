@@ -947,3 +947,137 @@ def test_db_check_constraint_blocks_institution_without_institution(vis_data, te
     with pytest.raises(IntegrityError):
         test_db.flush()
     test_db.rollback()
+
+
+# ---------------------------------------------------------------------------
+# Feature-owned documents (TF-986): ``managed_by`` hides a document from every
+# generic surface, for every user — owner, read_all admin and SuperUser too.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def managed_doc(vis_data, test_db):
+    """A private inst-A document of ``owner`` owned by a feature module (e.g.
+    a portfolio submission file)."""
+    doc = Document(
+        filename="managed.pdf",
+        original_filename="managed.pdf",
+        file_path="/tmp/managed.pdf",
+        file_size=10,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=vis_data.owner.institution_id,
+        user_id=vis_data.owner.id,
+        visibility=DocumentVisibility.PRIVATE,
+        vector_collection="doc_managed",
+        managed_by="portfolio_assessment",
+    )
+    test_db.add(doc)
+    test_db.commit()
+    return doc
+
+
+@pytest.mark.parametrize("who", ["owner", "admin_read_all", "superuser"])
+def test_managed_document_hidden_from_filter(vis_data, managed_doc, test_db, who):
+    user = getattr(vis_data, who)
+    ids = _visible_ids(user, test_db)
+    assert managed_doc.id not in ids
+    # Negative control: the same user still sees the owner's regular
+    # private document -- only the managed_by row is filtered out.
+    assert vis_data.doc_private.id in ids
+    assert not is_document_visible_for(user, managed_doc, test_db)
+    assert is_document_visible_for(user, vis_data.doc_private, test_db)
+
+
+def test_managed_document_hidden_from_list_endpoint(vis_data, managed_doc, test_db):
+    ids = _list_ids(vis_data.owner, test_db)
+    assert managed_doc.id not in ids
+    assert vis_data.doc_private.id in ids
+
+
+def test_managed_document_hidden_from_rag_selection(vis_data, managed_doc, test_db):
+    ids = _available_doc_ids(vis_data.owner, test_db)
+    assert managed_doc.id not in ids
+    assert vis_data.doc_private.id in ids
+
+
+def test_managed_document_single_endpoint_returns_404(vis_data, managed_doc, test_db):
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            get_document(
+                document_id=managed_doc.id,
+                request=None,
+                current_user=vis_data.owner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+def test_managed_document_delete_endpoint_returns_404(vis_data, managed_doc, test_db):
+    """DELETE /documents/{id} does not route through document_visibility --
+    it must refuse a feature-owned document itself (would otherwise drop it
+    from its portfolio assessment)."""
+    from api.documents import delete_document
+
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            delete_document(
+                document_id=managed_doc.id,
+                http_request=None,
+                current_user=vis_data.owner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+    test_db.expire_all()
+    assert test_db.get(Document, managed_doc.id) is not None
+
+
+def test_managed_document_process_endpoint_returns_404(vis_data, managed_doc, test_db):
+    """POST /documents/{id}/process must not (re-)vectorise portfolio files."""
+    from api.documents import process_document
+
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            process_document(
+                document_id=managed_doc.id,
+                create_vectors=True,
+                background_tasks=None,
+                request=None,
+                current_user=vis_data.owner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 404
+
+
+def test_managed_documents_do_not_count_against_document_quota(
+    vis_data, managed_doc, test_db
+):
+    from models.auth import Institution
+    from utils.tenant_utils import SubscriptionLimits
+
+    institution = test_db.get(Institution, vis_data.owner.institution_id)
+    regular = (
+        test_db.query(Document)
+        .filter(
+            Document.institution_id == institution.id,
+            Document.managed_by.is_(None),
+        )
+        .count()
+    )
+    # Exactly at the limit with the regular documents only: the managed one
+    # must not push the institution over it.
+    institution.max_documents = regular + 1
+    test_db.commit()
+
+    SubscriptionLimits.check_document_limit(institution, test_db)
+    stats = SubscriptionLimits.get_usage_stats(institution, test_db)
+    assert stats["documents"]["current"] == regular
+
+    # Negative control: one more regular document reaches the limit.
+    institution.max_documents = regular
+    test_db.commit()
+    with pytest.raises(HTTPException):
+        SubscriptionLimits.check_document_limit(institution, test_db)

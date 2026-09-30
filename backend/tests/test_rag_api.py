@@ -179,6 +179,7 @@ class TestRAGAPI:
         doc.file_size = 1024
         doc.institution_id = 1
         doc.user_id = 42  # == mock_user.id → owner-visible (TF-354 filter)
+        doc.managed_by = None  # regular user document (TF-986)
         return doc
 
     @pytest.fixture
@@ -440,6 +441,7 @@ class TestRAGAPI:
         mock_doc = Mock()
         mock_doc.institution_id = 1
         mock_doc.user_id = 42
+        mock_doc.managed_by = None  # regular user document (TF-986)
 
         with (
             patch.object(
@@ -475,6 +477,7 @@ class TestRAGAPI:
         mock_doc = Mock()
         mock_doc.institution_id = 1
         mock_doc.user_id = 42
+        mock_doc.managed_by = None  # regular user document (TF-986)
 
         with (
             patch.object(
@@ -518,6 +521,7 @@ class TestRAGAPI:
         mock_doc = Mock()
         mock_doc.institution_id = 1
         mock_doc.user_id = 42
+        mock_doc.managed_by = None  # regular user document (TF-986)
 
         with (
             patch.object(
@@ -554,6 +558,7 @@ class TestRAGAPI:
         mock_doc = Mock()
         mock_doc.institution_id = 1
         mock_doc.user_id = 42
+        mock_doc.managed_by = None  # regular user document (TF-986)
 
         with (
             patch.object(
@@ -976,6 +981,7 @@ class TestRAGAPIIntegration:
         mock_doc.mime_type = "text/plain"
         mock_doc.institution_id = 1
         mock_doc.user_id = 42  # owner-visible (TF-354 filter)
+        mock_doc.managed_by = None  # regular user document (TF-986)
         mock_doc.file_size = 2048
 
         mock_query = Mock()
@@ -1008,7 +1014,7 @@ class TestRAGAPIIntegration:
             patch.object(
                 actual_document_service,
                 "get_document_by_id",
-                return_value=Mock(institution_id=1, user_id=42),
+                return_value=Mock(institution_id=1, user_id=42, managed_by=None),
             ),
             patch("services.rag_service.rag_service") as mock_rag_service,
             patch(
@@ -1158,7 +1164,10 @@ class TestRAGQuestionPersistence:
         ):
             # Owned by the auth user (id 42) → visible (TF-354 filter)
             mock_doc_svc.get_document_by_id.return_value = Mock(
-                status=DocumentStatus.PROCESSED, institution_id=1, user_id=42
+                status=DocumentStatus.PROCESSED,
+                institution_id=1,
+                user_id=42,
+                managed_by=None,
             )
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()
@@ -1185,7 +1194,10 @@ class TestRAGQuestionPersistence:
         ):
             # Owned by the auth user (id 42) → visible (TF-354 filter)
             mock_doc_svc.get_document_by_id.return_value = Mock(
-                status=DocumentStatus.PROCESSED, institution_id=1, user_id=42
+                status=DocumentStatus.PROCESSED,
+                institution_id=1,
+                user_id=42,
+                managed_by=None,
             )
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()

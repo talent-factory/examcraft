@@ -1570,7 +1570,10 @@ async def delete_document(
     try:
         document = document_service.get_document_by_id(document_id, db)
 
-        if not document:
+        # Feature-owned documents (TF-986) are deleted by their owning module
+        # only -- deleting one here would silently drop it from e.g. a
+        # portfolio assessment. 404 like every other hidden document.
+        if not document or document.managed_by is not None:
             raise api_error(404, "documents_not_found", locale)
 
         # Access policy (in evaluation order):
@@ -1671,7 +1674,9 @@ async def process_document(
     locale = get_request_locale(request, current_user)
     # Check whether the document exists
     document = document_service.get_document_by_id(document_id, db)
-    if not document:
+    # Feature-owned documents (TF-986) must not be (re-)vectorised -- portfolio
+    # files are deliberately never embedded.
+    if not document or document.managed_by is not None:
         raise api_error(404, "documents_not_found", locale)
 
     # Check user permission (superuser bypass with audit log)

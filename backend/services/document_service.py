@@ -57,6 +57,7 @@ class DocumentService:
         file: UploadFile,
         user_id: Optional[int] = None,
         db: Optional[Session] = None,
+        managed_by: Optional[str] = None,
     ) -> Document:
         """
         Upload and store document
@@ -65,6 +66,9 @@ class DocumentService:
             file: FastAPI UploadFile object
             user_id: Optional user ID for association (integer)
             db: Database session
+            managed_by: Owning feature module for an internal document
+                (``Document.managed_by``, TF-986); set on insert so the row
+                is never briefly visible as a regular document
 
         Returns:
             Document: Created Document object
@@ -117,6 +121,7 @@ class DocumentService:
                 status=DocumentStatus.UPLOADED,
                 user_id=user_id,
                 vector_collection=f"doc_{uuid.uuid4().hex[:8]}",
+                managed_by=managed_by,
             )
 
             if db:
@@ -295,8 +300,15 @@ class DocumentService:
 
         return document
 
-    def delete_document(self, document_id: int, db: Session) -> bool:
-        """Delete document and file"""
+    def delete_document(
+        self, document_id: int, db: Session, *, strict: bool = False
+    ) -> bool:
+        """Delete document and file.
+
+        ``strict``: a failed S3 delete aborts (returns False, DB row kept)
+        instead of only logging a warning -- for callers that must not leave
+        an orphaned file behind (portfolio deletion, TF-986).
+        """
         document = self.get_document_by_id(document_id, db)
         if not document:
             return False
@@ -309,6 +321,8 @@ class DocumentService:
                     storage_service.delete_file(document.file_path)
                     logger.info(f"Deleted file from S3: {document.file_path}")
                 except Exception as e:
+                    if strict:
+                        raise
                     logger.warning(
                         f"Failed to delete S3 file {document.file_path}: {e}"
                     )
