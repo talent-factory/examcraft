@@ -181,6 +181,20 @@ class TestRAGAPI:
         doc.user_id = 42  # == mock_user.id → owner-visible (TF-354 filter)
         return doc
 
+    @pytest.fixture
+    def visible_document(self, mock_processed_document):
+        """TF-969: generate-exam requires document_ids — serve a visible,
+        processed document for tests that exercise other validation."""
+        with (
+            patch.object(
+                actual_document_service,
+                "get_document_by_id",
+                return_value=mock_processed_document,
+            ),
+            patch("api.rag_exams.get_accessible_org_unit_ids_for", return_value=set()),
+        ):
+            yield mock_processed_document
+
     def test_generate_rag_exam_success(self, auth_client, mock_processed_document):
         """Test successful RAG exam generation — now returns task_id"""
         request_data = {
@@ -254,16 +268,24 @@ class TestRAGAPI:
         detail = response.json()["detail"]
         assert "nicht verarbeitet" in detail or "not processed" in detail.lower()
 
-    def test_generate_rag_exam_invalid_question_type(self, auth_client):
+    def test_generate_rag_exam_invalid_question_type(
+        self, auth_client, mock_processed_document
+    ):
         """Test RAG exam generation with an invalid question type"""
 
         request_data = {
             "topic": "Test Topic",
+            "document_ids": [1],
             "question_count": 1,
             "question_types": ["invalid_type"],
         }
 
-        response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
+        with patch.object(
+            actual_document_service,
+            "get_document_by_id",
+            return_value=mock_processed_document,
+        ):
+            response = auth_client.post("/api/v1/rag/generate-exam", json=request_data)
 
         assert response.status_code == 400
         detail = response.json()["detail"]
@@ -292,6 +314,20 @@ class TestRAGAPI:
             json={"topic": "Valid Topic", "question_count": -1},
         )
         assert response.status_code == 422
+
+    @pytest.mark.parametrize("document_ids", [None, []])
+    def test_generate_rag_exam_requires_document_ids(self, auth_client, document_ids):
+        """TF-969: document_ids is required and non-empty — an unfiltered
+        search would put other users' chunk text into the prompt."""
+        payload = {"topic": "Valid Topic", "question_count": 1}
+        if document_ids is not None:
+            payload["document_ids"] = document_ids
+
+        with patch("api.rag_exams.generate_questions_task") as mock_task:
+            response = auth_client.post("/api/v1/rag/generate-exam", json=payload)
+
+        assert response.status_code == 422
+        mock_task.apply_async.assert_not_called()
 
     def test_generate_exam_job_created_with_topic_and_count(
         self, auth_client, mock_processed_document
@@ -342,7 +378,7 @@ class TestRAGAPI:
         from database import get_db
         from utils.auth_utils import get_current_user
 
-        request_data = {"topic": "Test Topic", "question_count": 1}
+        request_data = {"topic": "Test Topic", "document_ids": [1], "question_count": 1}
 
         mock_db = MagicMock()
         mock_user = MagicMock()
@@ -355,6 +391,12 @@ class TestRAGAPI:
 
         try:
             with (
+                # mock_user/mock_db are blanket MagicMocks — the visibility
+                # check is not under test here.
+                patch(
+                    "api.rag_exams.get_accessible_org_unit_ids_for", return_value=set()
+                ),
+                patch("api.rag_exams.is_document_visible_for", return_value=True),
                 patch("api.rag_exams.document_service") as mock_doc_service,
                 patch("api.rag_exams.generate_questions_task") as mock_task,
                 patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
@@ -667,7 +709,7 @@ class TestRAGAPI:
         # was dropped as a fallback path (see claude_service.py:208).
 
     def test_generate_rag_exam_with_valid_tag_ids_returns_200(
-        self, auth_client, mock_db
+        self, auth_client, mock_db, visible_document
     ):
         """tag_ids=[1] with a valid tag from the caller's own institution → 200."""
         mock_tag = Mock()
@@ -697,6 +739,7 @@ class TestRAGAPI:
                 "/api/v1/rag/generate-exam",
                 json={
                     "topic": "Test",
+                    "document_ids": [1],
                     "question_count": 2,
                     "question_types": ["single_choice"],
                     "difficulty": "medium",
@@ -709,7 +752,7 @@ class TestRAGAPI:
         assert "task_id" in response.json()
 
     def test_generate_rag_exam_with_missing_tag_id_returns_422(
-        self, auth_client, mock_db
+        self, auth_client, mock_db, visible_document
     ):
         """tag_ids=[999] — tag does not exist → uniform 422 (enumeration prevention)."""
         mock_db.query.return_value.filter.return_value.all.return_value = []
@@ -718,6 +761,7 @@ class TestRAGAPI:
             "/api/v1/rag/generate-exam",
             json={
                 "topic": "Test",
+                "document_ids": [1],
                 "question_count": 2,
                 "question_types": ["single_choice"],
                 "difficulty": "medium",
@@ -730,7 +774,7 @@ class TestRAGAPI:
         assert response.json()["error_code"] == "rag_tag_ids_invalid"
 
     def test_generate_rag_exam_with_foreign_institution_tag_returns_422(
-        self, auth_client, mock_db
+        self, auth_client, mock_db, visible_document
     ):
         """tag_ids=[2] — tag belongs to another institution, scope='institution' →
         uniform 422 (cross-tenant enumeration prevention)."""
@@ -742,6 +786,7 @@ class TestRAGAPI:
             "/api/v1/rag/generate-exam",
             json={
                 "topic": "Test",
+                "document_ids": [1],
                 "question_count": 2,
                 "question_types": ["single_choice"],
                 "difficulty": "medium",
@@ -753,7 +798,7 @@ class TestRAGAPI:
         assert response.status_code == 422
 
     def test_generate_rag_exam_with_archived_tag_returns_422(
-        self, auth_client, mock_db
+        self, auth_client, mock_db, visible_document
     ):
         """tag_ids=[3] — tag is archived → 422."""
         mock_tag = Mock()
@@ -768,6 +813,7 @@ class TestRAGAPI:
             "/api/v1/rag/generate-exam",
             json={
                 "topic": "Test",
+                "document_ids": [1],
                 "question_count": 2,
                 "question_types": ["single_choice"],
                 "difficulty": "medium",
@@ -992,13 +1038,16 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
         ):
-            mock_doc_svc.get_document_by_id.return_value = None
+            # Owned by the auth user (id 42) → visible (TF-354 filter)
+            mock_doc_svc.get_document_by_id.return_value = Mock(
+                status=DocumentStatus.PROCESSED, institution_id=1, user_id=42
+            )
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()
 
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
-                json={"topic": "Test Topic", "question_count": 2},
+                json={"topic": "Test Topic", "document_ids": [1], "question_count": 2},
             )
 
         assert response.status_code == 200, (
@@ -1016,13 +1065,16 @@ class TestRAGQuestionPersistence:
             patch("api.rag_exams.QuestionGenerationJob") as mock_job_cls,
             patch("utils.tenant_utils.SubscriptionLimits"),
         ):
-            mock_doc_svc.get_document_by_id.return_value = None
+            # Owned by the auth user (id 42) → visible (TF-354 filter)
+            mock_doc_svc.get_document_by_id.return_value = Mock(
+                status=DocumentStatus.PROCESSED, institution_id=1, user_id=42
+            )
             mock_task.apply_async.return_value = MagicMock()
             mock_job_cls.return_value = MagicMock()
 
             response = auth_client.post(
                 "/api/v1/rag/generate-exam",
-                json={"topic": "Test Topic", "question_count": 2},
+                json={"topic": "Test Topic", "document_ids": [1], "question_count": 2},
             )
 
         assert response.status_code == 200, (

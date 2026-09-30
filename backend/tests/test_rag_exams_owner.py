@@ -14,6 +14,7 @@ from fastapi import HTTPException
 
 from api.rag_exams import retry_generation
 from models.auth import Institution, User, UserStatus
+from models.document import Document, DocumentStatus, DocumentVisibility
 from models.question_generation_job import QuestionGenerationJob
 
 
@@ -62,17 +63,31 @@ def stage(test_db):
     )
     test_db.add_all([owner, other, admin])
     test_db.flush()
+    # Retry re-checks the stored documents for the job owner (TF-969).
+    doc = Document(
+        filename="retry.pdf",
+        original_filename="retry.pdf",
+        file_path="/tmp/retry.pdf",
+        file_size=10,
+        mime_type="application/pdf",
+        status=DocumentStatus.PROCESSED,
+        institution_id=inst.id,
+        user_id=owner.id,
+        visibility=DocumentVisibility.PRIVATE,
+    )
+    test_db.add(doc)
+    test_db.flush()
     job = QuestionGenerationJob(
         task_id="rag-task-foreign",
         user_id=owner.id,
         topic="Test",
         question_count=5,
         status="FAILURE",
-        request_data={"question_count": 5},
+        request_data={"question_count": 5, "document_ids": [doc.id]},
     )
     test_db.add(job)
     test_db.commit()
-    return SimpleNamespace(owner=owner, other=other, admin=admin, job=job)
+    return SimpleNamespace(owner=owner, other=other, admin=admin, job=job, doc=doc)
 
 
 def _run(coro):
@@ -105,6 +120,67 @@ def test_retry_unknown_task_returns_404(stage, test_db):
             )
         )
     assert exc.value.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        # Jobs stored before document_ids became required: replaying them
+        # would run the vector search over the whole index.
+        {},
+        {"document_ids": None},
+        {"document_ids": []},
+        # A document that no longer exists.
+        {"document_ids": [987654321]},
+    ],
+)
+def test_retry_job_without_usable_documents_is_rejected(stage, test_db, mocker, stored):
+    """TF-969: retry re-checks the stored documents at replay time."""
+    s = stage
+    s.job.request_data = {"question_count": 5, **stored}
+    test_db.commit()
+    mock_task = mocker.patch("api.rag_exams.generate_questions_task")
+
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            retry_generation(
+                task_id=s.job.task_id,
+                http_request=None,
+                current_user=s.owner,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.error_code == "rag_retry_documents_unavailable"
+    mock_task.apply_async.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["unshared", "unprocessed"])
+def test_retry_rechecks_document_state_for_owner(stage, test_db, mocker, change):
+    """TF-969: the visibility/processing check runs again at replay time and
+    for the job owner — a superuser retrying a colleague's job must not reach
+    a document the owner can no longer see."""
+    s = stage
+    if change == "unshared":
+        # Now another user's private document — invisible to the job owner.
+        s.doc.user_id = s.other.id
+    else:
+        s.doc.status = DocumentStatus.FAILED
+    test_db.commit()
+    mock_task = mocker.patch("api.rag_exams.generate_questions_task")
+
+    with pytest.raises(HTTPException) as exc:
+        _run(
+            retry_generation(
+                task_id=s.job.task_id,
+                http_request=None,
+                current_user=s.admin,
+                db=test_db,
+            )
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.error_code == "rag_retry_documents_unavailable"
+    mock_task.apply_async.assert_not_called()
 
 
 def test_retry_own_failed_job_as_owner_succeeds(stage, test_db, mocker):
