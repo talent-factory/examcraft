@@ -9,6 +9,20 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.3] - 2026-09-30
+
+### Security
+
+- **Dokumentauswahl bei KI-Generierung und Chat durchgängig geprüft
+  (TF-969):** Fragengenerierung, Kontextvorschau, erneute Generierung,
+  Chat und die MCP-Fragengenerierung verwenden nur noch Dokumente, die
+  für den jeweiligen Benutzer sichtbar sind. `document_ids` ist bei
+  `POST /api/v1/rag/generate-exam` und `/api/v1/rag/retrieve-context`
+  jetzt Pflicht (mindestens ein Dokument, sonst 422). Eine erneute
+  Generierung prüft die gespeicherte Dokumentauswahl erneut und wird mit
+  `rag_retry_documents_unavailable` abgelehnt, wenn Dokumente fehlen
+  oder nicht mehr verfügbar sind.
+
 ## [1.13.2] - 2026-09-29
 
 ### Fixed
