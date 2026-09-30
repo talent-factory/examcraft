@@ -44,6 +44,9 @@ export type PortfolioAssessmentReviewStatus =
 
 export type PortfolioTemplateVisibility = 'private' | 'team' | 'institution' | 'system';
 
+/** `MAX_CRITERION_POINTS` in `premium/backend/services/portfolio_template_service.py`. */
+export const PORTFOLIO_MAX_CRITERION_POINTS = 100;
+
 export type PortfolioDocumentOrigin = 'upload_zip' | 'github_repository';
 
 export type PortfolioClassificationSource = 'auto' | 'manual';
@@ -68,7 +71,8 @@ export interface PortfolioTemplatePhase {
   position: number;
   name: string;
   description: string | null;
-  expected_folder_patterns: Record<string, unknown> | null;
+  /** LLM hint for classification, not a hard rule (e.g. `["01_auftrag"]`). */
+  expected_folder_patterns: string[] | null;
   criteria: PortfolioTemplateCriterion[];
 }
 
@@ -102,7 +106,7 @@ export interface PortfolioTemplateCriterionPayload {
 export interface PortfolioTemplatePhasePayload {
   name: string;
   description?: string | null;
-  expected_folder_patterns?: Record<string, unknown> | null;
+  expected_folder_patterns?: string[] | null;
   criteria: NonEmptyArray<PortfolioTemplateCriterionPayload>;
 }
 
