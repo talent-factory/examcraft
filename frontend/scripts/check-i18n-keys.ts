@@ -21,6 +21,56 @@
  *         calls pass no count). A translateError call whose third argument is
  *         not a literal must be listed in DOCUMENTED_DYNAMIC_CALLS.
  *
+ *   C. Is every key in the reference locale still spent somewhere? (TF-775 B)
+ *      7. A key counts as live when one of these covers it — exactly, as the
+ *         plural base of a `_one`/`_other` form, or as an ancestor (a
+ *         `returnObjects` read or an `i18n_key` prefix covers everything under
+ *         it):
+ *         - any key-shaped string literal in the scanned source, not only one
+ *           inside `t()` — a key parked in a constant, an options table
+ *           (`labelKey: '…'`), a prop (`featureNameKey="…"`) or
+ *           `<Trans i18nKey="…">` reaches `t()` through a variable;
+ *         - the static head of a template literal or a `'…' +` concatenation
+ *           (`` t(`pages.dashboard.activityTypes.${type}`) ``): the whole
+ *           prefix is live, since which keys under it render is runtime data;
+ *         - `errors.<code>` for every code in APP_ERROR_CODES. A dynamic
+ *           `errors.` prefix, or an ancestor literal like `'errors.rag'`, is
+ *           NOT used for this namespace: one
+ *           `` t(`errors.${e.code}`) `` would otherwise cover ~500 keys and
+ *           blind the check exactly where codes churn most. The registry is
+ *           the accept-list — an unregistered code never reaches `t()` — so it
+ *           is the complete set, and a registered code without a consumer is
+ *           live by design (TF-772 #255: unused but working service methods);
+ *         - `i18n_key` values from the data files the source reads keys from
+ *           (DATA_KEY_SOURCES).
+ *         Skipped, with a notice, when every tier outside core/ is absent —
+ *         the public mirror (`subtree split --prefix=core`) has no premium/
+ *         or enterprise/, and every key only they spend would read as dead
+ *         there (235 of them when measured). Liveness needs every consumer;
+ *         the private repo, where all three tiers exist, is where it gates.
+ *         A skip must not happen there silently, so it fails instead when
+ *         only some tiers are absent (a renamed or removed tier, not a
+ *         mirror) and when I18N_REQUIRE_ALL_TIERS is set — the private CI
+ *         sets it, so a core-only checkout cannot turn the check off.
+ *         Whatever none of these covers is reported. Keys listed in
+ *         i18n-unreferenced-keys.baseline.json are the known backlog and do
+ *         not fail; any other unreferenced key does, and so does a baseline
+ *         entry that is referenced again or gone — the baseline only shrinks.
+ *
+ *      Regex, not an AST, on purpose (measured in TF-775 B): the literal rule
+ *      matches a key-shaped run between two equal quotes directly, not by
+ *      pairing every quote in the file, so a stray apostrophe (JSX text, a
+ *      regex literal) or a `${…}` around it cannot hide a key — its errors
+ *      lean towards "live": a key-shaped literal that never reaches `t()`
+ *      keeps a dead key alive, it never gets a live one deleted. An AST would
+ *      only sharpen that harmless direction, and the hard cases (a key passed
+ *      as a prop into another file, `errors.${code}` from runtime data) would
+ *      need cross-file data flow, not a parser. One known gap leans the other
+ *      way: a template literal nested inside another template's `${…}` on one
+ *      line loses its dynamic head (none exist). Revisit when a false
+ *      "unreferenced" report ever needs an exception list of its own — that
+ *      is the signal the regex is being outwitted.
+ *
  * Why this exists: i18n.ts sets `fallbackLng: 'de'`, so a missing key does not
  * surface as an empty string or a raw key name — it silently renders German
  * text to a French or Italian user. TF-670 found 410 such keys in fr and it
@@ -41,7 +91,10 @@
  * (QUOTA_ERROR_CODES), `help-hint-keys.test.ts` (the Python seed),
  * `onboardingStepsI18n.test.ts` (help-onboarding-steps.json) and
  * `releaseNotes.test.ts` (RELEASE_NOTES). They check dynamic keys
- * (`t(`errors.${code}`)`), which a literal scan cannot enumerate.
+ * (`t(`errors.${code}`)`), which a literal scan cannot enumerate. Part C reads
+ * two of those registries (APP_ERROR_CODES, the onboarding steps) and the hint
+ * seed in the opposite direction — "is this key still spent?" — which none of
+ * the five guards asks.
  *
  * Frontend locales only. The backend's `core/backend/locales/t.<lang>.json`
  * are gated by `core/backend/tests/test_locale_parity.py` (TF-773 Part C).
@@ -272,7 +325,36 @@ export interface SourceReferences {
   dynamicCalls: number;
   /** The parseable ones among `dynamicCalls`, with their raw argument expression. */
   dynamicCallExprs: DynamicCall[];
+  /** Every key-shaped string literal, wherever it sits (part C). */
+  keyLiterals: Reference[];
+  /** Static heads of template literals / `'…' +` concatenations (part C). */
+  dynamicPrefixes: Reference[];
 }
+
+/**
+ * A whole literal of two or more dotted segments (`a.b` is the shortest real
+ * key, `common.close`), in any quote style. The key shape holds no quote, so
+ * it is matched directly instead of pairing every quote in the file: an
+ * apostrophe elsewhere on the line (`Don't`, `/'/g`) cannot shift the pairing,
+ * and a key inside a template's `${…}` is found like any other. A template
+ * with a placeholder never matches — `$`, `{` are not key characters — and is
+ * a prefix instead, below.
+ */
+const KEY_LITERAL = /(['"`])([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)\1/g;
+
+/**
+ * `` `pages.dashboard.activityTypes.${…}` `` — the head before the first
+ * `${`, after any leading whitespace (a template opened on its own line). The
+ * head may end mid-segment (`admin.orgUnits.unitType_${type}`), and it is
+ * matched as a plain string prefix, so that works too.
+ */
+const TEMPLATE_PREFIX = /`\s*([A-Za-z0-9_.-]*\.[A-Za-z0-9_.-]*)\$\{/g;
+
+/**
+ * `'components.documentLibrary.errorMessages.' + code`, and like the template
+ * head it may end mid-segment (`'admin.orgUnits.unitType_' + type`).
+ */
+const CONCAT_PREFIX = /(['"])([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]*)+)\1\s*\+/g;
 
 const lineAt = (src: string, index: number): number => src.slice(0, index).split('\n').length;
 
@@ -326,7 +408,140 @@ export function scanReferences(src: string, file: string): SourceReferences {
   const parsedCalls = literalCallCount + dynamicCallExprs.length;
   const dynamicCalls = dynamicCallExprs.length + Math.max(0, totalCalls - parsedCalls);
 
-  return { tKeys, fallbackKeys, dynamicCalls, dynamicCallExprs };
+  const keyLiterals: Reference[] = [];
+  for (const m of code.matchAll(KEY_LITERAL)) {
+    keyLiterals.push({ key: m[2], file, line: lineAt(code, m.index ?? 0) });
+  }
+  const dynamicPrefixes: Reference[] = [];
+  for (const pattern of [TEMPLATE_PREFIX, CONCAT_PREFIX]) {
+    for (const m of code.matchAll(pattern)) {
+      const prefix = m[pattern === TEMPLATE_PREFIX ? 1 : 2];
+      // A head without a letter (`${a}.${b}`, a lone `.`) names no namespace.
+      if (/[A-Za-z]/.test(prefix)) dynamicPrefixes.push({ key: prefix, file, line: lineAt(code, m.index ?? 0) });
+    }
+  }
+
+  return { tKeys, fallbackKeys, dynamicCalls, dynamicCallExprs, keyLiterals, dynamicPrefixes };
+}
+
+// ---------------------------------------------------------------------------
+// Part C: unreferenced keys (TF-775 B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Namespaces whose liveness comes from a registry, not from a dynamic
+ * prefix — see header point C7 for why `errors.` is one.
+ */
+export const REGISTRY_NAMESPACES = ['errors.'] as const;
+
+export interface Liveness {
+  /** Keys covered exactly, as plural base, or as ancestor. */
+  exact: ReadonlySet<string>;
+  /** String prefixes: every key starting with one is live. */
+  prefixes: readonly string[];
+}
+
+const inRegistryNamespace = (prefix: string): boolean =>
+  REGISTRY_NAMESPACES.some((ns) => prefix.startsWith(ns));
+
+/** Drops dynamic prefixes inside a registry-owned namespace (header, C7). */
+export function effectivePrefixes(prefixes: readonly string[]): string[] {
+  return [...new Set(prefixes)].filter((prefix) => !inRegistryNamespace(prefix));
+}
+
+/** How `key` is covered, or null. Pure; the order matches header point C7. */
+export function coveredBy(key: string, live: Liveness): string | null {
+  if (live.exact.has(key)) return key;
+  const base = key.replace(PLURAL_SUFFIX_RE, '');
+  if (base !== key && live.exact.has(base)) return base;
+  const parts = key.split('.');
+  for (let i = parts.length - 1; i > 0; i--) {
+    const ancestor = parts.slice(0, i).join('.');
+    // Inside a registry namespace only the registry decides: a literal
+    // `'errors.rag'` must not keep every `errors.rag.*` alive (header, C7).
+    if (inRegistryNamespace(`${ancestor}.`)) break;
+    if (live.exact.has(ancestor)) return ancestor;
+  }
+  const prefix = live.prefixes.find((p) => key.startsWith(p));
+  return prefix ? `${prefix}*` : null;
+}
+
+/** SCAN_ROOTS whose directory is missing from this checkout. Pure: `exists` is injected. */
+export function absentScanRoots(
+  roots: ReadonlyArray<{ dir: string; prefix: string }>,
+  exists: (dir: string) => boolean
+): string[] {
+  return roots.filter((root) => !exists(root.dir)).map((root) => root.prefix);
+}
+
+/**
+ * Whether part C runs, given the SCAN_ROOTS this checkout lacks. Pure; see
+ * the header, C7. Only a checkout without every tier outside core/ is a
+ * mirror and may skip — and not even that where the caller demands every
+ * tier (`requireAllTiers`, the private CI). Anything else is a broken layout
+ * that would otherwise switch the check off without a trace.
+ */
+export function partCMode(
+  absent: readonly string[],
+  roots: ReadonlyArray<{ prefix: string }>,
+  requireAllTiers: boolean
+): { mode: 'run' } | { mode: 'skip' } | { mode: 'fail'; reason: string } {
+  if (absent.length === 0) return { mode: 'run' };
+  const tiers = roots.filter((root) => !root.prefix.startsWith('core/')).map((root) => root.prefix);
+  const mirror = absent.length === tiers.length && tiers.every((tier) => absent.includes(tier));
+  if (!mirror) {
+    return { mode: 'fail', reason: `${absent.join(', ')} missing, but not every tier is — renamed or removed?` };
+  }
+  if (requireAllTiers) {
+    return { mode: 'fail', reason: `${absent.join(', ')} missing, but I18N_REQUIRE_ALL_TIERS is set` };
+  }
+  return { mode: 'skip' };
+}
+
+/** How many of `keys` each prefix covers, widest first, only those with ≥ `min`. */
+export function widePrefixes(
+  prefixes: readonly string[],
+  keys: readonly string[],
+  min: number
+): Array<{ prefix: string; covers: number }> {
+  return prefixes
+    .map((prefix) => ({ prefix, covers: keys.filter((key) => key.startsWith(prefix)).length }))
+    .filter((entry) => entry.covers >= min)
+    .sort((a, b) => b.covers - a.covers || a.prefix.localeCompare(b.prefix));
+}
+
+export function findUnreferencedKeys(keys: Iterable<string>, live: Liveness): string[] {
+  return [...keys].filter((key) => coveredBy(key, live) === null);
+}
+
+/**
+ * The ratchet: an unreferenced key outside the baseline fails, and so does a
+ * baseline entry that is no longer unreferenced (live again, or deleted) —
+ * otherwise the file would keep listing keys long after they were cleaned up.
+ */
+export function compareWithBaseline(
+  unreferenced: readonly string[],
+  baseline: readonly string[]
+): { added: string[]; stale: string[] } {
+  const current = new Set(unreferenced);
+  const known = new Set(baseline);
+  return {
+    added: unreferenced.filter((key) => !known.has(key)),
+    stale: baseline.filter((key) => !current.has(key)),
+  };
+}
+
+/** Every `i18n_key` string anywhere in a parsed JSON document. */
+export function collectI18nKeys(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collectI18nKeys(item, out);
+  } else if (node !== null && typeof node === 'object') {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'i18n_key' && typeof value === 'string') out.push(value);
+      else collectI18nKeys(value, out);
+    }
+  }
+  return out;
 }
 
 /**
@@ -505,10 +720,15 @@ function checkLocales(): { failures: string[]; bundles: Map<string, unknown> } {
 }
 
 /** Part B: every statically visible key the source spends resolves in every loaded locale. */
-function checkReferences(bundles: Map<string, unknown>): string[] {
+function checkReferences(bundles: Map<string, unknown>): {
+  failures: string[];
+  spent: SpentKeys;
+} {
   const failures: string[] = [];
   const tKeys: Reference[] = [];
   const fallbackKeys: Reference[] = [];
+  const keyLiterals: Reference[] = [];
+  const dynamicPrefixes: Reference[] = [];
   const dynamicByFile = new Map<string, number>();
   const dynamicExprsByFile = new Map<string, string[]>();
 
@@ -518,6 +738,8 @@ function checkReferences(bundles: Map<string, unknown>): string[] {
       const found = scanReferences(fs.readFileSync(file, 'utf8'), rel);
       tKeys.push(...found.tKeys);
       fallbackKeys.push(...found.fallbackKeys);
+      keyLiterals.push(...found.keyLiterals);
+      dynamicPrefixes.push(...found.dynamicPrefixes);
       if (found.dynamicCalls > 0) dynamicByFile.set(rel, found.dynamicCalls);
       if (found.dynamicCallExprs.length) {
         dynamicExprsByFile.set(rel, found.dynamicCallExprs.map((d) => d.expr));
@@ -569,12 +791,119 @@ function checkReferences(bundles: Map<string, unknown>): string[] {
     );
   }
 
-  return failures;
+  return { failures, spent: { keys: [...tKeys, ...fallbackKeys, ...keyLiterals], prefixes: dynamicPrefixes } };
+}
+
+/**
+ * Files the source reads `i18n_key` values from at runtime. Paths relative to
+ * core/frontend, so they hold in the public mirror too (core/ is its root).
+ * `min` is the sanity floor, same reason as the t() floor above: a source
+ * that moved or changed shape must fail, not silently contribute nothing.
+ */
+const DATA_KEY_SOURCES: Array<{ file: string; min: number; read: (text: string) => string[] }> = [
+  {
+    file: 'public/help-onboarding-steps.json',
+    min: 20,
+    read: (text) => collectI18nKeys(JSON.parse(text)),
+  },
+  {
+    // The Python seed is the single source of truth for which context hints
+    // exist; the same regex help-hint-keys.test.ts reads it with.
+    file: '../backend/utils/seed_help_hints.py',
+    min: 3,
+    read: (text) => [...text.matchAll(/"i18n_key":\s*"([^"]+)"/g)].map((m) => m[1]),
+  },
+];
+
+/** What the source spends, as input to part C. */
+interface SpentKeys {
+  keys: Reference[];
+  prefixes: Reference[];
+}
+
+const WIDE_PREFIX_MIN = 20;
+
+const BASELINE_FILE = path.resolve(import.meta.dir, 'i18n-unreferenced-keys.baseline.json');
+
+/** Part C: every reference-locale key is spent somewhere, or on the baseline. */
+async function checkUnreferenced(
+  bundles: Map<string, unknown>,
+  spent: SpentKeys
+): Promise<{ failures: string[]; skipped: boolean }> {
+  const failures: string[] = [];
+  if (!bundles.has(REFERENCE)) return { failures, skipped: false };
+
+  const absent = absentScanRoots(SCAN_ROOTS, fs.existsSync);
+  const decision = partCMode(absent, SCAN_ROOTS, process.env.I18N_REQUIRE_ALL_TIERS === '1');
+  if (decision.mode === 'fail') {
+    failures.push(`unreferenced-key check cannot run: ${decision.reason}`);
+    return { failures, skipped: false };
+  }
+  if (decision.mode === 'skip') {
+    console.log(
+      `\ni18n unreferenced keys — SKIPPED: ${absent.join(', ')} not in this checkout ` +
+        `(public mirror). Keys only those tiers spend would read as dead.\n`
+    );
+    return { failures, skipped: true };
+  }
+
+  const exact = new Set(spent.keys.map((ref) => ref.key));
+
+  const { APP_ERROR_CODES } = await import('../src/errors/AppError');
+  if (APP_ERROR_CODES.length <= 100) {
+    failures.push(`only ${APP_ERROR_CODES.length} APP_ERROR_CODES — registry import broken?`);
+  }
+  for (const code of APP_ERROR_CODES) exact.add(`errors.${code}`);
+
+  let dataKeys = 0;
+  for (const source of DATA_KEY_SOURCES) {
+    const full = path.resolve(import.meta.dir, '..', source.file);
+    const keys = fs.existsSync(full) ? source.read(fs.readFileSync(full, 'utf8')) : [];
+    if (keys.length < source.min) {
+      failures.push(`${source.file}: ${keys.length} i18n_key value(s), expected ≥ ${source.min} — moved or reshaped?`);
+    }
+    for (const key of keys) exact.add(key);
+    dataKeys += keys.length;
+  }
+
+  const prefixes = effectivePrefixes(spent.prefixes.map((ref) => ref.key));
+  const referenceKeys = [...flatten(bundles.get(REFERENCE)).keys()];
+  const unreferenced = findUnreferencedKeys(referenceKeys, { exact, prefixes });
+  const baseline: string[] = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
+  const { added, stale } = compareWithBaseline(unreferenced, baseline);
+
+  console.log(
+    `\ni18n unreferenced keys — ${prefixes.length} dynamic prefix(es), ${APP_ERROR_CODES.length} registry ` +
+      `code(s), ${dataKeys} data-file key(s); ${unreferenced.length} unreferenced, ${baseline.length} on the baseline\n`
+  );
+  // A prefix exempts everything under it from this check, so a broad one
+  // (`` t(`pages.${x}`) ``) must be visible in the log, not just counted.
+  const wide = widePrefixes(prefixes, referenceKeys, WIDE_PREFIX_MIN);
+  if (wide.length) {
+    console.log(`  prefixes covering ≥ ${WIDE_PREFIX_MIN} keys:`);
+    for (const { prefix, covers } of wide) console.log(`    ${prefix}* — ${covers}`);
+  }
+  if (added.length) {
+    failures.push(`${added.length} key(s) in ${REFERENCE} are not referenced anywhere`);
+    console.log(
+      `  ✗ unreferenced — delete from all four locales, or reference them (${added.length}):\n${sample(added)}`
+    );
+  }
+  if (stale.length) {
+    failures.push(`${stale.length} baseline entr(y/ies) no longer unreferenced`);
+    console.log(
+      `  ✗ referenced again or deleted — remove from ${path.basename(BASELINE_FILE)} (${stale.length}):\n${sample(stale)}`
+    );
+  }
+  return { failures, skipped: false };
 }
 
 if (import.meta.main) {
   const { failures, bundles } = checkLocales();
-  failures.push(...checkReferences(bundles));
+  const references = checkReferences(bundles);
+  failures.push(...references.failures);
+  const unreferenced = await checkUnreferenced(bundles, references.spent);
+  failures.push(...unreferenced.failures);
 
   if (failures.length) {
     console.error('\nFAIL — frontend i18n is out of sync:');
@@ -588,5 +917,10 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  console.log('\nOK — all four locales complete and in sync, every static source reference resolves.');
+  console.log(
+    '\nOK — all four locales complete and in sync, every static source reference resolves, ' +
+      (unreferenced.skipped
+        ? 'unreferenced-key check SKIPPED (tiers absent, see above).'
+        : 'no unreferenced key beyond the baseline.')
+  );
 }

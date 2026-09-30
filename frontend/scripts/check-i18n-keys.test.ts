@@ -7,14 +7,22 @@
  */
 import { describe, expect, it } from 'bun:test';
 import {
+  absentScanRoots,
   analyzeLocaleDirs,
+  collectI18nKeys,
+  compareWithBaseline,
+  coveredBy,
   diffLocale,
+  effectivePrefixes,
   emptyValues,
   findUndocumentedDynamicCalls,
+  findUnreferencedKeys,
   flatten,
+  partCMode,
   placeholders,
   resolves,
   scanReferences,
+  widePrefixes,
 } from './check-i18n-keys';
 
 describe('flatten', () => {
@@ -345,5 +353,193 @@ describe('resolves — does a referenced key render text?', () => {
   it('accepts plural forms only when asked to — translateError passes no count', () => {
     expect(resolves(bundle, 'n', true)).toBe(true);
     expect(resolves(bundle, 'n', false)).toBe(false);
+  });
+});
+
+describe('scanReferences — liveness inputs for unreferenced keys (TF-775 B)', () => {
+  it('collects key-shaped literals outside t(): constants, option tables, props, <Trans>', () => {
+    const src = [
+      "const KEY = 'a.constant';",
+      "const OPTS = [{ labelKey: 'a.option' }];",
+      '<X featureNameKey="a.prop" />',
+      '<Trans i18nKey="a.trans" />',
+      'const tpl = `a.template`;',
+    ].join('\n');
+    const keys = scanReferences(src, 'f.tsx').keyLiterals.map((r) => r.key);
+    expect(keys).toEqual(['a.constant', 'a.option', 'a.prop', 'a.trans', 'a.template']);
+  });
+
+  it('does not read a single-segment string or a template with a placeholder as a key', () => {
+    const src = `const a = 'plain'; const b = \`x.\${y}\`; const c = 'has space.x';`;
+    expect(scanReferences(src, 'f.ts').keyLiterals).toEqual([]);
+  });
+
+  it('ignores a key literal left behind in a comment', () => {
+    const src = "// const OLD = 'a.dead';\n/* 'b.dead' */\nconst x = 1;";
+    expect(scanReferences(src, 'f.ts').keyLiterals).toEqual([]);
+  });
+
+  it("finds a key inside a template's placeholder, which is not a prefix of its own", () => {
+    const src = `const a = \`\${cond ? 'a.lit' : 'a.other'}\`; t(\`b.outer.\${c ? 'b.lit' : x}\`);`;
+    const keys = scanReferences(src, 'f.tsx').keyLiterals.map((r) => r.key);
+    expect(keys).toEqual(['a.lit', 'a.other', 'b.lit']);
+  });
+
+  it('is not thrown off by a stray apostrophe earlier on the same line', () => {
+    const src = [
+      "<p>Don't <Trans i18nKey='a.jsx' /></p>",
+      "s.replace(/'/g, ''); const k = 'a.regex';",
+    ].join('\n');
+    const keys = scanReferences(src, 'f.tsx').keyLiterals.map((r) => r.key);
+    expect(keys).toEqual(['a.jsx', 'a.regex']);
+  });
+
+  it('takes the static head of a template literal as a prefix, even mid-segment', () => {
+    const src = `t(\`pages.dashboard.activityTypes.\${item.type}\`); t(\`admin.orgUnits.unitType_\${type}\`);`;
+    const prefixes = scanReferences(src, 'f.tsx').dynamicPrefixes.map((r) => r.key);
+    expect(prefixes).toEqual(['pages.dashboard.activityTypes.', 'admin.orgUnits.unitType_']);
+  });
+
+  it("takes a 'prefix.' + expr concatenation as a prefix", () => {
+    const src = "const k = 'components.documentLibrary.errorMessages.' + code;";
+    const prefixes = scanReferences(src, 'f.ts').dynamicPrefixes.map((r) => r.key);
+    expect(prefixes).toEqual(['components.documentLibrary.errorMessages.']);
+  });
+
+  it('takes a concatenation head that ends mid-segment as a prefix, like a template head', () => {
+    const src = `const k = 'admin.orgUnits.unitType_' + type; const j = "h.pref" + code;`;
+    const prefixes = scanReferences(src, 'f.ts').dynamicPrefixes.map((r) => r.key);
+    expect(prefixes).toEqual(['admin.orgUnits.unitType_', 'h.pref']);
+  });
+
+  it('takes the head of a template opened on its own line', () => {
+    const src = `t(\`\n  pages.x.\${y}\`);`;
+    const prefixes = scanReferences(src, 'f.tsx').dynamicPrefixes.map((r) => r.key);
+    expect(prefixes).toEqual(['pages.x.']);
+  });
+
+  it('ignores template heads that name no namespace: no dot, or no letter', () => {
+    const src = `t(\`\${step.i18n_key}.title\`); fetch(\`/api/v1/exams/\${id}\`); t(\`plain\${x}\`);`;
+    expect(scanReferences(src, 'f.tsx').dynamicPrefixes).toEqual([]);
+  });
+});
+
+describe('effectivePrefixes — errors.* comes from the registry, not a prefix (TF-775 B)', () => {
+  it('drops a dynamic errors. prefix and anything under it, keeps the rest, de-duplicates', () => {
+    expect(effectivePrefixes(['errors.', 'errors.rag.', 'a.b.', 'a.b.'])).toEqual(['a.b.']);
+  });
+});
+
+describe('coveredBy / findUnreferencedKeys — which locale keys are live (TF-775 B)', () => {
+  const live = { exact: new Set(['a.exact', 'a.plural', 'a.parent']), prefixes: ['a.dyn.'] };
+
+  it('covers a key exactly, as plural base, as ancestor, and by prefix', () => {
+    expect(coveredBy('a.exact', live)).toBe('a.exact');
+    expect(coveredBy('a.plural_one', live)).toBe('a.plural');
+    expect(coveredBy('a.plural_other', live)).toBe('a.plural');
+    expect(coveredBy('a.plural_zero', live)).toBe('a.plural');
+    expect(coveredBy('a.plural_few', live)).toBe('a.plural');
+    expect(coveredBy('a.plural_many', live)).toBe('a.plural');
+    expect(coveredBy('a.parent.items.0', live)).toBe('a.parent');
+    expect(coveredBy('a.dyn.anything', live)).toBe('a.dyn.*');
+  });
+
+  it('does not treat a key as the ancestor of a sibling with a longer name', () => {
+    // `a.exact` must not cover `a.exactly` — ancestors split on dots, not characters.
+    expect(coveredBy('a.exactly', live)).toBeNull();
+  });
+
+  it('lets only the registry decide inside errors.: no prefix, no ancestor literal', () => {
+    const errorsLive = {
+      exact: new Set(['errors.rag.known', 'errors.rag']),
+      prefixes: effectivePrefixes(['errors.', 'errors.rag.']),
+    };
+    expect(coveredBy('errors.rag.known', errorsLive)).toBe('errors.rag.known');
+    expect(findUnreferencedKeys(['errors.rag.known', 'errors.rag.unregistered'], errorsLive)).toEqual([
+      'errors.rag.unregistered',
+    ]);
+  });
+
+  it('reports what nothing covers, and only that', () => {
+    const keys = ['a.exact', 'a.plural_one', 'a.dead', 'a.dyn.x', 'b.dead_one'];
+    expect(findUnreferencedKeys(keys, live)).toEqual(['a.dead', 'b.dead_one']);
+  });
+});
+
+describe('compareWithBaseline — the unreferenced-key ratchet only shrinks (TF-775 B)', () => {
+  it('passes when current and baseline agree', () => {
+    expect(compareWithBaseline(['a', 'b'], ['a', 'b'])).toEqual({ added: [], stale: [] });
+  });
+
+  it('reports a newly unreferenced key', () => {
+    expect(compareWithBaseline(['a', 'new'], ['a'])).toEqual({ added: ['new'], stale: [] });
+  });
+
+  it('reports a baseline entry that is referenced again or was deleted', () => {
+    expect(compareWithBaseline(['a'], ['a', 'gone'])).toEqual({ added: [], stale: ['gone'] });
+  });
+});
+
+describe('collectI18nKeys — i18n_key values in a data file (TF-775 B)', () => {
+  it('finds i18n_key at any depth, in objects and arrays, and nothing else', () => {
+    const data = {
+      teacher: { core: [{ step: 0, i18n_key: 'help.tour.a' }], tracks: [{ i18n_key: 'help.tour.b', label: 'x.y' }] },
+      i18n_key: 42,
+    };
+    expect(collectI18nKeys(data)).toEqual(['help.tour.a', 'help.tour.b']);
+  });
+});
+
+describe('absentScanRoots — part C only runs with every tier present (TF-775 B)', () => {
+  const roots = [
+    { dir: '/r/core/frontend/src', prefix: 'core/frontend/src' },
+    { dir: '/r/premium/frontend/src', prefix: 'premium/frontend/src' },
+    { dir: '/r/enterprise/frontend/src', prefix: 'enterprise/frontend/src' },
+  ];
+
+  it('reports nothing when every root exists (the private repo)', () => {
+    expect(absentScanRoots(roots, () => true)).toEqual([]);
+  });
+
+  it('reports the tiers the public mirror lacks', () => {
+    const mirror = (dir: string) => dir.includes('/core/');
+    expect(absentScanRoots(roots, mirror)).toEqual(['premium/frontend/src', 'enterprise/frontend/src']);
+  });
+});
+
+describe('partCMode — only a mirror may skip part C, and never where every tier is required (TF-775 B)', () => {
+  const roots = [
+    { prefix: 'core/frontend/src' },
+    { prefix: 'premium/frontend/src' },
+    { prefix: 'enterprise/frontend/src' },
+  ];
+  const tiers = ['premium/frontend/src', 'enterprise/frontend/src'];
+
+  it('runs when nothing is absent, whether or not every tier is required', () => {
+    expect(partCMode([], roots, false)).toEqual({ mode: 'run' });
+    expect(partCMode([], roots, true)).toEqual({ mode: 'run' });
+  });
+
+  it('skips in the public mirror, where every tier outside core/ is absent', () => {
+    expect(partCMode(tiers, roots, false)).toEqual({ mode: 'skip' });
+  });
+
+  it('fails when only one tier is absent — a renamed or removed tier, not a mirror', () => {
+    expect(partCMode(['enterprise/frontend/src'], roots, false).mode).toBe('fail');
+    expect(partCMode(['premium/frontend/src'], roots, false).mode).toBe('fail');
+  });
+
+  it('fails instead of skipping when every tier is required (the private CI)', () => {
+    expect(partCMode(tiers, roots, true).mode).toBe('fail');
+  });
+});
+
+describe('widePrefixes — broad prefixes are listed, widest first (TF-775 B)', () => {
+  it('counts the keys under each prefix and keeps those at or above the floor', () => {
+    const keys = ['a.x.1', 'a.x.2', 'a.x.3', 'b.y.1', 'b.y.2', 'c.z.1'];
+    expect(widePrefixes(['b.y.', 'a.x.', 'c.z.'], keys, 2)).toEqual([
+      { prefix: 'a.x.', covers: 3 },
+      { prefix: 'b.y.', covers: 2 },
+    ]);
   });
 });
