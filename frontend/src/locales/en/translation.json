@@ -1023,7 +1023,20 @@
         "columnStatus": "Status",
         "columnReview": "Review",
         "studentFallback": "Student #{{id}}",
-        "open": "Open"
+        "open": "Open",
+        "create": "New portfolio assessment",
+        "filterStatus": "Status",
+        "filterReview": "Review",
+        "filterTemplate": "Template",
+        "filterAll": "All",
+        "emptyFiltered": "No portfolio assessments match these filters.",
+        "columnTemplate": "Template",
+        "columnLastJob": "Last job",
+        "noJob": "Not uploaded yet",
+        "delete": "Delete",
+        "deleteBlocked": "Deleting is possible once the running job has finished.",
+        "rowsPerPage": "Rows per page",
+        "displayedRows": "{{from}}–{{to}} of {{count}}"
       },
       "templates": {
         "title": "Portfolio templates",
@@ -1035,10 +1048,11 @@
       "detail": {
         "back": "Back to overview",
         "sections": {
-          "upload": "The portfolio upload (ZIP archive or GitHub repository) will appear here.",
+          "upload": "The portfolio has not been uploaded yet. A teacher with management rights starts the upload.",
           "classification": "The review of the file-to-phase assignment will appear here.",
           "grading": "Starting the grading and its progress will appear here.",
-          "review": "The phase results and their review will appear here."
+          "review": "The phase results and their review will appear here.",
+          "uploadRunning": "The portfolio is being imported. You can see the progress above."
         },
         "retry": "Try again",
         "refreshFailed": "The status could not be refreshed; what you see may be out of date. {{reason}}",
@@ -1080,7 +1094,12 @@
         "stalled": "This job is taking unusually long. If nothing changes, please contact support.",
         "messages": "Messages",
         "unknownEntry": "Unknown message from the background job.",
-        "unknownEntryWithReason": "Unknown message from the background job: {{reason}}"
+        "unknownEntryWithReason": "Unknown message from the background job: {{reason}}",
+        "type": {
+          "ingest": "Import",
+          "classify": "Classification",
+          "grade": "Grading"
+        }
       },
       "jobCodes": {
         "portfolio_classification_batch_failed": "Some files could not be classified automatically. Please assign them to a phase manually.",
@@ -1116,11 +1135,13 @@
         "portfolio_grading_queue_unavailable": "The grading could not be started because the background service was unreachable.",
         "portfolio_grading_time_budget_exceeded": "The grading ran out of time before all phases were graded. You can resume the grading.",
         "portfolio_grading_timeout": "The grading exceeded its time limit.",
+        "portfolio_grading_watchdog_reaped": "The grading was stuck for too long and was cancelled automatically. Please start it again.",
         "portfolio_ingestion_archive_too_large": "The archive is too large once extracted.",
         "portfolio_ingestion_corrupt_archive": "The archive is corrupt or not a valid ZIP file.",
         "portfolio_ingestion_file_too_large": "A file in the archive exceeds the maximum file size.",
         "portfolio_ingestion_internal_error": "An unexpected internal error occurred while importing the files.",
         "portfolio_ingestion_interrupted": "The previous import attempt was interrupted. Please upload the archive again.",
+        "portfolio_ingestion_no_files": "No processable files were found in the archive or repository.",
         "portfolio_ingestion_path_traversal": "The archive contains disallowed file paths and was rejected.",
         "portfolio_ingestion_queue_unavailable": "The import could not be started because the background service was unreachable.",
         "portfolio_ingestion_time_budget_exceeded": "The import ran out of time; not all files were imported.",
@@ -1128,7 +1149,51 @@
         "portfolio_ingestion_too_many_files": "The archive contains too many files.",
         "portfolio_ingestion_watchdog_reaped": "The import was stuck for too long and was cancelled automatically. Please upload the archive again."
       },
-      "unknownValue": "Unknown ({{value}})"
+      "unknownValue": "Unknown ({{value}})",
+      "create": {
+        "title": "New portfolio assessment",
+        "template": "Template",
+        "noTemplates": "There is no active template yet. Create one under “Templates” first.",
+        "student": "Student",
+        "studentHelp": "Search by name or external ID",
+        "noStudents": "No students found",
+        "gradingScheme": "Grading scheme (optional)",
+        "gradingSchemeNone": "No grading scheme",
+        "frameworkConditions": "Framework conditions (optional)",
+        "frameworkConditionsHelp": "For example the assignment, scope or submission format. The AI takes them into account when grading.",
+        "repositoryUrl": "GitHub repository (optional)",
+        "repositoryUrlHelp": "Fetched during the import in addition to the ZIP archive. github.com only.",
+        "repositoryUrlInvalid": "Please enter a URL of the form https://github.com/<owner>/<repo>.",
+        "submit": "Create",
+        "repositoryUrlPlaceholder": "https://github.com/<owner>/<repo>"
+      },
+      "ingestion": {
+        "title": "Upload portfolio",
+        "retryHint": "The last import failed; the cause is shown above. You can upload the portfolio again.",
+        "repository": "Repository:",
+        "repositoryAlwaysFetched": "The repository is fetched on every import, also together with a ZIP archive.",
+        "tokenMissing": "Importing from GitHub requires a personal GitHub token. Store it here before you start the import.",
+        "tokenReplace": "The stored GitHub token did not work. Store a new token and start the import again.",
+        "tokenLabel": "GitHub token",
+        "tokenSave": "Save token",
+        "tokenHelp": "A token with read access to the repository is enough. It is stored encrypted and never shown again.",
+        "zipTitle": "ZIP archive",
+        "zipHelp": "ZIP file containing the portfolio, at most {{max_mb}} MB.",
+        "chooseFile": "Choose file",
+        "fileInfo": "{{name}} ({{size}} MB)",
+        "upload": "Upload and import",
+        "uploading": "Uploading … {{percent}} %",
+        "githubTitle": "GitHub only",
+        "githubHelp": "Imports the portfolio directly from the repository, without a ZIP archive.",
+        "githubStart": "Import from GitHub",
+        "creatorToken": "The import uses the GitHub token of the person who created this portfolio assessment.",
+        "creatorTokenFailed": "The GitHub token of the person who created this portfolio assessment did not work. Only they can replace it."
+      },
+      "delete": {
+        "title": "Delete portfolio assessment?",
+        "body": "The portfolio assessment of {{student}} ({{template}}) will be deleted together with all uploaded files and results. This cannot be undone.",
+        "confirm": "Delete"
+      }
     }
   },
   "admin": {
@@ -3379,6 +3444,8 @@
     "portfolio_assessment_classify_failed": "The classification could not be started.",
     "portfolio_assessment_confirm_classification_failed": "The classification could not be confirmed.",
     "portfolio_assessment_create_failed": "The portfolio assessment could not be created.",
+    "portfolio_assessment_delete_failed": "The portfolio assessment could not be deleted completely. Please try again.",
+    "portfolio_assessment_delete_job_active": "This portfolio assessment is currently being processed. It can only be deleted once processing has finished.",
     "portfolio_assessment_document_invalid_phase": "The selected phase does not belong to this portfolio assessment's template.",
     "portfolio_assessment_document_not_found": "The file was not found in this portfolio assessment.",
     "portfolio_assessment_document_update_failed": "The file's phase could not be changed.",
@@ -3389,6 +3456,7 @@
     "portfolio_assessment_grading_not_ready": "This portfolio assessment is not currently ready for grading.",
     "portfolio_assessment_grading_queue_unavailable": "The grading could not be started — the background service was unreachable. Please try again.",
     "portfolio_assessment_grading_scheme_not_found": "The selected grading scheme was not found or is not available to your institution.",
+    "portfolio_assessment_ingest_failed": "The import from GitHub could not be started.",
     "portfolio_assessment_invalid_repository_url": "The repository URL is invalid. Expected https://github.com/<owner>/<repo>.",
     "portfolio_assessment_list_failed": "The portfolio assessments could not be loaded.",
     "portfolio_assessment_load_failed": "The portfolio assessment could not be loaded.",
@@ -3396,8 +3464,10 @@
     "portfolio_assessment_phase_result_not_found": "The phase result was not found in this portfolio assessment.",
     "portfolio_assessment_phase_result_not_reviewable": "This phase is not yet completed and cannot be reviewed yet.",
     "portfolio_assessment_phase_result_override_invalid": "Invalid criterion override.",
+    "portfolio_assessment_repository_missing": "No GitHub repository is set for this portfolio assessment. Upload a ZIP archive instead.",
     "portfolio_assessment_review_failed": "The review could not be saved.",
     "portfolio_assessment_student_not_found": "The student was not found in your institution.",
+    "portfolio_assessment_student_search_failed": "The students could not be loaded.",
     "portfolio_assessment_template_not_found": "The portfolio template was not found or is not visible to you.",
     "portfolio_assessment_tier_insufficient": "Portfolio assessments require the Professional plan or higher.",
     "portfolio_assessment_unclassified_documents": "Not all files have been assigned to a phase yet.",

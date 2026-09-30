@@ -33,10 +33,9 @@ async function caught(promise: Promise<unknown>): Promise<AppError> {
 
 describe('portfolioApi', () => {
   it('liefert die Daten der Antwort', async () => {
-    client.get.mockResolvedValue({ data: [{ id: 'a-1' }] });
-    await expect(portfolioApi.listAssessments({ status: 'grading' })).resolves.toEqual([
-      { id: 'a-1' },
-    ]);
+    const page = { items: [{ id: 'a-1' }], total: 1, limit: 50, offset: 0 };
+    client.get.mockResolvedValue({ data: page });
+    await expect(portfolioApi.listAssessments({ status: 'grading' })).resolves.toEqual(page);
     expect(client.get).toHaveBeenCalledWith('/api/v1/portfolio-assessments', {
       params: { status: 'grading' },
     });
@@ -75,6 +74,29 @@ describe('portfolioApi', () => {
     expect(url).toBe('/api/v1/portfolio-assessments/a-1/upload');
     expect((body as FormData).get('file')).toBe(file);
     expect((config as { timeout: number }).timeout).toBeGreaterThan(30000);
+  });
+
+  it('meldet den Upload-Fortschritt als Anteil, auch ohne «total» vom Browser', async () => {
+    client.post.mockResolvedValue({ data: { id: 'a-1' } });
+    const file = new File(['0123456789'], 'p.zip');
+    const onProgress = jest.fn();
+    await portfolioApi.uploadArchive('a-1', file, onProgress);
+    const config = client.post.mock.calls[0][2] as {
+      onUploadProgress: (event: { loaded: number; total?: number }) => void;
+    };
+    config.onUploadProgress({ loaded: 25, total: 100 });
+    config.onUploadProgress({ loaded: 5 });
+    config.onUploadProgress({ loaded: 120, total: 100 });
+    expect(onProgress.mock.calls).toEqual([[0.25], [0.5], [1]]);
+  });
+
+  it('liefert die Treffer der Studierenden-Suche als Liste', async () => {
+    const hit = { id: 7, external_id: 'mia@x.ch', display_name: 'Mia', classes: [] };
+    client.get.mockResolvedValue({ data: { items: [hit] } });
+    await expect(portfolioApi.searchStudents('Mia')).resolves.toEqual([hit]);
+    expect(client.get).toHaveBeenCalledWith('/api/v1/portfolio-assessments/students', {
+      params: { search: 'Mia', limit: 20 },
+    });
   });
 
   it('meldet einen Upload-Abbruch nach dem Timeout mit eigenem Code', async () => {
@@ -224,6 +246,27 @@ describe('portfolioApi', () => {
       'put',
       '/api/v1/portfolio-github-credential',
       'portfolio_assessment_github_credential_save_failed',
+    ],
+    [
+      'searchStudents',
+      () => portfolioApi.searchStudents('Mia'),
+      'get',
+      '/api/v1/portfolio-assessments/students',
+      'portfolio_assessment_student_search_failed',
+    ],
+    [
+      'deleteAssessment',
+      () => portfolioApi.deleteAssessment('a-1'),
+      'delete',
+      '/api/v1/portfolio-assessments/a-1',
+      'portfolio_assessment_delete_failed',
+    ],
+    [
+      'startRepositoryIngestion',
+      () => portfolioApi.startRepositoryIngestion('a-1'),
+      'post',
+      '/api/v1/portfolio-assessments/a-1/ingest',
+      'portfolio_assessment_ingest_failed',
     ],
   ];
 

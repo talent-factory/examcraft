@@ -1023,7 +1023,20 @@
         "columnStatus": "Status",
         "columnReview": "Überprüfung",
         "studentFallback": "Studierende/r #{{id}}",
-        "open": "Öffnen"
+        "open": "Öffnen",
+        "create": "Neue Portfolio-Bewertung",
+        "filterStatus": "Status",
+        "filterReview": "Überprüfung",
+        "filterTemplate": "Template",
+        "filterAll": "Alle",
+        "emptyFiltered": "Keine Portfolio-Bewertungen für diese Filter.",
+        "columnTemplate": "Template",
+        "columnLastJob": "Letzter Auftrag",
+        "noJob": "Noch kein Upload",
+        "delete": "Löschen",
+        "deleteBlocked": "Löschen ist erst möglich, wenn der laufende Auftrag beendet ist.",
+        "rowsPerPage": "Zeilen pro Seite",
+        "displayedRows": "{{from}}–{{to}} von {{count}}"
       },
       "templates": {
         "title": "Portfolio-Templates",
@@ -1035,10 +1048,11 @@
       "detail": {
         "back": "Zurück zur Übersicht",
         "sections": {
-          "upload": "Hier folgt der Upload des Portfolios (ZIP-Archiv oder GitHub-Repository).",
+          "upload": "Das Portfolio wurde noch nicht hochgeladen. Den Upload startet eine Lehrperson mit Verwaltungsrecht.",
           "classification": "Hier folgt die Überprüfung der Datei-Zuordnung zu den Phasen.",
           "grading": "Hier folgen Start und Fortschritt der Bewertung.",
-          "review": "Hier folgen die Phasenergebnisse und deren Überprüfung."
+          "review": "Hier folgen die Phasenergebnisse und deren Überprüfung.",
+          "uploadRunning": "Das Portfolio wird importiert. Den Fortschritt siehst du oben."
         },
         "retry": "Erneut versuchen",
         "refreshFailed": "Der Status konnte nicht aktualisiert werden; die Anzeige ist möglicherweise veraltet. {{reason}}",
@@ -1080,7 +1094,12 @@
         "stalled": "Dieser Auftrag läuft ungewöhnlich lange. Falls sich nichts mehr bewegt, wende dich bitte an den Support.",
         "messages": "Meldungen",
         "unknownEntry": "Unbekannte Meldung des Hintergrund-Auftrags.",
-        "unknownEntryWithReason": "Unbekannte Meldung des Hintergrund-Auftrags: {{reason}}"
+        "unknownEntryWithReason": "Unbekannte Meldung des Hintergrund-Auftrags: {{reason}}",
+        "type": {
+          "ingest": "Import",
+          "classify": "Klassifikation",
+          "grade": "Bewertung"
+        }
       },
       "jobCodes": {
         "portfolio_classification_batch_failed": "Ein Teil der Dateien konnte nicht automatisch klassifiziert werden. Ordne diese Dateien bitte manuell einer Phase zu.",
@@ -1116,11 +1135,13 @@
         "portfolio_grading_queue_unavailable": "Die Bewertung konnte nicht gestartet werden, weil der Hintergrund-Dienst nicht erreichbar war.",
         "portfolio_grading_time_budget_exceeded": "Das Zeitbudget der Bewertung war erschöpft, bevor alle Phasen bewertet waren. Du kannst die Bewertung fortsetzen.",
         "portfolio_grading_timeout": "Die Bewertung hat das Zeitlimit überschritten.",
+        "portfolio_grading_watchdog_reaped": "Die Bewertung hing zu lange und wurde automatisch abgebrochen. Bitte starte sie erneut.",
         "portfolio_ingestion_archive_too_large": "Das Archiv ist entpackt zu gross.",
         "portfolio_ingestion_corrupt_archive": "Das Archiv ist beschädigt oder keine gültige ZIP-Datei.",
         "portfolio_ingestion_file_too_large": "Eine Datei im Archiv überschreitet die maximale Dateigrösse.",
         "portfolio_ingestion_internal_error": "Beim Einlesen der Dateien ist ein unerwarteter interner Fehler aufgetreten.",
         "portfolio_ingestion_interrupted": "Der vorherige Einleseversuch wurde unterbrochen. Bitte lade das Archiv erneut hoch.",
+        "portfolio_ingestion_no_files": "Im Archiv bzw. Repository wurden keine verarbeitbaren Dateien gefunden.",
         "portfolio_ingestion_path_traversal": "Das Archiv enthält unzulässige Dateipfade und wurde abgelehnt.",
         "portfolio_ingestion_queue_unavailable": "Das Einlesen konnte nicht gestartet werden, weil der Hintergrund-Dienst nicht erreichbar war.",
         "portfolio_ingestion_time_budget_exceeded": "Das Zeitbudget für das Einlesen war erschöpft; nicht alle Dateien wurden übernommen.",
@@ -1128,7 +1149,51 @@
         "portfolio_ingestion_too_many_files": "Das Archiv enthält zu viele Dateien.",
         "portfolio_ingestion_watchdog_reaped": "Das Einlesen hing zu lange und wurde automatisch abgebrochen. Bitte lade das Archiv erneut hoch."
       },
-      "unknownValue": "Unbekannt ({{value}})"
+      "unknownValue": "Unbekannt ({{value}})",
+      "create": {
+        "title": "Neue Portfolio-Bewertung",
+        "template": "Template",
+        "noTemplates": "Es gibt noch kein aktives Template. Lege zuerst eines unter «Templates» an.",
+        "student": "Studierende/r",
+        "studentHelp": "Nach Name oder externer ID suchen",
+        "noStudents": "Keine Studierenden gefunden",
+        "gradingScheme": "Notenschema (optional)",
+        "gradingSchemeNone": "Kein Notenschema",
+        "frameworkConditions": "Rahmenbedingungen (optional)",
+        "frameworkConditionsHelp": "Zum Beispiel Aufgabenstellung, Umfang oder Abgabeform. Die KI berücksichtigt sie bei der Bewertung.",
+        "repositoryUrl": "GitHub-Repository (optional)",
+        "repositoryUrlHelp": "Wird beim Import zusätzlich zum ZIP-Archiv geladen. Nur github.com.",
+        "repositoryUrlInvalid": "Bitte eine URL der Form https://github.com/<owner>/<repo> angeben.",
+        "submit": "Anlegen",
+        "repositoryUrlPlaceholder": "https://github.com/<owner>/<repo>"
+      },
+      "ingestion": {
+        "title": "Portfolio hochladen",
+        "retryHint": "Der letzte Import ist fehlgeschlagen; die Ursache steht oben. Du kannst das Portfolio erneut hochladen.",
+        "repository": "Repository:",
+        "repositoryAlwaysFetched": "Das Repository wird bei jedem Import geladen, auch zusammen mit einem ZIP-Archiv.",
+        "tokenMissing": "Für den Import aus GitHub ist ein persönlicher GitHub-Token nötig. Hinterlege ihn hier, bevor du den Import startest.",
+        "tokenReplace": "Der gespeicherte GitHub-Token hat nicht funktioniert. Hinterlege einen neuen Token und starte den Import erneut.",
+        "tokenLabel": "GitHub-Token",
+        "tokenSave": "Token speichern",
+        "tokenHelp": "Ein Token mit Lesezugriff auf das Repository genügt. Er wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "zipTitle": "ZIP-Archiv",
+        "zipHelp": "ZIP-Datei mit dem Portfolio, höchstens {{max_mb}} MB.",
+        "chooseFile": "Datei wählen",
+        "fileInfo": "{{name}} ({{size}} MB)",
+        "upload": "Hochladen und importieren",
+        "uploading": "Wird hochgeladen … {{percent}} %",
+        "githubTitle": "Nur aus GitHub",
+        "githubHelp": "Importiert das Portfolio ohne ZIP-Archiv direkt aus dem Repository.",
+        "githubStart": "Aus GitHub importieren",
+        "creatorToken": "Der Import verwendet den GitHub-Token der Person, die diese Portfolio-Bewertung angelegt hat.",
+        "creatorTokenFailed": "Der GitHub-Token der Person, die diese Portfolio-Bewertung angelegt hat, hat nicht funktioniert. Nur sie kann ihn ersetzen."
+      },
+      "delete": {
+        "title": "Portfolio-Bewertung löschen?",
+        "body": "Die Portfolio-Bewertung von {{student}} ({{template}}) wird mit allen hochgeladenen Dateien und Ergebnissen gelöscht. Das lässt sich nicht rückgängig machen.",
+        "confirm": "Löschen"
+      }
     }
   },
   "admin": {
@@ -3379,6 +3444,8 @@
     "portfolio_assessment_classify_failed": "Die Klassifikation konnte nicht gestartet werden.",
     "portfolio_assessment_confirm_classification_failed": "Die Klassifikation konnte nicht bestätigt werden.",
     "portfolio_assessment_create_failed": "Die Portfolio-Bewertung konnte nicht angelegt werden.",
+    "portfolio_assessment_delete_failed": "Die Portfolio-Bewertung konnte nicht vollständig gelöscht werden. Bitte versuche es erneut.",
+    "portfolio_assessment_delete_job_active": "Für diese Portfolio-Bewertung läuft gerade eine Verarbeitung. Sie kann erst gelöscht werden, wenn diese abgeschlossen ist.",
     "portfolio_assessment_document_invalid_phase": "Die gewählte Phase gehört nicht zum Template dieser Portfolio-Bewertung.",
     "portfolio_assessment_document_not_found": "Die Datei wurde in dieser Portfolio-Bewertung nicht gefunden.",
     "portfolio_assessment_document_update_failed": "Die Phase der Datei konnte nicht geändert werden.",
@@ -3389,6 +3456,7 @@
     "portfolio_assessment_grading_not_ready": "Diese Portfolio-Bewertung ist aktuell nicht bereit für eine Bewertung.",
     "portfolio_assessment_grading_queue_unavailable": "Die Bewertung konnte nicht gestartet werden — der Hintergrund-Dienst war nicht erreichbar. Bitte erneut versuchen.",
     "portfolio_assessment_grading_scheme_not_found": "Das gewählte Notenschema wurde nicht gefunden oder ist für deine Institution nicht verfügbar.",
+    "portfolio_assessment_ingest_failed": "Der Import aus GitHub konnte nicht gestartet werden.",
     "portfolio_assessment_invalid_repository_url": "Die Repository-URL ist ungültig. Erwartet wird https://github.com/<owner>/<repo>.",
     "portfolio_assessment_list_failed": "Die Portfolio-Bewertungen konnten nicht geladen werden.",
     "portfolio_assessment_load_failed": "Die Portfolio-Bewertung konnte nicht geladen werden.",
@@ -3396,8 +3464,10 @@
     "portfolio_assessment_phase_result_not_found": "Das Phasenergebnis wurde in dieser Portfolio-Bewertung nicht gefunden.",
     "portfolio_assessment_phase_result_not_reviewable": "Diese Phase ist noch nicht abgeschlossen und kann daher noch nicht geprüft werden.",
     "portfolio_assessment_phase_result_override_invalid": "Ungültige Kriterien-Überschreibung.",
+    "portfolio_assessment_repository_missing": "Für diese Portfolio-Bewertung ist kein GitHub-Repository hinterlegt. Lade stattdessen ein ZIP-Archiv hoch.",
     "portfolio_assessment_review_failed": "Die Überprüfung konnte nicht gespeichert werden.",
     "portfolio_assessment_student_not_found": "Die lernende Person wurde in deiner Institution nicht gefunden.",
+    "portfolio_assessment_student_search_failed": "Die Studierenden konnten nicht geladen werden.",
     "portfolio_assessment_template_not_found": "Das Portfolio-Template wurde nicht gefunden oder ist für dich nicht sichtbar.",
     "portfolio_assessment_tier_insufficient": "Portfolio-Bewertungen sind erst ab dem Professional-Abonnement verfügbar.",
     "portfolio_assessment_unclassified_documents": "Es sind noch nicht alle Dateien einer Phase zugeordnet.",

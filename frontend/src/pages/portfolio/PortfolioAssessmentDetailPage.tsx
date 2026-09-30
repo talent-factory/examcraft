@@ -2,21 +2,27 @@
  * `/portfolio/:id` — detail scaffold (TF-987).
  *
  * Owns polling (`usePortfolioAssessment`), the status stepper and the job
- * panel; the body branches on the current step. Each branch is a placeholder
- * the later packages replace: upload → P3 (TF-989), classification → P4
- * (TF-990), grading → P5a (TF-991), review → P5b (TF-992).
+ * panel; the body branches on the current step. The upload step is the
+ * ingestion panel (TF-989); the others are placeholders the later packages
+ * replace: classification → P4 (TF-990), grading → P5a (TF-991), review →
+ * P5b (TF-992).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { Alert, Box, Button, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { useAuth } from '../../contexts/AuthContext';
 import { translateError } from '../../errors';
 import { useFeatures } from '../../hooks/useFeatures';
-import { usePortfolioAssessment } from '../../hooks/usePortfolioAssessment';
+import {
+  isPortfolioJobActive,
+  usePortfolioAssessment,
+} from '../../hooks/usePortfolioAssessment';
 import {
   PortfolioUpgradePrompt,
   isPortfolioTierError,
 } from '../../components/portfolio/PortfolioGate';
+import { PortfolioIngestionPanel } from '../../components/portfolio/PortfolioIngestionPanel';
 import { PortfolioJobPanel } from '../../components/portfolio/PortfolioJobPanel';
 import {
   PortfolioStatusStepper,
@@ -27,6 +33,7 @@ const PortfolioAssessmentDetailPage: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { tier } = useFeatures();
+  const { hasPermission } = useAuth();
   const { assessment, isLoading, error, refetch, runningSince } = usePortfolioAssessment(id);
 
   if (isPortfolioTierError(error)) {
@@ -80,14 +87,24 @@ const PortfolioAssessmentDetailPage: React.FC = () => {
               runningSince={runningSince}
             />
           )}
-          {step ? (
+          {step === 'upload' &&
+          hasPermission('portfolio_assessments:manage') &&
+          !isPortfolioJobActive(assessment.job) ? (
+            <Box data-testid="portfolio-detail-section-upload">
+              <PortfolioIngestionPanel assessment={assessment} />
+            </Box>
+          ) : step ? (
             <Paper
               variant="outlined"
               sx={{ p: 2 }}
               data-testid={`portfolio-detail-section-${step}`}
             >
               <Typography color="textSecondary">
-                {t(`pages.portfolio.detail.sections.${step}`)}
+                {t(
+                  step === 'upload' && isPortfolioJobActive(assessment.job)
+                    ? 'pages.portfolio.detail.sections.uploadRunning'
+                    : `pages.portfolio.detail.sections.${step}`,
+                )}
               </Typography>
             </Paper>
           ) : (

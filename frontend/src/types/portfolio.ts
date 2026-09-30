@@ -4,10 +4,9 @@
  * Mirrors the premium routers' serializers:
  * `premium/backend/api/v1/portfolio_templates.py::_serialize` and
  * `premium/backend/api/v1/portfolio_assessments.py::_serialize` /
- * `_serialize_phase_result` / `_serialize_document`, plus a few optional
- * fields the backend does not send yet — each marked NOT YET SENT or
- * PENDING TF-986. The status unions are the CHECK constraints in
- * `premium/backend/models/portfolio_assessment.py`.
+ * `_serialize_phase_result` / `_serialize_document` and the enriched list of
+ * `list_portfolio_assessments` (TF-986). The status unions are the CHECK
+ * constraints in `premium/backend/models/portfolio_assessment.py`.
  *
  * IDs of portfolio entities are UUID strings; `student_id`, `grading_scheme_id`,
  * `document_id` and user ids are integers (core tables) — except inside job
@@ -172,11 +171,13 @@ export const PORTFOLIO_JOB_CODES = [
   'portfolio_grading_queue_unavailable',
   'portfolio_grading_time_budget_exceeded',
   'portfolio_grading_timeout',
+  'portfolio_grading_watchdog_reaped',
   'portfolio_ingestion_archive_too_large',
   'portfolio_ingestion_corrupt_archive',
   'portfolio_ingestion_file_too_large',
   'portfolio_ingestion_internal_error',
   'portfolio_ingestion_interrupted',
+  'portfolio_ingestion_no_files',
   'portfolio_ingestion_path_traversal',
   'portfolio_ingestion_queue_unavailable',
   'portfolio_ingestion_time_budget_exceeded',
@@ -217,21 +218,15 @@ export interface PortfolioJobLogEntry {
 
 export interface PortfolioAssessmentJob {
   id: string;
+  job_type: PortfolioJobType;
   status: PortfolioJobStatus;
   files_total: number | null;
   files_done: number;
   error_log: PortfolioJobLogEntry[] | null;
-  /**
-   * NOT YET SENT by the backend: the job dict in `_serialize` only has
-   * `id/status/files_total/files_done/error_log`. The columns exist on
-   * `PortfolioAssessmentJob`; until the serializer exposes them,
-   * `usePortfolioAssessment` falls back to the moment it first saw the job
-   * active (see `runningSinceApproximate`).
-   */
-  job_type?: PortfolioJobType;
-  created_at?: string | null;
-  started_at?: string | null;
-  finished_at?: string | null;
+  created_at: string | null;
+  /** `null` until a worker picks the job up. */
+  started_at: string | null;
+  finished_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,12 +268,8 @@ export interface PortfolioAssessmentAggregate {
 }
 
 interface PortfolioPhaseResultBase {
-  /**
-   * The row id is not part of the serializer today, but the approve/override
-   * routes are keyed by it (`/phase-results/{phase_result_id}`). P5 (TF-991)
-   * has to close that gap; typed optional so nobody relies on it silently.
-   */
-  id?: string;
+  /** Key of the approve/override routes (`/phase-results/{phase_result_id}`, TF-986). */
+  id: string;
   phase_id: string;
   warnings: PortfolioJobLogEntry[] | null;
   reviewer_id: number | null;
@@ -321,6 +312,11 @@ export interface PortfolioAssessmentSummary {
   template_id: string;
   template_version: number;
   student_id: number;
+  /**
+   * Creator; `null` once that account is deleted. Repository ingestion uses
+   * this user's GitHub token, not the token of whoever starts it.
+   */
+  created_by: number | null;
   status: PortfolioAssessmentStatus;
   framework_conditions: string | null;
   source_repository_url: string | null;
@@ -330,7 +326,9 @@ export interface PortfolioAssessmentSummary {
   overall_points_awarded: number | null;
   overall_points_max: number | null;
   overall_percentage: number | null;
-  /** Latest job; always `null` in today's list response (TF-986 changes that). */
+  created_at: string | null;
+  updated_at: string | null;
+  /** Latest job, `null` before the first upload. */
   job: PortfolioAssessmentJob | null;
 }
 
@@ -346,32 +344,38 @@ export interface PortfolioAssessmentDetail extends PortfolioAssessmentSummary {
   overall_grade: string | null;
 }
 
-/**
- * List entry of `GET /api/v1/portfolio-assessments`.
- *
- * PENDING TF-986 (P0, not merged when this was written): the enriched list
- * will add `student_name`, `template_name` and a populated `job`. The names
- * below follow the TF-986 ticket text; re-check them against its PR before
- * P3 (TF-989) relies on them.
- */
+/** List entry of `GET /api/v1/portfolio-assessments`. */
 export interface PortfolioAssessmentListItem extends PortfolioAssessmentSummary {
-  student_name?: string | null;
-  template_name?: string | null;
+  /** The student's `display_name`, or `external_id` when it has none. */
+  student_name: string;
+  student_external_id: string;
+  template_name: string;
 }
 
-/**
- * Query filters and pagination of the list endpoint.
- *
- * PENDING TF-986: the backend ignores all of these today. Names follow the
- * TF-986 ticket (`status`, `review_status`, `template_id`, `limit`/`offset`
- * like `GET /api/v1/students`).
- */
+/** Page of `GET /api/v1/portfolio-assessments`, newest first. */
+export interface PortfolioAssessmentListPage {
+  items: PortfolioAssessmentListItem[];
+  /** Matches of the filters across all pages. */
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Query filters and pagination of the list endpoint (`limit` 1–200, default 50). */
 export interface PortfolioAssessmentListParams {
   status?: PortfolioAssessmentStatus;
   review_status?: PortfolioAssessmentReviewStatus;
   template_id?: string;
   limit?: number;
   offset?: number;
+}
+
+/** One hit of `GET /api/v1/portfolio-assessments/students` (own institution only). */
+export interface PortfolioStudentOption {
+  id: number;
+  external_id: string;
+  display_name: string | null;
+  classes: { class_id: number; class_name: string }[];
 }
 
 export interface PortfolioAssessmentCreatePayload {

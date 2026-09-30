@@ -73,7 +73,7 @@ beforeEach(() => {
   mockTier = 'professional';
   mockFeaturesLoading = false;
   (isFullDeployment as jest.Mock).mockReturnValue(true);
-  api.listAssessments.mockReset().mockResolvedValue([]);
+  api.listAssessments.mockReset().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
   api.listTemplates.mockReset().mockResolvedValue([]);
   api.getAssessment.mockReset();
 });

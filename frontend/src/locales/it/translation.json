@@ -1023,7 +1023,20 @@
         "columnStatus": "Stato",
         "columnReview": "Revisione",
         "studentFallback": "Studente n. {{id}}",
-        "open": "Apri"
+        "open": "Apri",
+        "create": "Nuova valutazione del portfolio",
+        "filterStatus": "Stato",
+        "filterReview": "Verifica",
+        "filterTemplate": "Modello",
+        "filterAll": "Tutti",
+        "emptyFiltered": "Nessuna valutazione del portfolio corrisponde a questi filtri.",
+        "columnTemplate": "Modello",
+        "columnLastJob": "Ultima attività",
+        "noJob": "Non ancora caricato",
+        "delete": "Elimina",
+        "deleteBlocked": "L'eliminazione sarà possibile al termine dell'attività in corso.",
+        "rowsPerPage": "Righe per pagina",
+        "displayedRows": "{{from}}–{{to}} di {{count}}"
       },
       "templates": {
         "title": "Modelli di portfolio",
@@ -1035,10 +1048,11 @@
       "detail": {
         "back": "Torna alla panoramica",
         "sections": {
-          "upload": "Qui apparirà il caricamento del portfolio (archivio ZIP o repository GitHub).",
+          "upload": "Il portfolio non è ancora stato caricato. Il caricamento viene avviato da un docente con diritti di gestione.",
           "classification": "Qui apparirà la verifica dell'assegnazione dei file alle fasi.",
           "grading": "Qui appariranno l'avvio e l'avanzamento della valutazione.",
-          "review": "Qui appariranno i risultati delle fasi e la loro revisione."
+          "review": "Qui appariranno i risultati delle fasi e la loro revisione.",
+          "uploadRunning": "Il portfolio è in fase di importazione. L'avanzamento è visibile qui sopra."
         },
         "retry": "Riprova",
         "refreshFailed": "Non è stato possibile aggiornare lo stato; la visualizzazione potrebbe non essere aggiornata. {{reason}}",
@@ -1080,7 +1094,12 @@
         "stalled": "Questa attività sta durando insolitamente a lungo. Se non cambia nulla, contatta l'assistenza.",
         "messages": "Messaggi",
         "unknownEntry": "Messaggio sconosciuto dell'attività in background.",
-        "unknownEntryWithReason": "Messaggio sconosciuto dell'attività in background: {{reason}}"
+        "unknownEntryWithReason": "Messaggio sconosciuto dell'attività in background: {{reason}}",
+        "type": {
+          "ingest": "Importazione",
+          "classify": "Classificazione",
+          "grade": "Valutazione"
+        }
       },
       "jobCodes": {
         "portfolio_classification_batch_failed": "Alcuni file non sono stati classificati automaticamente. Assegnali manualmente a una fase.",
@@ -1116,11 +1135,13 @@
         "portfolio_grading_queue_unavailable": "Non è stato possibile avviare la valutazione perché il servizio in background non era raggiungibile.",
         "portfolio_grading_time_budget_exceeded": "Il tempo a disposizione per la valutazione si è esaurito prima di valutare tutte le fasi. Puoi riprendere la valutazione.",
         "portfolio_grading_timeout": "La valutazione ha superato il limite di tempo.",
+        "portfolio_grading_watchdog_reaped": "La valutazione è rimasta bloccata troppo a lungo ed è stata interrotta automaticamente. Avviala di nuovo.",
         "portfolio_ingestion_archive_too_large": "L'archivio è troppo grande una volta estratto.",
         "portfolio_ingestion_corrupt_archive": "L'archivio è danneggiato o non è un file ZIP valido.",
         "portfolio_ingestion_file_too_large": "Un file dell'archivio supera la dimensione massima consentita.",
         "portfolio_ingestion_internal_error": "Si è verificato un errore interno imprevisto durante l'importazione dei file.",
         "portfolio_ingestion_interrupted": "Il precedente tentativo di importazione è stato interrotto. Carica di nuovo l'archivio.",
+        "portfolio_ingestion_no_files": "Nell'archivio o nel repository non sono stati trovati file elaborabili.",
         "portfolio_ingestion_path_traversal": "L'archivio contiene percorsi di file non consentiti ed è stato rifiutato.",
         "portfolio_ingestion_queue_unavailable": "Non è stato possibile avviare l'importazione perché il servizio in background non era raggiungibile.",
         "portfolio_ingestion_time_budget_exceeded": "Il tempo a disposizione per l'importazione si è esaurito; non tutti i file sono stati importati.",
@@ -1128,7 +1149,51 @@
         "portfolio_ingestion_too_many_files": "L'archivio contiene troppi file.",
         "portfolio_ingestion_watchdog_reaped": "L'importazione è rimasta bloccata troppo a lungo ed è stata interrotta automaticamente. Carica di nuovo l'archivio."
       },
-      "unknownValue": "Sconosciuto ({{value}})"
+      "unknownValue": "Sconosciuto ({{value}})",
+      "create": {
+        "title": "Nuova valutazione del portfolio",
+        "template": "Modello",
+        "noTemplates": "Non esiste ancora alcun modello attivo. Creane prima uno in «Modelli».",
+        "student": "Studente",
+        "studentHelp": "Cerca per nome o ID esterno",
+        "noStudents": "Nessuno studente trovato",
+        "gradingScheme": "Scala di valutazione (facoltativa)",
+        "gradingSchemeNone": "Nessuna scala di valutazione",
+        "frameworkConditions": "Condizioni quadro (facoltative)",
+        "frameworkConditionsHelp": "Ad esempio il compito, l'estensione o la forma di consegna. L'IA ne tiene conto nella valutazione.",
+        "repositoryUrl": "Repository GitHub (facoltativo)",
+        "repositoryUrlHelp": "Caricato durante l'importazione in aggiunta all'archivio ZIP. Solo github.com.",
+        "repositoryUrlInvalid": "Inserisci un URL nel formato https://github.com/<owner>/<repo>.",
+        "submit": "Crea",
+        "repositoryUrlPlaceholder": "https://github.com/<owner>/<repo>"
+      },
+      "ingestion": {
+        "title": "Carica il portfolio",
+        "retryHint": "L'ultima importazione non è riuscita; la causa è indicata qui sopra. Puoi caricare di nuovo il portfolio.",
+        "repository": "Repository:",
+        "repositoryAlwaysFetched": "Il repository viene caricato a ogni importazione, anche insieme a un archivio ZIP.",
+        "tokenMissing": "Per importare da GitHub serve un token GitHub personale. Salvalo qui prima di avviare l'importazione.",
+        "tokenReplace": "Il token GitHub salvato non ha funzionato. Salva un nuovo token e avvia di nuovo l'importazione.",
+        "tokenLabel": "Token GitHub",
+        "tokenSave": "Salva token",
+        "tokenHelp": "Basta un token con accesso in lettura al repository. Viene salvato in forma cifrata e non viene più mostrato.",
+        "zipTitle": "Archivio ZIP",
+        "zipHelp": "File ZIP con il portfolio, al massimo {{max_mb}} MB.",
+        "chooseFile": "Scegli file",
+        "fileInfo": "{{name}} ({{size}} MB)",
+        "upload": "Carica e importa",
+        "uploading": "Caricamento … {{percent}} %",
+        "githubTitle": "Solo da GitHub",
+        "githubHelp": "Importa il portfolio direttamente dal repository, senza archivio ZIP.",
+        "githubStart": "Importa da GitHub",
+        "creatorToken": "L'importazione usa il token GitHub della persona che ha creato questa valutazione del portfolio.",
+        "creatorTokenFailed": "Il token GitHub della persona che ha creato questa valutazione del portfolio non ha funzionato. Solo lei può sostituirlo."
+      },
+      "delete": {
+        "title": "Eliminare la valutazione del portfolio?",
+        "body": "La valutazione del portfolio di {{student}} ({{template}}) verrà eliminata insieme a tutti i file caricati e ai risultati. L'operazione è irreversibile.",
+        "confirm": "Elimina"
+      }
     }
   },
   "admin": {
@@ -3379,6 +3444,8 @@
     "portfolio_assessment_classify_failed": "Non è stato possibile avviare la classificazione.",
     "portfolio_assessment_confirm_classification_failed": "Non è stato possibile confermare la classificazione.",
     "portfolio_assessment_create_failed": "Non è stato possibile creare la valutazione del portfolio.",
+    "portfolio_assessment_delete_failed": "Non è stato possibile eliminare completamente la valutazione del portfolio. Riprova.",
+    "portfolio_assessment_delete_job_active": "Questa valutazione del portfolio è attualmente in elaborazione. Potrà essere eliminata solo al termine dell'elaborazione.",
     "portfolio_assessment_document_invalid_phase": "La fase selezionata non appartiene al modello di questa valutazione del portfolio.",
     "portfolio_assessment_document_not_found": "Il file non è stato trovato in questa valutazione del portfolio.",
     "portfolio_assessment_document_update_failed": "Non è stato possibile modificare la fase del file.",
@@ -3389,6 +3456,7 @@
     "portfolio_assessment_grading_not_ready": "Questa valutazione del portfolio non è attualmente pronta per la valutazione.",
     "portfolio_assessment_grading_queue_unavailable": "Non è stato possibile avviare la valutazione — il servizio in background non era raggiungibile. Riprova.",
     "portfolio_assessment_grading_scheme_not_found": "La scala di valutazione selezionata non è stata trovata o non è disponibile per la tua istituzione.",
+    "portfolio_assessment_ingest_failed": "L'importazione da GitHub non è stata avviata.",
     "portfolio_assessment_invalid_repository_url": "L'URL del repository non è valido. Formato atteso: https://github.com/<owner>/<repo>.",
     "portfolio_assessment_list_failed": "Non è stato possibile caricare le valutazioni del portfolio.",
     "portfolio_assessment_load_failed": "Non è stato possibile caricare la valutazione del portfolio.",
@@ -3396,8 +3464,10 @@
     "portfolio_assessment_phase_result_not_found": "Il risultato della fase non è stato trovato in questa valutazione del portfolio.",
     "portfolio_assessment_phase_result_not_reviewable": "Questa fase non è ancora completata e non può quindi ancora essere verificata.",
     "portfolio_assessment_phase_result_override_invalid": "Sovrascrittura del criterio non valida.",
+    "portfolio_assessment_repository_missing": "Per questa valutazione del portfolio non è impostato alcun repository GitHub. Carica invece un archivio ZIP.",
     "portfolio_assessment_review_failed": "Non è stato possibile salvare la revisione.",
     "portfolio_assessment_student_not_found": "La persona in formazione non è stata trovata nella tua istituzione.",
+    "portfolio_assessment_student_search_failed": "Non è stato possibile caricare gli studenti.",
     "portfolio_assessment_template_not_found": "Il modello di portfolio non è stato trovato o non è visibile per te.",
     "portfolio_assessment_tier_insufficient": "Le valutazioni del portfolio richiedono l'abbonamento Professional o superiore.",
     "portfolio_assessment_unclassified_documents": "Non tutti i file sono ancora stati assegnati a una fase.",

@@ -18,6 +18,12 @@ jest.mock('../../../hooks/useFeatures', () => ({
   useFeatures: () => ({ tier: 'professional', isLoading: false }),
 }));
 
+// Read-only by default: the upload step then shows its placeholder. The
+// ingestion panel has its own tests (PortfolioIngestionPanel.test.tsx).
+jest.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => false }),
+}));
+
 jest.mock('../../../api/portfolioApi', () => ({
   portfolioApi: { getAssessment: jest.fn() },
 }));
@@ -33,6 +39,7 @@ function assessment(
     template_id: 't-1',
     template_version: 1,
     student_id: 7,
+    created_by: 1,
     status,
     framework_conditions: null,
     source_repository_url: null,
@@ -42,6 +49,8 @@ function assessment(
     overall_points_awarded: null,
     overall_points_max: null,
     overall_percentage: null,
+    created_at: null,
+    updated_at: null,
     job,
     documents: [],
     phase_results: [],
@@ -52,10 +61,14 @@ function assessment(
 function job(overrides: Partial<PortfolioAssessmentJob> = {}): PortfolioAssessmentJob {
   return {
     id: 'job-1',
+    job_type: 'ingest',
     status: 'running',
     files_total: null,
     files_done: 0,
     error_log: null,
+    created_at: null,
+    started_at: null,
+    finished_at: null,
     ...overrides,
   };
 }
@@ -94,10 +107,23 @@ describe('PortfolioAssessmentDetailPage', () => {
     expect(getAssessment).toHaveBeenCalledWith('a-1');
   });
 
+  it('zeigt Lesenden im Upload-Schritt kein Upload-Panel', async () => {
+    getAssessment.mockResolvedValue(assessment('uploading', null));
+    renderPage();
+    expect(
+      await screen.findByText(/Das Portfolio wurde noch nicht hochgeladen/),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-ingestion-panel')).not.toBeInTheDocument();
+  });
+
   it('übersetzt die Meldungen eines fehlgeschlagenen Jobs', async () => {
     getAssessment.mockResolvedValue(
       assessment('failed', {
         id: 'job-1',
+        job_type: 'ingest',
+        created_at: null,
+        started_at: null,
+        finished_at: null,
         status: 'failed',
         files_total: null,
         files_done: 0,
@@ -122,6 +148,10 @@ describe('PortfolioAssessmentDetailPage', () => {
     getAssessment.mockResolvedValue(
       assessment('uploading', {
         id: 'job-1',
+        job_type: 'ingest',
+        created_at: null,
+        started_at: null,
+        finished_at: null,
         status: 'running',
         files_total: 10,
         files_done: 4,
@@ -139,6 +169,9 @@ describe('PortfolioAssessmentDetailPage', () => {
     getAssessment.mockResolvedValue(
       assessment('grading', {
         id: 'job-1',
+        job_type: 'ingest',
+        created_at: null,
+        finished_at: null,
         status: 'running',
         files_total: null,
         files_done: 0,

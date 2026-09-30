@@ -23,11 +23,13 @@
  * `portfolio_assessment_document_update_failed`,
  * `portfolio_assessment_github_credential_load_failed`,
  * `portfolio_assessment_github_credential_save_failed`,
- * `portfolio_assessment_grade_failed`, `portfolio_assessment_list_failed`,
+ * `portfolio_assessment_grade_failed`, `portfolio_assessment_ingest_failed`
+ * (GitHub-only ingestion), `portfolio_assessment_list_failed`,
  * `portfolio_assessment_load_failed`, `portfolio_assessment_review_failed`
- * (approve and override), `portfolio_assessment_upload_failed`,
- * `portfolio_assessment_upload_timeout` (axios gave up after the 10-minute
- * upload timeout). No delete fallback yet: `DELETE /{id}` comes with TF-986.
+ * (approve and override), `portfolio_assessment_student_search_failed`,
+ * `portfolio_assessment_upload_failed`, `portfolio_assessment_upload_timeout`
+ * (axios gave up after the 10-minute upload timeout). The delete operation
+ * falls back to the backend's own `portfolio_assessment_delete_failed`.
  */
 export const PORTFOLIO_ASSESSMENTS_ERROR_CODES = [
   'portfolio_assessment_archive_too_large',
@@ -37,6 +39,8 @@ export const PORTFOLIO_ASSESSMENTS_ERROR_CODES = [
   'portfolio_assessment_classify_failed',
   'portfolio_assessment_confirm_classification_failed',
   'portfolio_assessment_create_failed',
+  'portfolio_assessment_delete_failed',
+  'portfolio_assessment_delete_job_active',
   'portfolio_assessment_document_invalid_phase',
   'portfolio_assessment_document_not_found',
   'portfolio_assessment_document_update_failed',
@@ -47,6 +51,7 @@ export const PORTFOLIO_ASSESSMENTS_ERROR_CODES = [
   'portfolio_assessment_grading_not_ready',
   'portfolio_assessment_grading_queue_unavailable',
   'portfolio_assessment_grading_scheme_not_found',
+  'portfolio_assessment_ingest_failed',
   'portfolio_assessment_invalid_repository_url',
   'portfolio_assessment_list_failed',
   'portfolio_assessment_load_failed',
@@ -54,8 +59,10 @@ export const PORTFOLIO_ASSESSMENTS_ERROR_CODES = [
   'portfolio_assessment_phase_result_not_found',
   'portfolio_assessment_phase_result_not_reviewable',
   'portfolio_assessment_phase_result_override_invalid',
+  'portfolio_assessment_repository_missing',
   'portfolio_assessment_review_failed',
   'portfolio_assessment_student_not_found',
+  'portfolio_assessment_student_search_failed',
   'portfolio_assessment_template_not_found',
   'portfolio_assessment_tier_insufficient',
   'portfolio_assessment_unclassified_documents',

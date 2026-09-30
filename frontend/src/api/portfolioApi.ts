@@ -16,13 +16,14 @@ import { AppError, AppErrorCode, appErrorFromAxios } from '../errors';
 import type {
   PortfolioAssessmentCreatePayload,
   PortfolioAssessmentDetail,
-  PortfolioAssessmentListItem,
+  PortfolioAssessmentListPage,
   PortfolioAssessmentListParams,
   PortfolioAssessmentSummary,
   PortfolioDocument,
   PortfolioGithubCredentialStatus,
   PortfolioPhaseOverridePayload,
   PortfolioPhaseReviewResponse,
+  PortfolioStudentOption,
   PortfolioTemplate,
   PortfolioTemplateCreatePayload,
   PortfolioTemplateUpdatePayload,
@@ -32,6 +33,9 @@ const ASSESSMENTS = '/api/v1/portfolio-assessments';
 const TEMPLATES = '/api/v1/portfolio-templates';
 const GITHUB_CREDENTIAL = '/api/v1/portfolio-github-credential';
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Share of the archive sent so far, 0–1. */
+export type PortfolioUploadProgressHandler = (fraction: number) => void;
 
 async function call<T>(fallbackCode: AppErrorCode, request: () => Promise<{ data: T }>): Promise<T> {
   try {
@@ -74,11 +78,18 @@ export const portfolioApi = {
   // Assessments
   // -------------------------------------------------------------------------
 
-  /** Filters and pagination are ignored by the backend until TF-986 lands. */
-  listAssessments: (params?: PortfolioAssessmentListParams): Promise<PortfolioAssessmentListItem[]> =>
+  listAssessments: (params?: PortfolioAssessmentListParams): Promise<PortfolioAssessmentListPage> =>
     call('portfolio_assessment_list_failed', () =>
-      apiClient.get<PortfolioAssessmentListItem[]>(ASSESSMENTS, { params }),
+      apiClient.get<PortfolioAssessmentListPage>(ASSESSMENTS, { params }),
     ),
+
+  /** Slim lookup under `portfolio_assessments:manage`, unlike `/api/v1/students`. */
+  searchStudents: (search: string, limit = 20): Promise<PortfolioStudentOption[]> =>
+    call('portfolio_assessment_student_search_failed', () =>
+      apiClient.get<{ items: PortfolioStudentOption[] }>(`${ASSESSMENTS}/students`, {
+        params: { search, limit },
+      }),
+    ).then((body) => body.items),
 
   getAssessment: (id: string): Promise<PortfolioAssessmentDetail> =>
     call('portfolio_assessment_load_failed', () =>
@@ -90,11 +101,22 @@ export const portfolioApi = {
       apiClient.post<PortfolioAssessmentSummary>(ASSESSMENTS, payload),
     ),
 
-  // No deleteAssessment yet: `DELETE /{id}` arrives with TF-986; until then it
-  // would only produce an indistinguishable 405. P3 (TF-989) adds it.
+  /** Removes documents and jobs too; 409 while a job is queued or running. */
+  deleteAssessment: (id: string): Promise<{ id: string }> =>
+    call('portfolio_assessment_delete_failed', () =>
+      apiClient.delete<{ id: string }>(`${ASSESSMENTS}/${id}`),
+    ),
 
-  /** Starts the ingestion job (202). The archive is sent as multipart field `file`. */
-  uploadArchive: async (id: string, file: File): Promise<PortfolioAssessmentSummary> => {
+  /**
+   * Starts the ingestion job (202). The archive is sent as multipart field
+   * `file`. With a repository URL on the assessment the job fetches the
+   * repository as well.
+   */
+  uploadArchive: async (
+    id: string,
+    file: File,
+    onProgress?: PortfolioUploadProgressHandler,
+  ): Promise<PortfolioAssessmentSummary> => {
     const form = new FormData();
     form.append('file', file);
     try {
@@ -105,6 +127,13 @@ export const portfolioApi = {
           headers: { 'Content-Type': 'multipart/form-data' },
           // The shared client's 30 s would abort a large archive mid-upload.
           timeout: UPLOAD_TIMEOUT_MS,
+          onUploadProgress: onProgress
+            ? (event) => {
+                // `total` is missing when the browser cannot compute it.
+                const total = event.total ?? file.size;
+                if (total > 0) onProgress(Math.min(1, event.loaded / total));
+              }
+            : undefined,
         },
       );
       return response.data;
@@ -120,6 +149,12 @@ export const portfolioApi = {
       throw appErrorFromAxios(err, 'portfolio_assessment_upload_failed');
     }
   },
+
+  /** Ingestion from the assessment's GitHub repository alone, without an archive (202). */
+  startRepositoryIngestion: (id: string): Promise<PortfolioAssessmentSummary> =>
+    call('portfolio_assessment_ingest_failed', () =>
+      apiClient.post<PortfolioAssessmentSummary>(`${ASSESSMENTS}/${id}/ingest`),
+    ),
 
   startClassification: (id: string): Promise<PortfolioAssessmentSummary> =>
     call('portfolio_assessment_classify_failed', () =>

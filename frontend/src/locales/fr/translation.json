@@ -1023,7 +1023,20 @@
         "columnStatus": "Statut",
         "columnReview": "Vérification",
         "studentFallback": "Étudiant·e n° {{id}}",
-        "open": "Ouvrir"
+        "open": "Ouvrir",
+        "create": "Nouvelle évaluation de portfolio",
+        "filterStatus": "Statut",
+        "filterReview": "Vérification",
+        "filterTemplate": "Modèle",
+        "filterAll": "Tous",
+        "emptyFiltered": "Aucune évaluation de portfolio ne correspond à ces filtres.",
+        "columnTemplate": "Modèle",
+        "columnLastJob": "Dernière tâche",
+        "noJob": "Pas encore téléversé",
+        "delete": "Supprimer",
+        "deleteBlocked": "La suppression sera possible une fois la tâche en cours terminée.",
+        "rowsPerPage": "Lignes par page",
+        "displayedRows": "{{from}}–{{to}} sur {{count}}"
       },
       "templates": {
         "title": "Modèles de portfolio",
@@ -1035,10 +1048,11 @@
       "detail": {
         "back": "Retour à l'aperçu",
         "sections": {
-          "upload": "Le téléversement du portfolio (archive ZIP ou dépôt GitHub) apparaîtra ici.",
+          "upload": "Le portfolio n'a pas encore été téléversé. Le téléversement est lancé par un·e enseignant·e disposant du droit de gestion.",
           "classification": "La vérification de l'attribution des fichiers aux phases apparaîtra ici.",
           "grading": "Le lancement et la progression de l'évaluation apparaîtront ici.",
-          "review": "Les résultats des phases et leur vérification apparaîtront ici."
+          "review": "Les résultats des phases et leur vérification apparaîtront ici.",
+          "uploadRunning": "Le portfolio est en cours d'import. La progression est affichée ci-dessus."
         },
         "retry": "Réessayer",
         "refreshFailed": "Le statut n'a pas pu être actualisé ; l'affichage n'est peut-être plus à jour. {{reason}}",
@@ -1080,7 +1094,12 @@
         "stalled": "Cette tâche dure anormalement longtemps. Si rien ne change, contacte le support.",
         "messages": "Messages",
         "unknownEntry": "Message inconnu de la tâche d'arrière-plan.",
-        "unknownEntryWithReason": "Message inconnu de la tâche d'arrière-plan : {{reason}}"
+        "unknownEntryWithReason": "Message inconnu de la tâche d'arrière-plan : {{reason}}",
+        "type": {
+          "ingest": "Import",
+          "classify": "Classification",
+          "grade": "Évaluation"
+        }
       },
       "jobCodes": {
         "portfolio_classification_batch_failed": "Une partie des fichiers n'a pas pu être classée automatiquement. Attribue-les manuellement à une phase.",
@@ -1116,11 +1135,13 @@
         "portfolio_grading_queue_unavailable": "L'évaluation n'a pas pu être lancée, car le service d'arrière-plan était injoignable.",
         "portfolio_grading_time_budget_exceeded": "Le temps imparti à l'évaluation a été épuisé avant que toutes les phases soient évaluées. Tu peux reprendre l'évaluation.",
         "portfolio_grading_timeout": "L'évaluation a dépassé la limite de temps.",
+        "portfolio_grading_watchdog_reaped": "L'évaluation est restée bloquée trop longtemps et a été interrompue automatiquement. Relance-la.",
         "portfolio_ingestion_archive_too_large": "L'archive est trop volumineuse une fois décompressée.",
         "portfolio_ingestion_corrupt_archive": "L'archive est endommagée ou n'est pas un fichier ZIP valide.",
         "portfolio_ingestion_file_too_large": "Un fichier de l'archive dépasse la taille maximale autorisée.",
         "portfolio_ingestion_internal_error": "Une erreur interne inattendue s'est produite lors de l'importation des fichiers.",
         "portfolio_ingestion_interrupted": "La tentative d'importation précédente a été interrompue. Téléverse à nouveau l'archive.",
+        "portfolio_ingestion_no_files": "Aucun fichier exploitable n'a été trouvé dans l'archive ou le dépôt.",
         "portfolio_ingestion_path_traversal": "L'archive contient des chemins de fichiers non autorisés et a été refusée.",
         "portfolio_ingestion_queue_unavailable": "L'importation n'a pas pu être lancée, car le service d'arrière-plan était injoignable.",
         "portfolio_ingestion_time_budget_exceeded": "Le temps imparti à l'importation a été épuisé ; tous les fichiers n'ont pas été importés.",
@@ -1128,7 +1149,51 @@
         "portfolio_ingestion_too_many_files": "L'archive contient trop de fichiers.",
         "portfolio_ingestion_watchdog_reaped": "L'importation est restée bloquée trop longtemps et a été interrompue automatiquement. Téléverse à nouveau l'archive."
       },
-      "unknownValue": "Inconnu ({{value}})"
+      "unknownValue": "Inconnu ({{value}})",
+      "create": {
+        "title": "Nouvelle évaluation de portfolio",
+        "template": "Modèle",
+        "noTemplates": "Il n'existe encore aucun modèle actif. Crées-en d'abord un sous « Modèles ».",
+        "student": "Étudiant·e",
+        "studentHelp": "Rechercher par nom ou identifiant externe",
+        "noStudents": "Aucun·e étudiant·e trouvé·e",
+        "gradingScheme": "Barème (facultatif)",
+        "gradingSchemeNone": "Aucun barème",
+        "frameworkConditions": "Conditions-cadres (facultatif)",
+        "frameworkConditionsHelp": "Par exemple la consigne, l'étendue ou la forme de remise. L'IA en tient compte lors de l'évaluation.",
+        "repositoryUrl": "Dépôt GitHub (facultatif)",
+        "repositoryUrlHelp": "Chargé lors de l'import en plus de l'archive ZIP. github.com uniquement.",
+        "repositoryUrlInvalid": "Saisis une URL de la forme https://github.com/<owner>/<repo>.",
+        "submit": "Créer",
+        "repositoryUrlPlaceholder": "https://github.com/<owner>/<repo>"
+      },
+      "ingestion": {
+        "title": "Téléverser le portfolio",
+        "retryHint": "Le dernier import a échoué ; la cause est indiquée ci-dessus. Tu peux téléverser le portfolio à nouveau.",
+        "repository": "Dépôt :",
+        "repositoryAlwaysFetched": "Le dépôt est chargé à chaque import, même avec une archive ZIP.",
+        "tokenMissing": "L'import depuis GitHub nécessite un jeton GitHub personnel. Enregistre-le ici avant de lancer l'import.",
+        "tokenReplace": "Le jeton GitHub enregistré n'a pas fonctionné. Enregistre un nouveau jeton et relance l'import.",
+        "tokenLabel": "Jeton GitHub",
+        "tokenSave": "Enregistrer le jeton",
+        "tokenHelp": "Un jeton avec accès en lecture au dépôt suffit. Il est stocké chiffré et n'est plus jamais affiché.",
+        "zipTitle": "Archive ZIP",
+        "zipHelp": "Fichier ZIP contenant le portfolio, {{max_mb}} Mo au maximum.",
+        "chooseFile": "Choisir un fichier",
+        "fileInfo": "{{name}} ({{size}} Mo)",
+        "upload": "Téléverser et importer",
+        "uploading": "Téléversement … {{percent}} %",
+        "githubTitle": "Uniquement depuis GitHub",
+        "githubHelp": "Importe le portfolio directement depuis le dépôt, sans archive ZIP.",
+        "githubStart": "Importer depuis GitHub",
+        "creatorToken": "L'import utilise le jeton GitHub de la personne qui a créé cette évaluation de portfolio.",
+        "creatorTokenFailed": "Le jeton GitHub de la personne qui a créé cette évaluation de portfolio n'a pas fonctionné. Elle seule peut le remplacer."
+      },
+      "delete": {
+        "title": "Supprimer l'évaluation de portfolio ?",
+        "body": "L'évaluation de portfolio de {{student}} ({{template}}) sera supprimée avec tous les fichiers téléversés et les résultats. Cette action est irréversible.",
+        "confirm": "Supprimer"
+      }
     }
   },
   "admin": {
@@ -3379,6 +3444,8 @@
     "portfolio_assessment_classify_failed": "La classification n'a pas pu être lancée.",
     "portfolio_assessment_confirm_classification_failed": "La classification n'a pas pu être confirmée.",
     "portfolio_assessment_create_failed": "L'évaluation de portfolio n'a pas pu être créée.",
+    "portfolio_assessment_delete_failed": "L'évaluation de portfolio n'a pas pu être entièrement supprimée. Veuillez réessayer.",
+    "portfolio_assessment_delete_job_active": "Cette évaluation de portfolio est en cours de traitement. Elle ne pourra être supprimée qu'une fois le traitement terminé.",
     "portfolio_assessment_document_invalid_phase": "La phase sélectionnée n'appartient pas au modèle de cette évaluation de portfolio.",
     "portfolio_assessment_document_not_found": "Le fichier n'a pas été trouvé dans cette évaluation de portfolio.",
     "portfolio_assessment_document_update_failed": "La phase du fichier n'a pas pu être modifiée.",
@@ -3389,6 +3456,7 @@
     "portfolio_assessment_grading_not_ready": "Cette évaluation de portfolio n'est actuellement pas prête pour une évaluation.",
     "portfolio_assessment_grading_queue_unavailable": "L'évaluation n'a pas pu être démarrée — le service en arrière-plan était injoignable. Veuillez réessayer.",
     "portfolio_assessment_grading_scheme_not_found": "Le barème de notation sélectionné est introuvable ou n'est pas disponible pour ton institution.",
+    "portfolio_assessment_ingest_failed": "L'import depuis GitHub n'a pas pu être lancé.",
     "portfolio_assessment_invalid_repository_url": "L'URL du dépôt est invalide. Format attendu : https://github.com/<owner>/<repo>.",
     "portfolio_assessment_list_failed": "Les évaluations de portfolio n'ont pas pu être chargées.",
     "portfolio_assessment_load_failed": "L'évaluation de portfolio n'a pas pu être chargée.",
@@ -3396,8 +3464,10 @@
     "portfolio_assessment_phase_result_not_found": "Le résultat de phase n'a pas été trouvé dans cette évaluation de portfolio.",
     "portfolio_assessment_phase_result_not_reviewable": "Cette phase n'est pas encore terminée et ne peut donc pas encore être vérifiée.",
     "portfolio_assessment_phase_result_override_invalid": "Correction de critère invalide.",
+    "portfolio_assessment_repository_missing": "Aucun dépôt GitHub n'est défini pour cette évaluation de portfolio. Téléversez plutôt une archive ZIP.",
     "portfolio_assessment_review_failed": "La vérification n'a pas pu être enregistrée.",
     "portfolio_assessment_student_not_found": "La personne en formation est introuvable dans ton institution.",
+    "portfolio_assessment_student_search_failed": "Les étudiant·e·s n'ont pas pu être chargé·e·s.",
     "portfolio_assessment_template_not_found": "Le modèle de portfolio est introuvable ou ne t'est pas visible.",
     "portfolio_assessment_tier_insufficient": "Les évaluations de portfolio nécessitent l'abonnement Professional ou supérieur.",
     "portfolio_assessment_unclassified_documents": "Tous les fichiers n'ont pas encore été attribués à une phase.",

@@ -12,11 +12,10 @@
  * runs for minutes, and a frozen «läuft» would hide exactly the stalled-job
  * hint this hook exists for. `refetch` lets the page offer a manual retry.
  *
- * `runningSince` exists because the grade job has no watchdog yet (TF-946): a
- * hung job would otherwise look exactly like a slow one. The backend does not
- * serialize the job's `started_at`/`created_at` yet (see
- * `PortfolioAssessmentJob` in `types/portfolio.ts`), so until it does the hook
- * falls back to the moment it first saw the job active and flags that with
+ * `runningSince` makes a hung job distinguishable from a slow one. It is the
+ * job's `started_at`, or `created_at` while the job still waits in the queue
+ * (TF-986). Only if the backend sends neither does the hook fall back to the
+ * moment it first saw the job active and flag that with
  * `runningSince.approximate` — the real start can only be earlier.
  */
 import { useRef } from 'react';
@@ -29,6 +28,8 @@ export const PORTFOLIO_POLL_INTERVAL_MS = 2500;
 export const PORTFOLIO_POLL_MAX_BACKOFF_MS = 30_000;
 
 export const portfolioAssessmentQueryKey = (id: string) => ['portfolioAssessment', id] as const;
+/** Prefix of every list page (filters and paging are appended). */
+export const portfolioAssessmentsQueryKey = ['portfolioAssessments'] as const;
 
 export function isPortfolioJobActive(job: PortfolioAssessmentJob | null | undefined): boolean {
   return job?.status === 'queued' || job?.status === 'running';
