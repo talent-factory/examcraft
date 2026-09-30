@@ -381,6 +381,18 @@ def test_premium_portfolio_watchdog_registration_reflects_actual_importability_i
         "routing_key": "maintenance.process",
     }
 
+    grading_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_grading_jobs"
+    )
+    assert (
+        beat["reap-stuck-portfolio-grading-jobs-every-5-minutes"]["task"]
+        == grading_task_name
+    )
+    assert routes[grading_task_name] == {
+        "queue": "maintenance_processing",
+        "routing_key": "maintenance.process",
+    }
+
 
 def test_premium_portfolio_watchdog_registration_import_error_deterministically_degrades(
     monkeypatch,
@@ -453,6 +465,15 @@ def test_portfolio_watchdog_task_is_registered_and_routed_in_running_app():
     assert classification_task_name in celery_app.conf.task_routes
     assert (
         "reap-stuck-portfolio-classification-jobs-every-5-minutes"
+        in celery_app.conf.beat_schedule
+    )
+
+    grading_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_grading_jobs"
+    )
+    assert grading_task_name in celery_app.conf.task_routes
+    assert (
+        "reap-stuck-portfolio-grading-jobs-every-5-minutes"
         in celery_app.conf.beat_schedule
     )
 

@@ -604,13 +604,13 @@ def _resolve_premium_portfolio_watchdog_registration(
     deployment_mode: str,
 ) -> tuple[dict, dict]:
     """Bedingte Celery-Registrierung fuer die Portfolio-Ingestion-/
-    Klassifikations-Watchdogs (TF-936/TF-944).
+    Klassifikations-/Bewertungs-Watchdogs (TF-936/TF-944/TF-946).
 
     Mirrors ``_resolve_premium_ops_alert_registration`` (Rueckgabe-statt-
     Seiteneffekt-Form, unit-testbar ohne Neuaufbau der echten Celery-App --
     siehe ``test_celery_config.py::test_premium_portfolio_watchdog_
     registration_*``), anders als ``_resolve_premium_portfolio_ingestion_
-    task_registration`` aber MIT Beat-Schedule-Haelfte: beide Tasks sind
+    task_registration`` aber MIT Beat-Schedule-Haelfte: alle Tasks sind
     periodisch (reapen stuck ``PortfolioAssessmentJob``-Zeilen alle 5
     Minuten), nicht on-demand.
 
@@ -641,6 +641,9 @@ def _resolve_premium_portfolio_watchdog_registration(
         "premium.tasks.portfolio_watchdog_tasks."
         "reap_stuck_portfolio_classification_jobs"
     )
+    grading_task_name = (
+        "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_grading_jobs"
+    )
     return (
         {
             "reap-stuck-portfolio-ingestion-jobs-every-5-minutes": {
@@ -651,6 +654,10 @@ def _resolve_premium_portfolio_watchdog_registration(
                 "task": classification_task_name,
                 "schedule": 300.0,  # 5 minutes
             },
+            "reap-stuck-portfolio-grading-jobs-every-5-minutes": {
+                "task": grading_task_name,
+                "schedule": 300.0,  # 5 minutes
+            },
         },
         {
             ingestion_task_name: {
@@ -658,6 +665,10 @@ def _resolve_premium_portfolio_watchdog_registration(
                 "routing_key": "maintenance.process",
             },
             classification_task_name: {
+                "queue": "maintenance_processing",
+                "routing_key": "maintenance.process",
+            },
+            grading_task_name: {
                 "queue": "maintenance_processing",
                 "routing_key": "maintenance.process",
             },
