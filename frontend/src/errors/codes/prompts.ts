@@ -31,9 +31,8 @@
  * `prompts_not_available_in_core` is the one code with no HTTP request behind
  * it. `core/frontend/src/api/promptsApi.ts` is a stub that refuses every call
  * unless `REACT_APP_DEPLOYMENT_MODE=full`; it threw the English literal
- * "Prompts API is only available in the Premium package" from ten methods. The
- * legacy `rag.notAvailableInCore` says the same thing for the RAG stub, but
- * `legacy.ts` is frozen and dot-notation — this one gets the current shape.
+ * "Prompts API is only available in the Premium package" from ten methods.
+ * `rag_not_available_in_core` says the same thing for the RAG stub.
  *
  * `prompts_validation_failed` carries `{{issues}}`: `PromptEditor` used to
  * unpack a 422 into "field: message" pairs, and dropping that would have made

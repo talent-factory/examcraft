@@ -3199,37 +3199,6 @@
     }
   },
   "errors": {
-    "compliance": {
-      "loadFailed": "Les documents de conformité n'ont pas pu être chargés."
-    },
-    "rag": {
-      "examGenerationFailed": "L'examen n'a pas pu être généré.",
-      "retryFailed": "La nouvelle tentative a échoué.",
-      "activeTasksFailed": "Les générations en cours n'ont pas pu être chargées.",
-      "taskResultFailed": "Le résultat de la génération n'a pas pu être chargé.",
-      "contextRetrievalFailed": "Le contexte n'a pas pu être récupéré.",
-      "questionTypesFailed": "Les types de questions n'ont pas pu être chargés.",
-      "healthCheckFailed": "Le service RAG est actuellement indisponible.",
-      "contextPreviewFailed": "Le contexte n'a pas pu être analysé.",
-      "notAvailableInCore": "Cette fonction n'est pas disponible dans l'édition Core."
-    },
-    "help": {
-      "statusFailed": "Le statut de l'aide n'a pas pu être chargé.",
-      "onboardingStatusFailed": "La progression de l'intégration n'a pas pu être chargée.",
-      "onboardingStepFailed": "L'étape d'intégration n'a pas pu être terminée.",
-      "onboardingSkipFailed": "L'étape d'intégration n'a pas pu être ignorée.",
-      "contextHintFailed": "L'indication n'a pas pu être chargée.",
-      "hintDismissFailed": "L'indication n'a pas pu être masquée.",
-      "messageFailed": "Ta question n'a pas pu être envoyée.",
-      "feedbackFailed": "Ton retour n'a pas pu être transmis."
-    },
-    "features": {
-      "loadFailed": "Les fonctions disponibles n'ont pas pu être chargées."
-    },
-    "chat": {
-      "downloadFailed": "L'historique de la conversation n'a pas pu être téléchargé.",
-      "conversionFailed": "La conversation n'a pas pu être convertie en document."
-    },
     "oauth": {
       "providerError": "La connexion auprès du fournisseur a échoué.",
       "callbackFailed": "La connexion n'a pas pu être finalisée."
@@ -3341,6 +3310,7 @@
     "competency_frameworks_list_failed": "Impossible de charger les référentiels de compétences.",
     "competency_frameworks_not_found": "Référentiel de compétences introuvable.",
     "competency_frameworks_update_failed": "Impossible d'enregistrer le référentiel.",
+    "compliance_load_failed": "Les documents de conformité n'ont pas pu être chargés.",
     "dashboard_activity_load_failed": "Impossible de charger les activités",
     "dashboard_stats_load_failed": "Impossible de charger les statistiques",
     "delete_exam_failed": "Échec de la suppression de l'examen",
@@ -3424,6 +3394,7 @@
     "exams_unfinalize_failed": "L'annulation a échoué. Réessaie.",
     "exams_unsupported_format": "Format d'export non pris en charge",
     "exams_update_failed": "Erreur lors de l'enregistrement. Recharge la page et réessaie.",
+    "features_load_failed": "Les fonctions disponibles n'ont pas pu être chargées.",
     "grades_approve_failed": "Impossible de valider l'évaluation",
     "grades_bulk_approve_failed": "Échec de la validation groupée",
     "grades_bulk_approve_invalid": "Approbation groupée non valide",
@@ -3449,8 +3420,16 @@
     "grading_schemes_system_not_editable": "Les barèmes système ne peuvent pas être modifiés",
     "grading_schemes_uniqueness_violated": "La mise à jour du barème viole une contrainte d'unicité",
     "grading_schemes_update_failed": "Impossible de mettre à jour le schème de notation.",
+    "help_context_hint_failed": "L'indication n'a pas pu être chargée.",
+    "help_feedback_failed": "Ton retour n'a pas pu être transmis.",
+    "help_hint_dismiss_failed": "L'indication n'a pas pu être masquée.",
+    "help_message_failed": "Ta question n'a pas pu être envoyée.",
+    "help_onboarding_skip_failed": "L'étape d'intégration n'a pas pu être ignorée.",
+    "help_onboarding_status_failed": "La progression de l'intégration n'a pas pu être chargée.",
+    "help_onboarding_step_failed": "L'étape d'intégration n'a pas pu être terminée.",
     "help_onboarding_track_step_failed": "Impossible d'enregistrer la progression",
     "help_rate_limit_exceeded": "Limite atteinte : 20 questions d'aide au maximum par heure",
+    "help_status_failed": "Le statut de l'aide n'a pas pu être chargé.",
     "help_too_many_tracks": "Trop de parcours d'intégration (maximum {{max}})",
     "help_track_id_invalid": "Identifiant de parcours non valide",
     "impersonation_action_locked": "Cette action est verrouillée pendant une session d'impersonation active",
@@ -3619,14 +3598,20 @@
     "prompts_version_name_too_long": "Le nom du prompt est trop long pour le versionnage ({{length}} caractères, {{max}} au maximum).",
     "prompts_versions_load_failed": "Impossible de charger l'historique des versions",
     "prompts_versions_not_found": "Aucune version trouvée pour le prompt « {{name}} ».",
+    "rag_active_tasks_failed": "Les générations en cours n'ont pas pu être chargées.",
+    "rag_context_preview_failed": "Le contexte n'a pas pu être analysé.",
     "rag_context_retrieval_failed": "Échec de la récupération du contexte",
     "rag_document_not_found": "Document introuvable",
     "rag_document_not_processed": "Le document n'a pas encore été traité",
     "rag_generation_failed": "Échec de la génération de questions",
     "rag_get_documents_failed": "Échec de la récupération des documents",
+    "rag_health_check_failed": "Le service RAG est actuellement indisponible.",
     "rag_no_institution": "L'utilisateur n'est associé à aucune institution",
+    "rag_not_available_in_core": "Cette fonction n'est pas disponible dans l'édition Core.",
+    "rag_question_types_failed": "Les types de questions n'ont pas pu être chargés.",
     "rag_retry_already_succeeded": "Cette génération a déjà réussi. Les questions se trouvent dans la file de révision.",
     "rag_retry_documents_unavailable": "Relance impossible : les documents de cette tâche sont manquants ou ne sont plus disponibles. Veuillez lancer une nouvelle génération avec une nouvelle sélection de documents.",
+    "rag_retry_failed": "La nouvelle tentative a échoué.",
     "rag_retry_owner_unavailable": "Le propriétaire d'origine de la tâche n'est plus disponible — relance impossible.",
     "rag_tag_archived": "Le tag « {{name}} » est archivé.",
     "rag_tag_ids_invalid": "Identifiants de tag invalides.",
@@ -3635,6 +3620,7 @@
     "rag_task_not_found": "Tâche de génération introuvable.",
     "rag_task_pending_timeout": "La génération de questions n'a pas démarré après {{seconds}} secondes. Recharge la page ou réessaie plus tard.",
     "rag_task_queue_unavailable": "File de tâches indisponible",
+    "rag_task_result_failed": "Le résultat de la génération n'a pas pu être chargé.",
     "rag_task_status_unavailable": "Impossible de récupérer l'état de la génération de questions (erreur de connexion). Réessaie plus tard.",
     "rag_task_stream_error": "Erreur interne du serveur lors de la transmission de la progression. Recharge la page pour voir l'état actuel.",
     "rag_task_unknown_question_type": "Le type de question choisi n'est pas pris en charge. Choisis un autre type de question.",

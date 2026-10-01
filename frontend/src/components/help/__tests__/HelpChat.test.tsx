@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 
 import HelpChat from '../HelpChat';
 import { helpService } from '../../../services/HelpService';
+import { AppError } from '../../../errors';
 
 // jsdom does not implement scrollIntoView
 window.HTMLElement.prototype.scrollIntoView = jest.fn();
@@ -26,11 +27,16 @@ const translations: Record<string, string> = {
   'help.rateLimited': 'Du hast das Fragelimit erreicht. Bitte versuche es später erneut.',
   'help.sessionExpired': 'Deine Sitzung ist abgelaufen. Bitte lade die Seite neu.',
   'help.thinking': 'Denke nach…',
+  'errors.help_rate_limit_exceeded': 'Limit erreicht: maximal 20 Hilfe-Fragen pro Stunde',
+  'errors.help_message_failed': 'Deine Frage konnte nicht gesendet werden.',
 };
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => translations[key] ?? fallback ?? key,
+    // translateError passes interpolation params as the second argument, so
+    // only a string counts as a default value.
+    t: (key: string, fallback?: unknown) =>
+      translations[key] ?? (typeof fallback === 'string' ? fallback : key),
     i18n: { language: 'de' },
   }),
 }));
@@ -151,5 +157,57 @@ describe('HelpChat — KI-Kennzeichnung (EU AI Act Art. 50, TF-747)', () => {
   it('weist darauf hin, dass mit einem KI-System gechattet wird', () => {
     renderChat();
     expect(screen.getByTestId('ai-notice-chat')).toBeInTheDocument();
+  });
+});
+
+describe('HelpChat — Fehlermeldungen', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const ask = async () => {
+    renderChat();
+    const input = screen.getByPlaceholderText(/Stelle eine Frage/i);
+    fireEvent.change(input, { target: { value: 'Wie geht das?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+
+  it('zeigt bei 429 mit Backend-Code dessen Satz mit Limit und Zeitfenster', async () => {
+    (helpService.sendMessage as jest.Mock).mockRejectedValue(
+      new AppError('help_rate_limit_exceeded', 'Rate limit', 429)
+    );
+
+    await ask();
+
+    expect(
+      await screen.findByText('Limit erreicht: maximal 20 Hilfe-Fragen pro Stunde')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Fragelimit erreicht/)).not.toBeInTheDocument();
+  });
+
+  it('bleibt bei 429 ohne Backend-Code (IP-Limiter) beim allgemeinen Satz', async () => {
+    // HelpService turns a code-less response into its operation fallback.
+    (helpService.sendMessage as jest.Mock).mockRejectedValue(
+      new AppError('help_message_failed', 'HTTP 429', 429)
+    );
+
+    await ask();
+
+    expect(
+      await screen.findByText('Du hast das Fragelimit erreicht. Bitte versuche es später erneut.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Deine Frage konnte nicht gesendet werden.')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei anderen Fehlern weiterhin den Nicht-verfügbar-Satz', async () => {
+    (helpService.sendMessage as jest.Mock).mockRejectedValue(
+      new AppError('help_message_failed', 'HTTP 500', 500)
+    );
+
+    await ask();
+
+    expect(
+      await screen.findByText('Der Hilfe-Chat ist derzeit nicht verfügbar.')
+    ).toBeInTheDocument();
   });
 });

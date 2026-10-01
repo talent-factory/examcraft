@@ -47,7 +47,9 @@ in `AppError.ts` grows by one import line.
    vector-search code a frontend service can receive. The MCP OAuth codes
    (`mcp_auth_*`) are not registered: no frontend code calls those endpoints.
    `dashboard.ts` is fallback-only because `dashboard.py` raises no
-   `HTTPException` at all today.
+   `HTTPException` at all today. `features.ts` and `compliance.ts` (TF-996)
+   are fallback-only too: `GET /api/auth/features` and the public compliance
+   content raise no `error_code`.
 
    `rag.ts` holds two groups under one prefix. Its `rag_validation_*` codes
    are frontend-only: they come from `RAGService.validateRAGRequest`, a check
@@ -118,7 +120,9 @@ Two kinds of code, and the distinction matters when reading `documents.ts`:
   is the accept-list for all three: a code that is not in it falls back to the
   caller's fallback code rather than reaching `translateError` untranslated.
 
-`legacy.ts` holds the 20 remaining dot-notation camelCase codes from TF-671
-(22 until TF-775 Teil B removed the two nothing threw). They predate
-ADR 0005 and do not follow the identity rule. TF-996 decides whether they get
-migrated; until then they are frozen — do not add to that file.
+There is no `legacy.ts` any more. It held the dot-notation camelCase codes
+TF-671 invented before ADR 0005 (`rag.examGenerationFailed` …); TF-996 moved
+the last 20 into the prefix files above in the flat form, and resolved their
+nested `errors.rag.*`, `errors.help.*` … locale blocks. Every code is now
+`errors.` + flat snake_case; the only nested keys left under `errors` are
+`errors.oauth.*`, which are plain fallback keys outside the registry.

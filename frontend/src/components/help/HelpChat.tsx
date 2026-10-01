@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { helpService } from '../../services/HelpService';
 import HelpMessage from './HelpMessage';
 import AiNotice from '../common/AiNotice';
+import { isAppError, translateError } from '../../errors';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -70,7 +71,14 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
       console.error('Help chat error:', err);
       let errorMessage = t('help.chatUnavailable');
       if (err?.status === 429) {
-        errorMessage = t('help.rateLimited');
+        // The per-user cap's own `help_rate_limit_exceeded` names the limit
+        // and the window, so it wins. Matched by code rather than handed to
+        // translateError: the IP limiter's 429 carries no code and arrives as
+        // the `help_message_failed` fallback, which would read worse than the
+        // generic sentence kept for it (TF-996).
+        errorMessage = isAppError(err) && err.code === 'help_rate_limit_exceeded'
+          ? translateError(err, t, 'help.rateLimited')
+          : t('help.rateLimited');
       } else if (err?.status === 401 || err?.status === 403) {
         errorMessage = t('help.sessionExpired');
       }

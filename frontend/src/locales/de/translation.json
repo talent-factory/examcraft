@@ -3199,37 +3199,6 @@
     }
   },
   "errors": {
-    "compliance": {
-      "loadFailed": "Die Compliance-Unterlagen konnten nicht geladen werden."
-    },
-    "rag": {
-      "examGenerationFailed": "Die Prüfung konnte nicht generiert werden.",
-      "retryFailed": "Der erneute Versuch ist fehlgeschlagen.",
-      "activeTasksFailed": "Laufende Generierungen konnten nicht geladen werden.",
-      "taskResultFailed": "Das Ergebnis der Generierung konnte nicht geladen werden.",
-      "contextRetrievalFailed": "Der Kontext konnte nicht abgerufen werden.",
-      "questionTypesFailed": "Die Fragetypen konnten nicht geladen werden.",
-      "healthCheckFailed": "Der RAG-Dienst ist derzeit nicht verfügbar.",
-      "contextPreviewFailed": "Der Kontext konnte nicht analysiert werden.",
-      "notAvailableInCore": "Diese Funktion ist in der Core-Version nicht verfügbar."
-    },
-    "help": {
-      "statusFailed": "Der Hilfe-Status konnte nicht geladen werden.",
-      "onboardingStatusFailed": "Der Onboarding-Fortschritt konnte nicht geladen werden.",
-      "onboardingStepFailed": "Der Onboarding-Schritt konnte nicht abgeschlossen werden.",
-      "onboardingSkipFailed": "Der Onboarding-Schritt konnte nicht übersprungen werden.",
-      "contextHintFailed": "Der Hinweis konnte nicht geladen werden.",
-      "hintDismissFailed": "Der Hinweis konnte nicht ausgeblendet werden.",
-      "messageFailed": "Deine Frage konnte nicht gesendet werden.",
-      "feedbackFailed": "Dein Feedback konnte nicht übermittelt werden."
-    },
-    "features": {
-      "loadFailed": "Die verfügbaren Funktionen konnten nicht geladen werden."
-    },
-    "chat": {
-      "downloadFailed": "Der Chat-Verlauf konnte nicht heruntergeladen werden.",
-      "conversionFailed": "Der Chat konnte nicht in ein Dokument umgewandelt werden."
-    },
     "oauth": {
       "providerError": "Die Anmeldung beim Anbieter ist fehlgeschlagen.",
       "callbackFailed": "Die Anmeldung konnte nicht abgeschlossen werden."
@@ -3341,6 +3310,7 @@
     "competency_frameworks_list_failed": "Kompetenzrahmen konnten nicht geladen werden.",
     "competency_frameworks_not_found": "Kompetenzrahmen nicht gefunden.",
     "competency_frameworks_update_failed": "Kompetenzrahmen konnte nicht gespeichert werden.",
+    "compliance_load_failed": "Die Compliance-Unterlagen konnten nicht geladen werden.",
     "dashboard_activity_load_failed": "Aktivitäten konnten nicht geladen werden",
     "dashboard_stats_load_failed": "Statistiken konnten nicht geladen werden",
     "delete_exam_failed": "Prüfung konnte nicht gelöscht werden",
@@ -3424,6 +3394,7 @@
     "exams_unfinalize_failed": "Zurücksetzen fehlgeschlagen. Bitte versuche es erneut.",
     "exams_unsupported_format": "Exportformat wird nicht unterstützt",
     "exams_update_failed": "Fehler beim Speichern. Bitte lade die Seite neu und versuche es erneut.",
+    "features_load_failed": "Die verfügbaren Funktionen konnten nicht geladen werden.",
     "grades_approve_failed": "Bewertung konnte nicht übernommen werden",
     "grades_bulk_approve_failed": "Sammelfreigabe fehlgeschlagen",
     "grades_bulk_approve_invalid": "Ungültige Sammel-Freigabe",
@@ -3449,8 +3420,16 @@
     "grading_schemes_system_not_editable": "System-Grading-Schemes sind nicht editierbar",
     "grading_schemes_uniqueness_violated": "Grading-Scheme-Update verletzt eine Eindeutigkeit",
     "grading_schemes_update_failed": "Bewertungsschema konnte nicht aktualisiert werden.",
+    "help_context_hint_failed": "Der Hinweis konnte nicht geladen werden.",
+    "help_feedback_failed": "Dein Feedback konnte nicht übermittelt werden.",
+    "help_hint_dismiss_failed": "Der Hinweis konnte nicht ausgeblendet werden.",
+    "help_message_failed": "Deine Frage konnte nicht gesendet werden.",
+    "help_onboarding_skip_failed": "Der Onboarding-Schritt konnte nicht übersprungen werden.",
+    "help_onboarding_status_failed": "Der Onboarding-Fortschritt konnte nicht geladen werden.",
+    "help_onboarding_step_failed": "Der Onboarding-Schritt konnte nicht abgeschlossen werden.",
     "help_onboarding_track_step_failed": "Fortschritt konnte nicht gespeichert werden",
     "help_rate_limit_exceeded": "Limit erreicht: maximal 20 Hilfe-Fragen pro Stunde",
+    "help_status_failed": "Der Hilfe-Status konnte nicht geladen werden.",
     "help_too_many_tracks": "Zu viele Onboarding-Tracks (maximal {{max}})",
     "help_track_id_invalid": "Ungültige Track-ID",
     "impersonation_action_locked": "Diese Aktion ist während einer aktiven Impersonation-Sitzung gesperrt",
@@ -3619,14 +3598,20 @@
     "prompts_version_name_too_long": "Der Prompt-Name ist zu lang für die Versionierung ({{length}} Zeichen, höchstens {{max}}).",
     "prompts_versions_load_failed": "Versionsverlauf konnte nicht geladen werden",
     "prompts_versions_not_found": "Keine Versionen für Prompt '{{name}}' gefunden.",
+    "rag_active_tasks_failed": "Laufende Generierungen konnten nicht geladen werden.",
+    "rag_context_preview_failed": "Der Kontext konnte nicht analysiert werden.",
     "rag_context_retrieval_failed": "Kontextabruf fehlgeschlagen",
     "rag_document_not_found": "Dokument nicht gefunden",
     "rag_document_not_processed": "Dokument wurde noch nicht verarbeitet",
     "rag_generation_failed": "Fragengenerierung fehlgeschlagen",
     "rag_get_documents_failed": "Dokumente konnten nicht abgerufen werden",
+    "rag_health_check_failed": "Der RAG-Dienst ist derzeit nicht verfügbar.",
     "rag_no_institution": "Benutzer ist keiner Institution zugeordnet",
+    "rag_not_available_in_core": "Diese Funktion ist in der Core-Version nicht verfügbar.",
+    "rag_question_types_failed": "Die Fragetypen konnten nicht geladen werden.",
     "rag_retry_already_succeeded": "Diese Generierung war bereits erfolgreich. Die Fragen liegen in der Review-Queue.",
     "rag_retry_documents_unavailable": "Wiederholung nicht möglich: Die Dokumente dieses Auftrags fehlen oder sind nicht mehr verfügbar. Bitte die Generierung mit einer neuen Dokumentauswahl starten.",
+    "rag_retry_failed": "Der erneute Versuch ist fehlgeschlagen.",
     "rag_retry_owner_unavailable": "Der ursprüngliche Auftragsbesitzer ist nicht mehr verfügbar — Wiederholung nicht möglich.",
     "rag_tag_archived": "Tag «{{name}}» ist archiviert.",
     "rag_tag_ids_invalid": "Ungültige Tag-IDs.",
@@ -3635,6 +3620,7 @@
     "rag_task_not_found": "Generierungsauftrag nicht gefunden.",
     "rag_task_pending_timeout": "Die Fragengenerierung wurde nach {{seconds}} Sekunden noch nicht gestartet. Lade die Seite neu oder versuch es später erneut.",
     "rag_task_queue_unavailable": "Aufgabenwarteschlange nicht verfügbar",
+    "rag_task_result_failed": "Das Ergebnis der Generierung konnte nicht geladen werden.",
     "rag_task_status_unavailable": "Der Status der Fragengenerierung kann nicht abgerufen werden (Verbindungsfehler). Bitte versuch es später erneut.",
     "rag_task_stream_error": "Interner Serverfehler bei der Übertragung des Fortschritts. Lade die Seite neu, um den aktuellen Stand zu sehen.",
     "rag_task_unknown_question_type": "Der gewählte Fragetyp wird nicht unterstützt. Wähle einen anderen Fragetyp.",

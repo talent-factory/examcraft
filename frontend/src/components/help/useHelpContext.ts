@@ -55,7 +55,14 @@ export function useHelpContext() {
     helpService
       .getOnboardingStatus(accessToken)
       .then(setOnboardingStatus)
-      .catch((err) => { console.warn('Onboarding status fetch failed:', err); setOnboardingStatus(null); })
+      // Reported, not only logged: a status read that keeps failing means new
+      // users are never offered the tour, and nothing else would say so —
+      // the backend never sees a network or CORS failure (TF-996).
+      .catch((err) => {
+        console.warn('Onboarding status fetch failed:', err);
+        reportHandledError(err, { feature: 'onboarding', action: 'getStatus' });
+        setOnboardingStatus(null);
+      })
       .finally(() => setLoading(false));
   }, [accessToken]);
 

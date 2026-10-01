@@ -16,6 +16,7 @@ import { LightbulbOutlined, ExpandMore } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { helpService, ContextHint } from '../../services/HelpService';
+import { translateError } from '../../errors';
 
 interface HelpContextHintProps {
   hint: ContextHint;
@@ -31,6 +32,7 @@ const HelpContextHint: React.FC<HelpContextHintProps> = ({
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [expanded, setExpanded] = useState(false);
+  const [dismissError, setDismissError] = useState<string | null>(null);
 
   if (!hint.i18n_key) return null;
 
@@ -45,14 +47,17 @@ const HelpContextHint: React.FC<HelpContextHintProps> = ({
 
   const handleDismissPermanently = async () => {
     if (accessToken && hint.hint_id) {
+      setDismissError(null);
       try {
         await helpService.dismissHint(accessToken, hint.hint_id);
       } catch (err) {
         // Left displayed rather than dismissed client-side-only: a dismiss
         // that never reached the server would otherwise reappear at the next
         // fetch anyway, so silently hiding it here would just be a confusing
-        // extra state with no persistence to back it up.
+        // extra state with no persistence to back it up. Said so, though —
+        // without a message the click looked ignored (TF-996).
         console.warn('Failed to permanently dismiss hint:', err);
+        setDismissError(translateError(err, t, 'errors.help_hint_dismiss_failed'));
         return;
       }
     }
@@ -141,6 +146,17 @@ const HelpContextHint: React.FC<HelpContextHintProps> = ({
             {t('help.context.dontShowAgain', 'Nicht mehr anzeigen')}
           </Button>
         </Box>
+        {dismissError && (
+          <Typography
+            variant="caption"
+            color="error"
+            role="alert"
+            data-testid="help-context-hint-dismiss-error"
+            sx={{ display: 'block', pb: 1, pl: 3.5 }}
+          >
+            {dismissError}
+          </Typography>
+        )}
       </Collapse>
     </Box>
   );

@@ -4,15 +4,15 @@ import type { AppErrorCode } from '../index';
 // The real i18next and the react-i18next mock in setupTests.ts agree on one
 // thing: a missing key resolves to the key itself. This fake reproduces that.
 const KNOWN: Record<string, string> = {
-  'errors.rag.contextPreviewFailed': 'Der Kontext konnte nicht analysiert werden.',
+  'errors.rag_context_preview_failed': 'Der Kontext konnte nicht analysiert werden.',
   'premium.ragExamCreator.errorContextPreview': 'Vorschau fehlgeschlagen.',
 };
 const t = (key: string): string => KNOWN[key] ?? key;
 
 describe('AppError', () => {
   it('behält Code, Detail und Status', () => {
-    const err = new AppError('rag.contextPreviewFailed', 'HTTP 500 boom', 500);
-    expect(err.code).toBe('rag.contextPreviewFailed');
+    const err = new AppError('rag_context_preview_failed', 'HTTP 500 boom', 500);
+    expect(err.code).toBe('rag_context_preview_failed');
     expect(err.detail).toBe('HTTP 500 boom');
     expect(err.status).toBe(500);
     expect(err).toBeInstanceOf(Error);
@@ -20,7 +20,7 @@ describe('AppError', () => {
   });
 
   it('erkennt AppError, aber nicht gewöhnliche Errors', () => {
-    expect(isAppError(new AppError('rag.contextPreviewFailed'))).toBe(true);
+    expect(isAppError(new AppError('rag_context_preview_failed'))).toBe(true);
     expect(isAppError(new Error('x'))).toBe(false);
     expect(isAppError('x')).toBe(false);
     expect(isAppError(null)).toBe(false);
@@ -36,7 +36,7 @@ describe('translateError', () => {
 
   it('übersetzt einen AppError über errors.<code>', () => {
     const result = translateError(
-      new AppError('rag.contextPreviewFailed', 'Context preview failed: boom'),
+      new AppError('rag_context_preview_failed', 'Context preview failed: boom'),
       t,
       'premium.ragExamCreator.errorContextPreview',
     );
@@ -117,7 +117,7 @@ describe('translateError', () => {
     // end-to-end string — a minimal, real-i18next-style interpolating fake
     // stands in for `t`.
     const templates: Record<string, string> = {
-      'errors.rag.contextPreviewFailed': 'Fehler bei Dokument {{documentId}}.',
+      'errors.rag_context_preview_failed': 'Fehler bei Dokument {{documentId}}.',
     };
     const interpolating = (key: string, params?: Record<string, string | number>): string => {
       const template = templates[key] ?? key;
@@ -130,7 +130,7 @@ describe('translateError', () => {
     };
 
     const result = translateError(
-      new AppError('rag.contextPreviewFailed', 'boom', 500, { documentId: 42 }),
+      new AppError('rag_context_preview_failed', 'boom', 500, { documentId: 42 }),
       interpolating,
       'premium.ragExamCreator.errorContextPreview',
     );

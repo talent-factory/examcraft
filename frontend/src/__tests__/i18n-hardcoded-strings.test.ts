@@ -56,12 +56,10 @@
  * 2. Every key exists in de, en, fr AND it. Not optional.
  * 3. Interpolation differs between the two systems: the backend writes
  *    `%{name}`, i18next writes `{{name}}`. Rewrite when copying a text over.
- * 4. Most NESTED keys (`errors.help.*`, `errors.rag.*`, …) belong to the 20
- *    frozen dot-notation codes in `src/errors/codes/legacy.ts`. TF-775 kept
- *    them (and deleted two nothing threw). `errors.oauth.*` and
- *    `errors.chat.conversionFailed` are plain fallback keys outside the
- *    registry (see `chat.ts`). Migrating all of them to the flat form is
- *    TF-996. Do not add to them.
+ * 4. No new NESTED keys under `errors`. TF-996 flattened the TF-671
+ *    dot-notation codes (`errors.rag.*`, `errors.help.*`, …); the one nested
+ *    block left is `errors.oauth.*`, plain fallback keys outside the registry.
+ *    Do not add to it.
  *
  * ---------------------------------------------------------------------------
  * Reach of this scan — what it does not see, and why

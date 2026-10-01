@@ -75,6 +75,33 @@
  * (`rag_get_documents_failed` predates both groups and lives in
  * `documents.ts`, because `DocumentService` is its only consumer.)
  *
+ * OPERATION FALLBACKS (TF-996). One per `RAGService` method that needs a
+ * fallback of its own, used when a non-ok response carries no registered
+ * `error_code` (a proxy's 502, an unmigrated 500). A rejected `fetch` — a
+ * network failure — is not caught in `RAGService` (except in
+ * `previewContext`), so it reaches the caller as a plain error and the
+ * caller's own fallback key renders. They were TF-671 dot-notation codes
+ * (`rag.retryFailed` …) until TF-996 flattened them:
+ *
+ *   rag_active_tasks_failed     getActiveTasks, and dismissTask's never-shown
+ *                               fallback
+ *   rag_context_preview_failed  previewContext, for a non-AppError only
+ *   rag_health_check_failed     checkHealth — no caller today, still thrown
+ *   rag_not_available_in_core   GenerationTasksContext without the premium
+ *                               RAGService (Core edition)
+ *   rag_question_types_failed   getQuestionTypes
+ *   rag_retry_failed            retryGeneration; also GenerationTasksBar's
+ *                               fallback key
+ *   rag_task_result_failed      getTaskResult
+ *
+ * Two former legacy codes were merged into the backend codes above instead:
+ * `rag.examGenerationFailed` (triggerGeneration) into `rag_generation_failed`
+ * and `rag.contextRetrievalFailed` (retrieveContext) into
+ * `rag_context_retrieval_failed` — same endpoint, same failure, and the
+ * backend already sends exactly that code for its 500. `retryGeneration`
+ * keeps its own `rag_retry_failed`: "the retry failed" says more in the task
+ * panel than the generic generation sentence would.
+ *
  * FRONTEND-ONLY CODES (TF-772 PR 5): `rag_validation_*` come from
  * `RAGService.validateRAGRequest`, which checks the request in the browser
  * before anything is sent. No endpoint is involved and there is no backend
@@ -84,13 +111,19 @@
  * but is a different sentence for a different failure.
  */
 export const RAG_ERROR_CODES = [
+  'rag_active_tasks_failed',
+  'rag_context_preview_failed',
   'rag_context_retrieval_failed',
   'rag_document_not_found',
   'rag_document_not_processed',
   'rag_generation_failed',
+  'rag_health_check_failed',
   'rag_no_institution',
+  'rag_not_available_in_core',
+  'rag_question_types_failed',
   'rag_retry_already_succeeded',
   'rag_retry_documents_unavailable',
+  'rag_retry_failed',
   'rag_retry_owner_unavailable',
   'rag_tag_archived',
   'rag_tag_ids_invalid',
@@ -99,6 +132,7 @@ export const RAG_ERROR_CODES = [
   'rag_task_not_found',
   'rag_task_pending_timeout',
   'rag_task_queue_unavailable',
+  'rag_task_result_failed',
   'rag_task_status_unavailable',
   'rag_task_stream_error',
   'rag_task_unknown_question_type',

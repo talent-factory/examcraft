@@ -5,13 +5,14 @@ import { AUTH_ERROR_CODES } from './codes/auth';
 import { BILLING_ERROR_CODES } from './codes/billing';
 import { CHAT_ERROR_CODES } from './codes/chat';
 import { COMPETENCY_FRAMEWORKS_ERROR_CODES } from './codes/competencyFrameworks';
+import { COMPLIANCE_ERROR_CODES } from './codes/compliance';
 import { DASHBOARD_ERROR_CODES } from './codes/dashboard';
 import { DOCUMENT_ERROR_CODES } from './codes/documents';
 import { EXAMS_ERROR_CODES } from './codes/exams';
+import { FEATURES_ERROR_CODES } from './codes/features';
 import { GRADES_ERROR_CODES } from './codes/grades';
 import { GRADING_SCHEMES_ERROR_CODES } from './codes/gradingSchemes';
 import { HELP_ERROR_CODES } from './codes/help';
-import { LEGACY_ERROR_CODES } from './codes/legacy';
 import { MOODLE_CONNECTIONS_ERROR_CODES } from './codes/moodleConnections';
 import { MOODLE_FEEDBACK_PUSH_ERROR_CODES } from './codes/moodleFeedbackPush';
 import { MOODLE_ROUNDTRIP_ERROR_CODES } from './codes/moodleRoundtrip';
@@ -57,7 +58,6 @@ import { WIZARD_ERROR_CODES } from './codes/wizard';
  * `codes/README.md` before adding a file.
  */
 export const APP_ERROR_CODES = [
-  ...LEGACY_ERROR_CODES,
   ...RESERVED_ERROR_CODES,
   ...ACTIVITY_ERROR_CODES,
   ...ADMIN_ERROR_CODES,
@@ -66,9 +66,11 @@ export const APP_ERROR_CODES = [
   ...BILLING_ERROR_CODES,
   ...CHAT_ERROR_CODES,
   ...COMPETENCY_FRAMEWORKS_ERROR_CODES,
+  ...COMPLIANCE_ERROR_CODES,
   ...DASHBOARD_ERROR_CODES,
   ...DOCUMENT_ERROR_CODES,
   ...EXAMS_ERROR_CODES,
+  ...FEATURES_ERROR_CODES,
   ...GRADES_ERROR_CODES,
   ...GRADING_SCHEMES_ERROR_CODES,
   ...HELP_ERROR_CODES,

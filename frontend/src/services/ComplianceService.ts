@@ -51,7 +51,7 @@ export class ComplianceService {
     const response = await fetch(`${API_BASE_URL}/api/v1/legal/compliance`);
     if (!response.ok) {
       throw new AppError(
-        'compliance.loadFailed',
+        'compliance_load_failed',
         `Failed to load compliance content (${response.status})`,
         response.status,
       );

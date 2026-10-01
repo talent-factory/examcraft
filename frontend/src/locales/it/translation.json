@@ -3199,37 +3199,6 @@
     }
   },
   "errors": {
-    "compliance": {
-      "loadFailed": "Non è stato possibile caricare i documenti di conformità."
-    },
-    "rag": {
-      "examGenerationFailed": "Non è stato possibile generare l'esame.",
-      "retryFailed": "Il nuovo tentativo non è riuscito.",
-      "activeTasksFailed": "Non è stato possibile caricare le generazioni in corso.",
-      "taskResultFailed": "Non è stato possibile caricare il risultato della generazione.",
-      "contextRetrievalFailed": "Non è stato possibile recuperare il contesto.",
-      "questionTypesFailed": "Non è stato possibile caricare i tipi di domanda.",
-      "healthCheckFailed": "Il servizio RAG non è al momento disponibile.",
-      "contextPreviewFailed": "Non è stato possibile analizzare il contesto.",
-      "notAvailableInCore": "Questa funzione non è disponibile nell'edizione Core."
-    },
-    "help": {
-      "statusFailed": "Non è stato possibile caricare lo stato della guida.",
-      "onboardingStatusFailed": "Non è stato possibile caricare l'avanzamento dell'onboarding.",
-      "onboardingStepFailed": "Non è stato possibile completare il passaggio di onboarding.",
-      "onboardingSkipFailed": "Non è stato possibile saltare il passaggio di onboarding.",
-      "contextHintFailed": "Non è stato possibile caricare il suggerimento.",
-      "hintDismissFailed": "Non è stato possibile nascondere il suggerimento.",
-      "messageFailed": "Non è stato possibile inviare la tua domanda.",
-      "feedbackFailed": "Non è stato possibile trasmettere il tuo feedback."
-    },
-    "features": {
-      "loadFailed": "Non è stato possibile caricare le funzioni disponibili."
-    },
-    "chat": {
-      "downloadFailed": "Non è stato possibile scaricare la cronologia della chat.",
-      "conversionFailed": "Non è stato possibile convertire la chat in un documento."
-    },
     "oauth": {
       "providerError": "L'accesso presso il provider non è riuscito.",
       "callbackFailed": "Non è stato possibile completare l'accesso."
@@ -3341,6 +3310,7 @@
     "competency_frameworks_list_failed": "Impossibile caricare i framework di competenze.",
     "competency_frameworks_not_found": "Quadro delle competenze non trovato.",
     "competency_frameworks_update_failed": "Impossibile salvare il framework.",
+    "compliance_load_failed": "Non è stato possibile caricare i documenti di conformità.",
     "dashboard_activity_load_failed": "Impossibile caricare le attività",
     "dashboard_stats_load_failed": "Impossibile caricare le statistiche",
     "delete_exam_failed": "Impossibile eliminare l'esame",
@@ -3424,6 +3394,7 @@
     "exams_unfinalize_failed": "Ripristino fallito. Riprova.",
     "exams_unsupported_format": "Formato di esportazione non supportato",
     "exams_update_failed": "Errore durante il salvataggio. Ricarica la pagina e riprova.",
+    "features_load_failed": "Non è stato possibile caricare le funzioni disponibili.",
     "grades_approve_failed": "Impossibile approvare la valutazione",
     "grades_bulk_approve_failed": "Approvazione in blocco fallita",
     "grades_bulk_approve_invalid": "Approvazione collettiva non valida",
@@ -3449,8 +3420,16 @@
     "grading_schemes_system_not_editable": "Gli schemi di valutazione di sistema non sono modificabili",
     "grading_schemes_uniqueness_violated": "L'aggiornamento dello schema di valutazione viola un vincolo di unicità",
     "grading_schemes_update_failed": "Impossibile aggiornare lo schema di valutazione.",
+    "help_context_hint_failed": "Non è stato possibile caricare il suggerimento.",
+    "help_feedback_failed": "Non è stato possibile trasmettere il tuo feedback.",
+    "help_hint_dismiss_failed": "Non è stato possibile nascondere il suggerimento.",
+    "help_message_failed": "Non è stato possibile inviare la tua domanda.",
+    "help_onboarding_skip_failed": "Non è stato possibile saltare il passaggio di onboarding.",
+    "help_onboarding_status_failed": "Non è stato possibile caricare l'avanzamento dell'onboarding.",
+    "help_onboarding_step_failed": "Non è stato possibile completare il passaggio di onboarding.",
     "help_onboarding_track_step_failed": "Impossibile salvare il progresso",
     "help_rate_limit_exceeded": "Limite raggiunto: massimo 20 domande di aiuto all'ora",
+    "help_status_failed": "Non è stato possibile caricare lo stato della guida.",
     "help_too_many_tracks": "Troppi percorsi di onboarding (massimo {{max}})",
     "help_track_id_invalid": "ID percorso non valido",
     "impersonation_action_locked": "Questa azione è bloccata durante una sessione di impersonazione attiva",
@@ -3619,14 +3598,20 @@
     "prompts_version_name_too_long": "Il nome del prompt è troppo lungo per il versionamento ({{length}} caratteri, al massimo {{max}}).",
     "prompts_versions_load_failed": "Impossibile caricare la cronologia delle versioni",
     "prompts_versions_not_found": "Nessuna versione trovata per il prompt '{{name}}'.",
+    "rag_active_tasks_failed": "Non è stato possibile caricare le generazioni in corso.",
+    "rag_context_preview_failed": "Non è stato possibile analizzare il contesto.",
     "rag_context_retrieval_failed": "Recupero del contesto fallito",
     "rag_document_not_found": "Documento non trovato",
     "rag_document_not_processed": "Il documento non è ancora stato elaborato",
     "rag_generation_failed": "Generazione delle domande fallita",
     "rag_get_documents_failed": "Impossibile recuperare i documenti",
+    "rag_health_check_failed": "Il servizio RAG non è al momento disponibile.",
     "rag_no_institution": "L'utente non è associato a nessuna istituzione",
+    "rag_not_available_in_core": "Questa funzione non è disponibile nell'edizione Core.",
+    "rag_question_types_failed": "Non è stato possibile caricare i tipi di domanda.",
     "rag_retry_already_succeeded": "Questa generazione è già riuscita. Le domande si trovano nella coda di revisione.",
     "rag_retry_documents_unavailable": "Nuovo tentativo non possibile: i documenti di questa attività mancano o non sono più disponibili. Avviare una nuova generazione con una nuova selezione di documenti.",
+    "rag_retry_failed": "Il nuovo tentativo non è riuscito.",
     "rag_retry_owner_unavailable": "Il proprietario originale dell'attività non è più disponibile — nuovo tentativo non possibile.",
     "rag_tag_archived": "Il tag «{{name}}» è archiviato.",
     "rag_tag_ids_invalid": "ID tag non validi.",
@@ -3635,6 +3620,7 @@
     "rag_task_not_found": "Attività di generazione non trovata.",
     "rag_task_pending_timeout": "La generazione di domande non è partita dopo {{seconds}} secondi. Ricarica la pagina o riprova più tardi.",
     "rag_task_queue_unavailable": "Coda delle attività non disponibile",
+    "rag_task_result_failed": "Non è stato possibile caricare il risultato della generazione.",
     "rag_task_status_unavailable": "Impossibile recuperare lo stato della generazione di domande (errore di connessione). Riprova più tardi.",
     "rag_task_stream_error": "Errore interno del server durante la trasmissione dell'avanzamento. Ricarica la pagina per vedere lo stato attuale.",
     "rag_task_unknown_question_type": "Il tipo di domanda scelto non è supportato. Scegli un altro tipo di domanda.",

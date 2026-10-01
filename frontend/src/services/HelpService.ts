@@ -76,14 +76,14 @@ class HelpService {
   }
 
   async getStatus(): Promise<HelpStatus> {
-    return this.request(`${API_BASE_URL}/api/v1/help/status`, {}, 'help.statusFailed');
+    return this.request(`${API_BASE_URL}/api/v1/help/status`, {}, 'help_status_failed');
   }
 
   async getOnboardingStatus(token: string): Promise<OnboardingStatus> {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/status`,
       { headers: this.getHeaders(token) },
-      'help.onboardingStatusFailed',
+      'help_onboarding_status_failed',
     );
   }
 
@@ -91,7 +91,7 @@ class HelpService {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/step`,
       { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
-      'help.onboardingStepFailed',
+      'help_onboarding_step_failed',
     );
   }
 
@@ -99,7 +99,7 @@ class HelpService {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/skip`,
       { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
-      'help.onboardingSkipFailed',
+      'help_onboarding_skip_failed',
     );
   }
 
@@ -133,7 +133,7 @@ class HelpService {
     return this.request(
       `${API_BASE_URL}/api/v1/help/context/${path}`,
       { headers: this.getHeaders(token) },
-      'help.contextHintFailed',
+      'help_context_hint_failed',
     );
   }
 
@@ -145,7 +145,7 @@ class HelpService {
         headers: this.getHeaders(token),
         body: JSON.stringify({ hint_id: hintId }),
       },
-      'help.hintDismissFailed',
+      'help_hint_dismiss_failed',
     );
   }
 
@@ -162,7 +162,7 @@ class HelpService {
         headers: this.getHeaders(token),
         body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
       },
-      'help.messageFailed',
+      'help_message_failed',
     );
   }
 
@@ -170,7 +170,7 @@ class HelpService {
     await this.request(
       `${API_BASE_URL}/api/v1/help/feedback`,
       { method: 'POST', headers: this.getHeaders(token), body: JSON.stringify(feedback) },
-      'help.feedbackFailed',
+      'help_feedback_failed',
     );
   }
 }

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import '@testing-library/jest-dom';
 import HelpContextHint from '../HelpContextHint';
 import { helpService } from '../../../services/HelpService';
+import { AppError } from '../../../errors';
 
 jest.mock('../../../services/HelpService', () => ({
   helpService: {
@@ -131,5 +132,50 @@ describe('HelpContextHint — permanent dismissal', () => {
       )
     );
     expect(onDismissPermanently).not.toHaveBeenCalled();
+  });
+
+  it('tells the user the dismiss failed instead of looking ignored (TF-996)', async () => {
+    mockedDismissHint.mockRejectedValueOnce(new AppError('help_hint_dismiss_failed', 'HTTP 500', 500));
+    const onDismissPermanently = jest.fn();
+
+    render(
+      <HelpContextHint
+        hint={hint}
+        onDismiss={jest.fn()}
+        onDismissPermanently={onDismissPermanently}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('help-context-hint-toggle'));
+    fireEvent.click(screen.getByText('Nicht mehr anzeigen'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Der Hinweis konnte nicht ausgeblendet werden.'
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 500');
+    expect(onDismissPermanently).not.toHaveBeenCalled();
+  });
+
+  it('clears the error when the next attempt succeeds', async () => {
+    mockedDismissHint
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce(undefined);
+    const onDismissPermanently = jest.fn();
+
+    render(
+      <HelpContextHint
+        hint={hint}
+        onDismiss={jest.fn()}
+        onDismissPermanently={onDismissPermanently}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('help-context-hint-toggle'));
+    fireEvent.click(screen.getByText('Nicht mehr anzeigen'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Nicht mehr anzeigen'));
+    await waitFor(() => expect(onDismissPermanently).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
