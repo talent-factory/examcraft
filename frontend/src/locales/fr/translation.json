@@ -1273,6 +1273,44 @@
         "creatorToken": "L'import utilise le jeton GitHub de la personne qui a créé cette évaluation de portfolio.",
         "creatorTokenFailed": "Le jeton GitHub de la personne qui a créé cette évaluation de portfolio n'a pas fonctionné. Elle seule peut le remplacer."
       },
+      "classification": {
+        "title": "Attribution des fichiers aux phases",
+        "intro": "L'IA propose une phase pour chaque fichier. Vérifie les propositions, corrige-les si nécessaire, puis confirme l'attribution. L'évaluation ne peut démarrer qu'ensuite.",
+        "classify": "Proposer une attribution",
+        "reclassify": "Proposer à nouveau une attribution",
+        "reclassifyHint": "Les fichiers attribués manuellement restent inchangés.",
+        "running": "L'IA attribue les fichiers. Tu vois la progression ci-dessus.",
+        "readOnly": "Un enseignant disposant du droit de gestion vérifie et confirme l'attribution.",
+        "templateLoadFailed": "Les phases du modèle n'ont pas pu être chargées ; les corrections ne sont donc pas possibles. {{reason}}",
+        "noDocuments": "Ce portfolio ne contient aucun fichier.",
+        "summary": "Fichiers : {{total}} · sans phase : {{unassigned}}",
+        "unassignedGroup": "Sans phase",
+        "unassignedHint": "Ces fichiers n'ont pas encore de phase. Attribue-les avant de confirmer.",
+        "unknownPhaseGroup": "Phase inconnue",
+        "emptyPhase": "Aucun fichier n'est attribué à cette phase.",
+        "columns": {
+          "path": "Fichier",
+          "origin": "Provenance",
+          "source": "Attribution",
+          "confidence": "Confiance",
+          "phase": "Phase"
+        },
+        "origin": {
+          "upload_zip": "ZIP",
+          "github_repository": "GitHub"
+        },
+        "source": {
+          "manual": "Manuelle",
+          "open": "Ouverte"
+        },
+        "confidence": "{{percent}} %",
+        "lowConfidence": "Inférieure à {{threshold}} %, donc pas attribuée automatiquement",
+        "choosePhase": "Choisir une phase",
+        "phaseFor": "Phase pour {{path}}",
+        "flagged": "Toujours sans phase lors de la confirmation",
+        "confirm": "Confirmer l'attribution",
+        "confirmBlocked": "La confirmation est possible dès que chaque fichier a une phase (ouverts : {{open}})."
+      },
       "delete": {
         "title": "Supprimer l'évaluation de portfolio ?",
         "body": "L'évaluation de portfolio de {{student}} ({{template}}) sera supprimée avec tous les fichiers téléversés et les résultats. Cette action est irréversible.",
@@ -3561,7 +3599,7 @@
     "portfolio_assessment_upload_timeout": "Le téléversement a pris trop de temps et a été interrompu. Vérifie ta connexion ou réduis la taille de l'archive.",
     "portfolio_template_conflict": "Le modèle de portfolio n'a pas pu être enregistré en raison d'un conflit de données.",
     "portfolio_template_create_failed": "Le modèle n'a pas pu être créé.",
-    "portfolio_template_delete_blocked": "Ce modèle ne peut pas être supprimé car des évaluations de portfolio ont déjà été notées avec lui.",
+    "portfolio_template_delete_blocked": "Ce modèle ne peut pas être supprimé car il est déjà utilisé par des évaluations de portfolio.",
     "portfolio_template_delete_failed": "Le modèle n'a pas pu être supprimé.",
     "portfolio_template_edit_forbidden": "Tu n'es pas autorisé·e à modifier ce modèle de portfolio.",
     "portfolio_template_incomplete_rubric": "Critère « {{criterion}} » : la grille d'évaluation ne couvre pas le(s) score(s) {{missing}}.",
@@ -3570,7 +3608,7 @@
     "portfolio_template_load_failed": "Le modèle n'a pas pu être chargé.",
     "portfolio_template_not_found": "Modèle de portfolio introuvable.",
     "portfolio_template_org_unit_required": "Le niveau de visibilité « team » nécessite une unité organisationnelle.",
-    "portfolio_template_phases_locked": "Les phases et critères ne peuvent plus être modifiés car des évaluations de portfolio ont déjà été notées avec eux.",
+    "portfolio_template_phases_locked": "Les phases et critères ne peuvent plus être modifiés car le modèle est déjà utilisé par des évaluations de portfolio.",
     "portfolio_template_update_failed": "Le modèle n'a pas pu être enregistré.",
     "portfolio_template_visibility_system_forbidden": "Seuls les superutilisateurs peuvent créer des modèles à l'échelle du système.",
     "portfolio_template_visibility_team_forbidden": "Tu n'es pas membre de cette unité organisationnelle.",
@@ -4133,6 +4171,10 @@
     "chat": {
       "label": "Assistant IA",
       "hint": "Vous interagissez avec un système d'IA et non avec un humain. Les réponses sont générées automatiquement et peuvent contenir des erreurs."
+    },
+    "classificationSuggestion": {
+      "label": "Proposition de l'IA – à vérifier",
+      "hint": "Cette attribution a été proposée par un système d'IA. Veuillez la vérifier et la corriger si nécessaire ; la décision revient à l'enseignant."
     }
   }
 }

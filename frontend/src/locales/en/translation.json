@@ -1273,6 +1273,44 @@
         "creatorToken": "The import uses the GitHub token of the person who created this portfolio assessment.",
         "creatorTokenFailed": "The GitHub token of the person who created this portfolio assessment did not work. Only they can replace it."
       },
+      "classification": {
+        "title": "Assignment of files to phases",
+        "intro": "The AI suggests a phase for each file. Review the suggestions, correct them if needed and then confirm the assignment. Only then can grading start.",
+        "classify": "Suggest assignment",
+        "reclassify": "Suggest assignment again",
+        "reclassifyHint": "Manually assigned files stay unchanged.",
+        "running": "The AI is assigning the files. You can see the progress above.",
+        "readOnly": "A teacher with management rights reviews and confirms the assignment.",
+        "templateLoadFailed": "The template's phases could not be loaded, so corrections are not possible. {{reason}}",
+        "noDocuments": "This portfolio contains no files.",
+        "summary": "Files: {{total}} · without phase: {{unassigned}}",
+        "unassignedGroup": "Without phase",
+        "unassignedHint": "These files have no phase yet. Assign them before you confirm.",
+        "unknownPhaseGroup": "Unknown phase",
+        "emptyPhase": "No file is assigned to this phase.",
+        "columns": {
+          "path": "File",
+          "origin": "Source",
+          "source": "Assignment",
+          "confidence": "Confidence",
+          "phase": "Phase"
+        },
+        "origin": {
+          "upload_zip": "ZIP",
+          "github_repository": "GitHub"
+        },
+        "source": {
+          "manual": "Manual",
+          "open": "Open"
+        },
+        "confidence": "{{percent}} %",
+        "lowConfidence": "Below {{threshold}} %, so not assigned automatically",
+        "choosePhase": "Choose phase",
+        "phaseFor": "Phase for {{path}}",
+        "flagged": "Still without phase when confirming",
+        "confirm": "Confirm assignment",
+        "confirmBlocked": "You can confirm once every file has a phase (open: {{open}})."
+      },
       "delete": {
         "title": "Delete portfolio assessment?",
         "body": "The portfolio assessment of {{student}} ({{template}}) will be deleted together with all uploaded files and results. This cannot be undone.",
@@ -3561,7 +3599,7 @@
     "portfolio_assessment_upload_timeout": "The upload took too long and was aborted. Please check your connection or make the archive smaller.",
     "portfolio_template_conflict": "The portfolio template could not be saved due to a data conflict.",
     "portfolio_template_create_failed": "The template could not be created.",
-    "portfolio_template_delete_blocked": "This template cannot be deleted because portfolio assessments have already been graded against it.",
+    "portfolio_template_delete_blocked": "This template cannot be deleted because it is already used by portfolio assessments.",
     "portfolio_template_delete_failed": "The template could not be deleted.",
     "portfolio_template_edit_forbidden": "You are not allowed to edit this portfolio template.",
     "portfolio_template_incomplete_rubric": "Criterion '{{criterion}}': the rubric is missing score(s) {{missing}}.",
@@ -3570,7 +3608,7 @@
     "portfolio_template_load_failed": "The template could not be loaded.",
     "portfolio_template_not_found": "Portfolio template not found.",
     "portfolio_template_org_unit_required": "Visibility level 'team' requires an organizational unit.",
-    "portfolio_template_phases_locked": "Phases and criteria can no longer be changed because portfolio assessments have already been graded against them.",
+    "portfolio_template_phases_locked": "Phases and criteria can no longer be changed because the template is already used by portfolio assessments.",
     "portfolio_template_update_failed": "The template could not be saved.",
     "portfolio_template_visibility_system_forbidden": "Only superusers may create system-wide templates.",
     "portfolio_template_visibility_team_forbidden": "You are not a member of this organizational unit.",
@@ -4133,6 +4171,10 @@
     "chat": {
       "label": "AI assistant",
       "hint": "You are interacting with an AI system, not a human. Answers are generated automatically and may contain errors."
+    },
+    "classificationSuggestion": {
+      "label": "AI suggestion – please review",
+      "hint": "This assignment was suggested by an AI system. Please review it and correct it if needed; the teacher makes the decision."
     }
   }
 }

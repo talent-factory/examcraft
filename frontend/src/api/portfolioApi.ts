@@ -37,6 +37,41 @@ const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 /** Share of the archive sent so far, 0–1. */
 export type PortfolioUploadProgressHandler = (fraction: number) => void;
 
+/**
+ * 409 `portfolio_assessment_unclassified_documents` of `confirm-classification`
+ * with the ids the backend listed. They travel as a list in `error_params`,
+ * which `readParams` drops (it keeps scalars only), so the API reads them here.
+ *
+ * Callers test with `isPortfolioUnclassifiedDocumentsError`, which checks
+ * `name` rather than `instanceof` (see `DocumentFetchError`): a test that
+ * mocks this module would otherwise hand the component another class.
+ */
+export class PortfolioUnclassifiedDocumentsError extends AppError {
+  constructor(
+    source: AppError,
+    readonly documentIds: number[],
+  ) {
+    super(source.code, source.detail, source.status, source.params);
+    this.name = 'PortfolioUnclassifiedDocumentsError';
+  }
+}
+
+export function isPortfolioUnclassifiedDocumentsError(
+  err: unknown,
+): err is PortfolioUnclassifiedDocumentsError {
+  return (
+    err instanceof AppError &&
+    err.name === 'PortfolioUnclassifiedDocumentsError' &&
+    Array.isArray((err as Partial<PortfolioUnclassifiedDocumentsError>).documentIds)
+  );
+}
+
+function unclassifiedDocumentIdsOf(err: unknown): number[] {
+  const ids = (err as { response?: { data?: { error_params?: { unclassified_document_ids?: unknown } } } })
+    ?.response?.data?.error_params?.unclassified_document_ids;
+  return Array.isArray(ids) ? ids.filter((id): id is number => typeof id === 'number') : [];
+}
+
 async function call<T>(fallbackCode: AppErrorCode, request: () => Promise<{ data: T }>): Promise<T> {
   try {
     const response = await request();
@@ -168,10 +203,21 @@ export const portfolioApi = {
       }),
     ),
 
-  confirmClassification: (id: string): Promise<PortfolioAssessmentSummary> =>
-    call('portfolio_assessment_confirm_classification_failed', () =>
-      apiClient.post<PortfolioAssessmentSummary>(`${ASSESSMENTS}/${id}/confirm-classification`),
-    ),
+  /** 409 with files still without a phase throws `PortfolioUnclassifiedDocumentsError`. */
+  confirmClassification: async (id: string): Promise<PortfolioAssessmentSummary> => {
+    try {
+      const response = await apiClient.post<PortfolioAssessmentSummary>(
+        `${ASSESSMENTS}/${id}/confirm-classification`,
+      );
+      return response.data;
+    } catch (err) {
+      const appError = appErrorFromAxios(err, 'portfolio_assessment_confirm_classification_failed');
+      if (appError.code === 'portfolio_assessment_unclassified_documents') {
+        throw new PortfolioUnclassifiedDocumentsError(appError, unclassifiedDocumentIdsOf(err));
+      }
+      throw appError;
+    }
+  },
 
   /** First start (`ready_to_grade`) and resume after a failed phase (`grading`). */
   startGrading: (id: string): Promise<PortfolioAssessmentSummary> =>

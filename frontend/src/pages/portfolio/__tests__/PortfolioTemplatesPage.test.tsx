@@ -446,7 +446,7 @@ describe('PortfolioTemplatesPage — delete', () => {
     fireEvent.click(within(await screen.findByTestId('pt-delete-dialog')).getByTestId('pt-delete-confirm'));
 
     expect(await screen.findByTestId('pt-delete-error')).toHaveTextContent(
-      'Das Template kann nicht gelöscht werden, da bereits Portfolio-Assessments damit bewertet wurden.',
+      'Das Template kann nicht gelöscht werden, da es bereits in Portfolio-Assessments verwendet wird.',
     );
   });
 });

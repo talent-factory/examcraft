@@ -25,10 +25,12 @@ jest.mock('../../../contexts/AuthContext', () => ({
 }));
 
 jest.mock('../../../api/portfolioApi', () => ({
-  portfolioApi: { getAssessment: jest.fn() },
+  // getTemplate: the classification step loads the phase names (TF-990).
+  portfolioApi: { getAssessment: jest.fn(), getTemplate: jest.fn() },
 }));
 
 const getAssessment = portfolioApi.getAssessment as jest.Mock;
+const getTemplate = portfolioApi.getTemplate as jest.Mock;
 
 function assessment(
   status: PortfolioAssessmentStatus,
@@ -90,6 +92,7 @@ function renderPage() {
 
 beforeEach(() => {
   getAssessment.mockReset();
+  getTemplate.mockReset().mockResolvedValue({ id: 't-1', phases: [] });
 });
 
 describe('PortfolioAssessmentDetailPage', () => {

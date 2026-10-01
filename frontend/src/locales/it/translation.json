@@ -1273,6 +1273,44 @@
         "creatorToken": "L'importazione usa il token GitHub della persona che ha creato questa valutazione del portfolio.",
         "creatorTokenFailed": "Il token GitHub della persona che ha creato questa valutazione del portfolio non ha funzionato. Solo lei può sostituirlo."
       },
+      "classification": {
+        "title": "Assegnazione dei file alle fasi",
+        "intro": "L'IA propone una fase per ogni file. Verifica le proposte, correggile se necessario e poi conferma l'assegnazione. Solo allora può iniziare la valutazione.",
+        "classify": "Proponi assegnazione",
+        "reclassify": "Proponi di nuovo l'assegnazione",
+        "reclassifyHint": "I file assegnati manualmente restano invariati.",
+        "running": "L'IA sta assegnando i file. Vedi l'avanzamento qui sopra.",
+        "readOnly": "Un docente con diritti di gestione verifica e conferma l'assegnazione.",
+        "templateLoadFailed": "Non è stato possibile caricare le fasi del modello, quindi le correzioni non sono possibili. {{reason}}",
+        "noDocuments": "Questo portfolio non contiene file.",
+        "summary": "File: {{total}} · senza fase: {{unassigned}}",
+        "unassignedGroup": "Senza fase",
+        "unassignedHint": "A questi file non è ancora assegnata una fase. Assegnali prima di confermare.",
+        "unknownPhaseGroup": "Fase sconosciuta",
+        "emptyPhase": "Nessun file è assegnato a questa fase.",
+        "columns": {
+          "path": "File",
+          "origin": "Provenienza",
+          "source": "Assegnazione",
+          "confidence": "Affidabilità",
+          "phase": "Fase"
+        },
+        "origin": {
+          "upload_zip": "ZIP",
+          "github_repository": "GitHub"
+        },
+        "source": {
+          "manual": "Manuale",
+          "open": "Aperta"
+        },
+        "confidence": "{{percent}} %",
+        "lowConfidence": "Inferiore a {{threshold}} %, quindi non assegnata automaticamente",
+        "choosePhase": "Scegli fase",
+        "phaseFor": "Fase per {{path}}",
+        "flagged": "Ancora senza fase al momento della conferma",
+        "confirm": "Conferma assegnazione",
+        "confirmBlocked": "Puoi confermare non appena ogni file ha una fase (aperti: {{open}})."
+      },
       "delete": {
         "title": "Eliminare la valutazione del portfolio?",
         "body": "La valutazione del portfolio di {{student}} ({{template}}) verrà eliminata insieme a tutti i file caricati e ai risultati. L'operazione è irreversibile.",
@@ -3561,7 +3599,7 @@
     "portfolio_assessment_upload_timeout": "Il caricamento ha richiesto troppo tempo ed è stato interrotto. Controlla la connessione o riduci l'archivio.",
     "portfolio_template_conflict": "Non è stato possibile salvare il modello di portfolio a causa di un conflitto di dati.",
     "portfolio_template_create_failed": "Non è stato possibile creare il modello.",
-    "portfolio_template_delete_blocked": "Questo modello non può essere eliminato perché sono già state effettuate valutazioni di portfolio in base ad esso.",
+    "portfolio_template_delete_blocked": "Questo modello non può essere eliminato perché è già utilizzato in valutazioni di portfolio.",
     "portfolio_template_delete_failed": "Non è stato possibile eliminare il modello.",
     "portfolio_template_edit_forbidden": "Non sei autorizzato/a a modificare questo modello di portfolio.",
     "portfolio_template_incomplete_rubric": "Criterio «{{criterion}}»: la griglia di valutazione non copre il/i punteggio/i {{missing}}.",
@@ -3570,7 +3608,7 @@
     "portfolio_template_load_failed": "Non è stato possibile caricare il modello.",
     "portfolio_template_not_found": "Modello di portfolio non trovato.",
     "portfolio_template_org_unit_required": "Il livello di visibilità «team» richiede un'unità organizzativa.",
-    "portfolio_template_phases_locked": "Le fasi e i criteri non possono più essere modificati perché sono già state effettuate valutazioni di portfolio in base ad essi.",
+    "portfolio_template_phases_locked": "Le fasi e i criteri non possono più essere modificati perché il modello è già utilizzato in valutazioni di portfolio.",
     "portfolio_template_update_failed": "Non è stato possibile salvare il modello.",
     "portfolio_template_visibility_system_forbidden": "Solo i superuser possono creare modelli validi per tutto il sistema.",
     "portfolio_template_visibility_team_forbidden": "Non sei membro di questa unità organizzativa.",
@@ -4133,6 +4171,10 @@
     "chat": {
       "label": "Assistente IA",
       "hint": "Stai interagendo con un sistema di IA, non con una persona. Le risposte sono generate automaticamente e possono contenere errori."
+    },
+    "classificationSuggestion": {
+      "label": "Proposta dell'IA – da verificare",
+      "hint": "Questa assegnazione è stata proposta da un sistema di IA. Verificala e correggila se necessario; la decisione spetta al docente."
     }
   }
 }

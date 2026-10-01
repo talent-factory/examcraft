@@ -1273,6 +1273,44 @@
         "creatorToken": "Der Import verwendet den GitHub-Token der Person, die diese Portfolio-Bewertung angelegt hat.",
         "creatorTokenFailed": "Der GitHub-Token der Person, die diese Portfolio-Bewertung angelegt hat, hat nicht funktioniert. Nur sie kann ihn ersetzen."
       },
+      "classification": {
+        "title": "Zuordnung der Dateien zu den Phasen",
+        "intro": "Die KI schlägt für jede Datei eine Phase vor. Prüfe die Vorschläge, korrigiere sie bei Bedarf und bestätige danach die Zuordnung. Erst dann kann die Bewertung starten.",
+        "classify": "Zuordnung vorschlagen",
+        "reclassify": "Zuordnung erneut vorschlagen",
+        "reclassifyHint": "Manuell zugeordnete Dateien bleiben dabei unverändert.",
+        "running": "Die KI ordnet die Dateien gerade zu. Den Fortschritt siehst du oben.",
+        "readOnly": "Die Zuordnung prüft und bestätigt eine Lehrperson mit Verwaltungsrecht.",
+        "templateLoadFailed": "Die Phasen des Templates konnten nicht geladen werden; Korrekturen sind deshalb nicht möglich. {{reason}}",
+        "noDocuments": "Dieses Portfolio enthält keine Dateien.",
+        "summary": "Dateien: {{total}} · ohne Phase: {{unassigned}}",
+        "unassignedGroup": "Ohne Phase",
+        "unassignedHint": "Diesen Dateien ist noch keine Phase zugeordnet. Ordne sie zu, bevor du bestätigst.",
+        "unknownPhaseGroup": "Unbekannte Phase",
+        "emptyPhase": "Dieser Phase ist keine Datei zugeordnet.",
+        "columns": {
+          "path": "Datei",
+          "origin": "Herkunft",
+          "source": "Zuordnung",
+          "confidence": "Konfidenz",
+          "phase": "Phase"
+        },
+        "origin": {
+          "upload_zip": "ZIP",
+          "github_repository": "GitHub"
+        },
+        "source": {
+          "manual": "Manuell",
+          "open": "Offen"
+        },
+        "confidence": "{{percent}} %",
+        "lowConfidence": "Unter {{threshold}} %, daher nicht automatisch zugeordnet",
+        "choosePhase": "Phase wählen",
+        "phaseFor": "Phase für {{path}}",
+        "flagged": "Beim Bestätigen noch ohne Phase",
+        "confirm": "Zuordnung bestätigen",
+        "confirmBlocked": "Bestätigen ist möglich, sobald jede Datei einer Phase zugeordnet ist (offen: {{open}})."
+      },
       "delete": {
         "title": "Portfolio-Bewertung löschen?",
         "body": "Die Portfolio-Bewertung von {{student}} ({{template}}) wird mit allen hochgeladenen Dateien und Ergebnissen gelöscht. Das lässt sich nicht rückgängig machen.",
@@ -3561,7 +3599,7 @@
     "portfolio_assessment_upload_timeout": "Der Upload hat zu lange gedauert und wurde abgebrochen. Bitte prüfe deine Verbindung oder verkleinere das Archiv.",
     "portfolio_template_conflict": "Portfolio-Template konnte wegen eines Datenkonflikts nicht gespeichert werden.",
     "portfolio_template_create_failed": "Das Template konnte nicht angelegt werden.",
-    "portfolio_template_delete_blocked": "Das Template kann nicht gelöscht werden, da bereits Portfolio-Assessments damit bewertet wurden.",
+    "portfolio_template_delete_blocked": "Das Template kann nicht gelöscht werden, da es bereits in Portfolio-Assessments verwendet wird.",
     "portfolio_template_delete_failed": "Das Template konnte nicht gelöscht werden.",
     "portfolio_template_edit_forbidden": "Du darfst dieses Portfolio-Template nicht bearbeiten.",
     "portfolio_template_incomplete_rubric": "Kriterium „{{criterion}}“: Bewertungsrubrik fehlt für Punktwert(e) {{missing}}.",
@@ -3570,7 +3608,7 @@
     "portfolio_template_load_failed": "Das Template konnte nicht geladen werden.",
     "portfolio_template_not_found": "Portfolio-Template nicht gefunden.",
     "portfolio_template_org_unit_required": "Für die Sichtbarkeitsstufe „team“ muss eine Organisationseinheit angegeben werden.",
-    "portfolio_template_phases_locked": "Phasen und Kriterien können nicht mehr geändert werden, da bereits Portfolio-Assessments damit bewertet wurden.",
+    "portfolio_template_phases_locked": "Phasen und Kriterien können nicht mehr geändert werden, da das Template bereits in Portfolio-Assessments verwendet wird.",
     "portfolio_template_update_failed": "Das Template konnte nicht gespeichert werden.",
     "portfolio_template_visibility_system_forbidden": "Nur Superuser dürfen system-weite Templates anlegen.",
     "portfolio_template_visibility_team_forbidden": "Du bist kein Mitglied dieser Organisationseinheit.",
@@ -4133,6 +4171,10 @@
     "chat": {
       "label": "KI-Assistent",
       "hint": "Sie interagieren mit einem KI-System, nicht mit einem Menschen. Antworten werden automatisch generiert und können Fehler enthalten."
+    },
+    "classificationSuggestion": {
+      "label": "KI-Vorschlag – bitte prüfen",
+      "hint": "Diese Zuordnung hat ein KI-System vorgeschlagen. Bitte prüfen und bei Bedarf korrigieren; die Entscheidung trifft die Lehrperson."
     }
   }
 }

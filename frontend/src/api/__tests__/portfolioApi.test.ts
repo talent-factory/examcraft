@@ -1,7 +1,11 @@
 /**
  * portfolioApi — every failure becomes an AppError (TF-987).
  */
-import { portfolioApi } from '../portfolioApi';
+import {
+  PortfolioUnclassifiedDocumentsError,
+  isPortfolioUnclassifiedDocumentsError,
+  portfolioApi,
+} from '../portfolioApi';
 import { apiClient } from '../apiClient';
 import { AppError } from '../../errors';
 
@@ -58,6 +62,36 @@ describe('portfolioApi', () => {
     expect(err.code).toBe('portfolio_assessment_archive_too_large');
     expect(err.status).toBe(413);
     expect(err.params).toEqual({ max_mb: 50 });
+  });
+
+  it('liefert beim Bestätigen die IDs der Dateien ohne Phase mit (TF-990)', async () => {
+    client.post.mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          detail: 'offen',
+          error_code: 'portfolio_assessment_unclassified_documents',
+          error_params: { unclassified_document_ids: [3, 'x', 5] },
+        },
+      },
+    });
+    const err = await caught(portfolioApi.confirmClassification('a-1'));
+    expect(isPortfolioUnclassifiedDocumentsError(err)).toBe(true);
+    expect((err as PortfolioUnclassifiedDocumentsError).documentIds).toEqual([3, 5]);
+    expect(err.code).toBe('portfolio_assessment_unclassified_documents');
+    expect(err.status).toBe(409);
+  });
+
+  it('gibt andere Bestätigungsfehler als gewöhnlichen AppError weiter', async () => {
+    client.post.mockRejectedValue({
+      response: {
+        status: 409,
+        data: { error_code: 'portfolio_assessment_classification_not_ready' },
+      },
+    });
+    const err = await caught(portfolioApi.confirmClassification('a-1'));
+    expect(isPortfolioUnclassifiedDocumentsError(err)).toBe(false);
+    expect(err.code).toBe('portfolio_assessment_classification_not_ready');
   });
 
   it('fällt ohne Backend-Code auf den Code der Operation zurück', async () => {

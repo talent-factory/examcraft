@@ -9,11 +9,13 @@ import { useTranslation } from 'react-i18next';
  * - `taskDraft`: AI-generated exam question drafts
  * - `gradingSuggestion`: AI-assisted grading proposals
  * - `chat`: conversational AI (help chat, document chat, prompt wizard)
+ * - `classificationSuggestion`: AI-proposed file → phase assignment of a
+ *   portfolio assessment (TF-990)
  *
  * `chip` is the compact label for cards and dialogs (hint as tooltip);
  * `alert` shows label and hint as a visible info block.
  */
-export type AiNoticeKind = 'taskDraft' | 'gradingSuggestion' | 'chat';
+export type AiNoticeKind = 'taskDraft' | 'gradingSuggestion' | 'chat' | 'classificationSuggestion';
 
 interface AiNoticeProps {
   kind: AiNoticeKind;

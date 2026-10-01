@@ -3,9 +3,9 @@
  *
  * Owns polling (`usePortfolioAssessment`), the status stepper and the job
  * panel; the body branches on the current step. The upload step is the
- * ingestion panel (TF-989); the others are placeholders the later packages
- * replace: classification → P4 (TF-990), grading → P5a (TF-991), review →
- * P5b (TF-992).
+ * ingestion panel (TF-989), the classification step the review panel
+ * (TF-990); the others are placeholders the later packages replace:
+ * grading → P5a (TF-991), review → P5b (TF-992).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,7 @@ import {
   PortfolioUpgradePrompt,
   isPortfolioTierError,
 } from '../../components/portfolio/PortfolioGate';
+import { PortfolioClassificationPanel } from '../../components/portfolio/PortfolioClassificationPanel';
 import { PortfolioIngestionPanel } from '../../components/portfolio/PortfolioIngestionPanel';
 import { PortfolioJobPanel } from '../../components/portfolio/PortfolioJobPanel';
 import {
@@ -92,6 +93,11 @@ const PortfolioAssessmentDetailPage: React.FC = () => {
           !isPortfolioJobActive(assessment.job) ? (
             <Box data-testid="portfolio-detail-section-upload">
               <PortfolioIngestionPanel assessment={assessment} />
+            </Box>
+          ) : step === 'classification' ? (
+            // Readers see the assignment too; the panel hides the actions.
+            <Box data-testid="portfolio-detail-section-classification">
+              <PortfolioClassificationPanel assessment={assessment} />
             </Box>
           ) : step ? (
             <Paper
