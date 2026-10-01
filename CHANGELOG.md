@@ -9,6 +9,48 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-01
+
+### Added
+
+- **Portfolio-Bewertung:** Lehrpersonen können Portfolios von
+  Lernenden mehrphasig bewerten lassen. Templates mit Phasen und
+  Bewertungskriterien lassen sich anlegen und bearbeiten. Portfolios
+  werden als ZIP-Datei hochgeladen oder aus einem GitHub-Repository
+  importiert. Die KI schlägt vor, welche Datei zu welcher Phase gehört.
+  Die Lehrperson prüft und korrigiert diese Zuordnung und bestätigt sie.
+  Danach bewertet die KI jede Phase anhand der Kriterien. Die Lehrperson
+  übernimmt jedes Phasenergebnis oder passt es an. Die Gesamtpunkte sind
+  bis dahin als vorläufiger KI-Vorschlag gekennzeichnet. Eine Note
+  erscheint erst, wenn alle Phasen geprüft sind. Eine abgebrochene
+  Bewertung lässt sich fortsetzen. Die Funktion muss pro Rolle
+  freigeschaltet werden.
+- **Passwort zurücksetzen:** Wer das Passwort vergessen hat, kann per
+  E-Mail einen Link anfordern, der eine Stunde gültig ist und nur
+  einmal funktioniert. Nach dem Zurücksetzen werden alle bestehenden
+  Anmeldungen beendet.
+- **Kennzeichnung von KI-Inhalten:** Von der KI erzeugte oder
+  vorgeschlagene Inhalte sind in der Oberfläche und in den Exporten als
+  solche gekennzeichnet, z. B. im Fragen-Review, in der Prüfungsansicht,
+  bei der Korrektur, in den Chats und im Prompt-Assistenten.
+
+### Changed
+
+- **Fragengenerierung mit wenig Material:** Reicht das ausgewählte
+  Material voraussichtlich nicht für die gewünschte Anzahl Fragen,
+  erscheint vor dem Start ein Hinweis. Die Liste der laufenden
+  Generierungen zeigt, wie viele der angeforderten Fragen erzeugt
+  wurden. Fortschritts- und Fehlermeldungen erscheinen in der
+  eingestellten Sprache der Oberfläche.
+- **Verständlichere Fehlermeldungen:** Fehlermeldungen des Servers
+  erscheinen in der Sprache der Oberfläche.
+
+### Fixed
+
+- **Keine doppelten Fragen nach Unterbrüchen:** Wird eine
+  Fragengenerierung durch einen Serverneustart unterbrochen, entstehen
+  beim erneuten Anlauf keine doppelten Fragen mehr.
+
 ## [1.13.4] - 2026-09-30
 
 ### Security
