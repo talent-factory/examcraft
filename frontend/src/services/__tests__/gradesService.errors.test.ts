@@ -93,10 +93,10 @@ describe('GradesService', () => {
   });
 
   it('verwirft einen nicht registrierten error_code zugunsten des Fallbacks', async () => {
-    // `documents_patch_no_fields` steht in den Backend-Locales, ist im
-    // Frontend aber bewusst nicht registriert (toter Schlüssel, siehe
-    // codes/documents.ts). Ein roher Schlüssel auf dem Bildschirm wäre
-    // schlechter als der generische Satz. Bis TF-772 PR 7 diente
+    // `documents_patch_no_fields` ist im Frontend nicht registriert (ein
+    // toter Backend-Schlüssel, in TF-775 gelöscht, siehe codes/documents.ts)
+    // und taugt deshalb als Beispiel für einen unbekannten Code. Ein roher
+    // Schlüssel auf dem Bildschirm wäre schlechter als der generische Satz. Bis TF-772 PR 7 diente
     // `exams_not_found` als Beispiel — der ist inzwischen registriert.
     global.fetch = jest
       .fn()

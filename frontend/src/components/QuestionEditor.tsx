@@ -378,8 +378,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
           {/* Correct Answer */}
           {isSingleChoice ? (
             <FormControl fullWidth error={!!errors.correct_answer}>
-              <InputLabel>{t('components.questionEditor.correctAnswer')}</InputLabel>
+              <InputLabel id="question-editor-correct-answer-label">{t('components.questionEditor.correctAnswer')}</InputLabel>
               <Select
+                labelId="question-editor-correct-answer-label"
                 value={formData.correct_answer || ''}
                 onChange={(e) => handleCorrectAnswerChange(e.target.value)}
                 disabled={loading}
@@ -449,8 +450,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
           {/* Difficulty */}
           <FormControl fullWidth>
-            <InputLabel>{t('components.questionEditor.difficulty')}</InputLabel>
+            <InputLabel id="question-editor-difficulty-label">{t('components.questionEditor.difficulty')}</InputLabel>
             <Select
+              labelId="question-editor-difficulty-label"
               value={formData.difficulty || 'medium'}
               onChange={(e) => handleFieldChange('difficulty', e.target.value)}
               disabled={loading}
@@ -464,8 +466,9 @@ const QuestionEditor: React.FC<QuestionEditorProps> = ({
 
           {/* Bloom Level */}
           <FormControl fullWidth>
-            <InputLabel shrink>{t('components.questionEditor.bloomLevel')}</InputLabel>
+            <InputLabel id="question-editor-bloom-level-label" shrink>{t('components.questionEditor.bloomLevel')}</InputLabel>
             <Select
+              labelId="question-editor-bloom-level-label"
               displayEmpty
               notched
               value={formData.bloom_level || ''}

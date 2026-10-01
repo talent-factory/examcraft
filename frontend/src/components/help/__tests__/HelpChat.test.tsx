@@ -25,7 +25,6 @@ const translations: Record<string, string> = {
   'help.chatUnavailable': 'Der Hilfe-Chat ist derzeit nicht verfügbar.',
   'help.rateLimited': 'Du hast das Fragelimit erreicht. Bitte versuche es später erneut.',
   'help.sessionExpired': 'Deine Sitzung ist abgelaufen. Bitte lade die Seite neu.',
-  'help.send': 'Senden',
   'help.thinking': 'Denke nach…',
 };
 

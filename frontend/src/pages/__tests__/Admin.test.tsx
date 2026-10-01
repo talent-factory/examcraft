@@ -117,7 +117,7 @@ describe('Admin Page', () => {
       expect(screen.getByText('Abonnement')).toBeInTheDocument();
       expect(screen.queryByText('Institutionen')).not.toBeInTheDocument();
       expect(screen.queryByText('Rollen & Berechtigungen')).not.toBeInTheDocument();
-      expect(screen.queryByText('Help Feedback')).not.toBeInTheDocument();
+      expect(screen.queryByText('Hilfe-Feedback')).not.toBeInTheDocument();
     });
 
     it('shows the platform tabs after switching scope for superusers', () => {
@@ -128,7 +128,7 @@ describe('Admin Page', () => {
 
       expect(screen.getByText('Institutionen')).toBeInTheDocument();
       expect(screen.getByText('Rollen & Berechtigungen')).toBeInTheDocument();
-      expect(screen.getByText('Help Feedback')).toBeInTheDocument();
+      expect(screen.getByText('Hilfe-Feedback')).toBeInTheDocument();
       // Institution-scope tabs are no longer shown once platform scope is active.
       expect(screen.queryByText('Benutzer-Verwaltung')).not.toBeInTheDocument();
     });

@@ -8,11 +8,11 @@
  * `throw new Error('Failed to update onboarding track step')` — the last
  * English literal in the file, and the reason the guard still listed it.
  *
- * It does NOT join its eight siblings: `legacy.ts` is frozen, and TF-775 owns
+ * It does NOT join its eight siblings: `legacy.ts` is frozen, and TF-996 owns
  * the question of whether that whole family migrates to flat snake_case. So
  * this code takes the current shape and sits alone in its own file. One flat
  * `help_*` code beside eight `help.*` ones looks inconsistent because it *is*
- * inconsistent — that inconsistency is TF-775's input, not something to hide by
+ * inconsistent — that inconsistency is TF-996's input, not something to hide by
  * writing a ninth legacy-style code.
  *
  * BACKEND COUNTERPART. All nine `HelpService` methods now route through

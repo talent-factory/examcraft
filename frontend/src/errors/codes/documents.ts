@@ -62,10 +62,10 @@
  * entries.
  *
  * Not included, deliberately: `documents_patch_no_fields`,
- * `documents_rename_invalid_chars` and `documents_rename_too_long` exist in the
- * backend locale files but are raised nowhere in the backend — dead keys, and
- * registering them here would put three permanently-unreachable codes under the
- * i18n test. Reported to TF-775 rather than fixed here (backend scope).
+ * `documents_rename_invalid_chars` and `documents_rename_too_long` were in the
+ * backend locale files but raised nowhere in the backend. TF-775 deleted them
+ * there; `core/backend/tests/test_locale_keys_referenced.py` keeps such dead
+ * keys from coming back.
  */
 export const DOCUMENT_ERROR_CODES = [
   'documents_access_denied',

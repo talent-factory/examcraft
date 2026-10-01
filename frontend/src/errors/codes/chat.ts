@@ -27,7 +27,7 @@
  * `chat_download_failed` below belongs to `ChatService.downloadChat`, a
  * different call site with no consumer today. Two codes for what reads like
  * one operation is the honest state; merging them would mean touching
- * `legacy.ts`, which is frozen until TF-775.
+ * `legacy.ts`, which is frozen until TF-996.
  */
 export const CHAT_ERROR_CODES = [
   'chat_create_session_failed',

@@ -39,6 +39,14 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
 
   const availableCategories = isSuperuser ? CATEGORIES_SUPER : CATEGORIES_BASE;
 
+  const categoryLabel = (value: string): string => {
+    if ((CATEGORIES_SUPER as string[]).includes(value)) {
+      return t(`pages.admin.audit.category.${value}`);
+    }
+    console.warn('[audit] Unknown category value:', value);
+    return value;
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -178,7 +186,12 @@ const AuditLogView: React.FC<AuditLogViewProps> = ({ isSuperuser }) => {
                     />
                   )}
                 </TableCell>
-                <TableCell><Chip size="small" label={row.category} /></TableCell>
+                {/* Same words as the category filter. The backend maps unknown actions to
+                    "security", so an unknown value is not expected — shown raw and logged if it
+                    ever comes. */}
+                <TableCell>
+                  <Chip size="small" label={categoryLabel(row.category)} />
+                </TableCell>
                 <TableCell>{row.action}</TableCell>
                 <TableCell>{row.resource_type ? `${row.resource_type}#${row.resource_id ?? '?'}` : '—'}</TableCell>
                 {/* The DB column is a free String(20); show an unknown value raw rather than a missing key. */}

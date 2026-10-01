@@ -48,12 +48,12 @@
  *   auth_verification_resend_failed
  *
  * `auth_registration_failed` is the twelfth fallback but a special case: the
- * key exists in the backend locales with exactly this meaning, yet nothing in
- * the backend ever raises it (reported as a dead key, along with
+ * backend locales carried a key with exactly this meaning that nothing ever
+ * raised, and TF-775 deleted it as dead, together with
  * auth_insufficient_permissions, auth_logout_success, auth_session_expired,
- * auth_token_missing and auth_username_taken). Reusing the name rather than
- * inventing `auth_register_failed` keeps the identity rule intact for the day
- * TF-773 wires it up.
+ * auth_token_missing and auth_username_taken. The name stays as it was rather
+ * than becoming `auth_register_failed`: should the backend ever raise it, the
+ * identity rule holds without a rename.
  *
  * AUTH DEPENDENCIES (TF-772 PR 7). Five codes below come not from `auth.py` but
  * from the FastAPI dependencies in `core/backend/utils/auth_utils.py`, which

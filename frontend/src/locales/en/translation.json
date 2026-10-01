@@ -25,18 +25,10 @@
       "promptLibrary": "Prompt Library",
       "tagSettings": "Tag Management",
       "moodleConnection": "Moodle connection",
-      "pricing": "Pricing",
-      "profile": "Profile",
       "competencyFrameworks": "Competency Frameworks",
       "portfolio": "Portfolio assessment",
       "portfolioTemplates": "Portfolio templates"
     }
-  },
-  "language": {
-    "de": "Deutsch",
-    "en": "English",
-    "fr": "Français",
-    "it": "Italiano"
   },
   "common": {
     "refresh": "Refresh",
@@ -100,12 +92,9 @@
         "rationale": "Claude's rationale"
       },
       "review": {
-        "title": "Review queue",
         "loadError": "Could not load review queue.",
         "emptyHint": "No open suggestions — all open-ended answers are reviewed.",
         "filterConfidence": "Confidence",
-        "filterConfidenceFrom": "Min",
-        "filterConfidenceTo": "Max",
         "filterQuestion": "Question",
         "filterStudent": "Student",
         "filterClear": "Clear filters",
@@ -114,7 +103,6 @@
         "totalCount": "{{count}} pending",
         "confidenceLabel": "Confidence {{value}}%",
         "noConfidence": "No confidence",
-        "rationale": "Rationale",
         "matchedAspects": "Matched aspects",
         "missingAspects": "Missing aspects",
         "questionLabel": "Question",
@@ -141,8 +129,6 @@
           "thresholdLabel": "Confidence ≥",
           "applyByThreshold": "Approve all above threshold",
           "applyBySelection": "Approve selected ({{count}})",
-          "selectAll": "Select all",
-          "clearSelection": "Clear selection",
           "confirmThreshold_one": "Approve {{count}} suggestion with confidence ≥ {{threshold}}%?",
           "confirmThreshold_other": "Approve {{count}} suggestions with confidence ≥ {{threshold}}%?",
           "success_one": "{{count}} grade approved.",
@@ -222,7 +208,6 @@
       "queued": "Import queued…"
     },
     "stats": {
-      "loadError": "Failed to load statistics.",
       "empty": "No submissions yet — statistics become available once results are imported.",
       "kpiSubmissions": "Submissions",
       "kpiReviewed_one": "{{count}} reviewed",
@@ -293,7 +278,6 @@
       "colCreated": "Created",
       "colActions": "Actions",
       "actionCreate": "Create class",
-      "actionDetail": "Detail",
       "actionRename": "Rename",
       "actionDelete": "Delete",
       "createDialog": {
@@ -310,10 +294,7 @@
         "submit": "Save"
       },
       "deleteConfirm": {
-        "title": "Delete class?",
-        "body": "Class \"{{name}}\" and all memberships will be removed. Students themselves remain.",
-        "submit": "Delete",
-        "cancel": "Cancel"
+        "body": "Class \"{{name}}\" and all memberships will be removed. Students themselves remain."
       },
       "detail": {
         "loadError": "Class detail could not be loaded.",
@@ -324,9 +305,7 @@
         "emptyMembers": "No students assigned yet.",
         "actionAssign": "Assign student",
         "actionRemoveMember": "Remove from class",
-        "memberRemoveSuccess": "Member removed.",
         "removeMemberError": "Member could not be removed.",
-        "memberAddSuccess": "Student assigned to class.",
         "tabHistory": "History",
         "tabMembers": "Members",
         "examTrendTitle": "Class average per exam",
@@ -342,7 +321,6 @@
         "searchLabel": "Search by email / name",
         "loading": "Searching…",
         "noMatch": "No matches.",
-        "submit": "Assign",
         "cancel": "Cancel",
         "duplicate": "Student is already a member of this class.",
         "searchError": "Search failed — please try again.",
@@ -362,8 +340,6 @@
       "colClasses": "Classes",
       "colSubmissions": "Exams",
       "colAvg": "Average",
-      "colActions": "Actions",
-      "actionDetail": "Detail",
       "noClasses": "—",
       "detail": {
         "loadError": "Student detail could not be loaded.",
@@ -373,7 +349,6 @@
         "bloomNoData": "No Bloom data — questions without Bloom level are not aggregated.",
         "topicHeatmapTitle": "Topic heatmap",
         "topicHeatmapNoData": "No topic data available.",
-        "classesTitle": "Class memberships",
         "noClasses": "No classes assigned.",
         "avgSummary_one": "{{count}} exam — average {{percentage}}%",
         "avgSummary_other": "{{count}} exams — average {{percentage}}%"
@@ -803,7 +778,7 @@
       "tabOrgUnits": "Organizational Units",
       "tabSystemHealth": "System Health",
       "tabLiveActivity": "Live Activity",
-      "auditPlaceholder": "Audit Logs — Coming soon",
+      "tabHelpFeedback": "Help Feedback",
       "categories": {
         "userAccess": "Users & Access",
         "organization": "Organization",
@@ -830,7 +805,6 @@
         "title": "System Health",
         "subtitle": "Live status of ExamCraft's core components — refreshes automatically every 10 seconds.",
         "lastUpdated": "Last updated: {{time}}",
-        "refreshing": "Refreshing…",
         "loadError": "Could not load health status.",
         "staleError": "Refresh failed — the data shown may be out of date.",
         "retry": "Retry",
@@ -971,8 +945,6 @@
     "paymentSuccess": {
       "title": "Payment Successful!",
       "subtitle": "Thank you for your subscription. Your account has been upgraded.",
-      "syncing": "Syncing subscription...",
-      "syncError": "Subscription sync delayed. Please refresh the page in a moment.",
       "redirecting": "Redirecting to your subscription...",
       "viewSubscription": "View Subscription"
     },
@@ -1022,7 +994,6 @@
         "columnStudent": "Student",
         "columnStatus": "Status",
         "columnReview": "Review",
-        "studentFallback": "Student #{{id}}",
         "open": "Open",
         "create": "New portfolio assessment",
         "filterStatus": "Status",
@@ -1327,7 +1298,6 @@
       "deleteError": "Removal failed — please try again.",
       "testError": "Test failed — please try again.",
       "validationError": "Please fill in both base URL and token.",
-      "noConnection": "No connection configured yet.",
       "baseUrlLabel": "Base URL",
       "baseUrlHelper": "e.g. https://moodle.your-school.org",
       "tokenLabel": "Web service token",
@@ -1473,12 +1443,6 @@
       "colQuotas": "Quotas",
       "colStatus": "Status",
       "colActions": "Actions",
-      "quotaUsers_one": "{{count}} user",
-      "quotaUsers_other": "{{count}} users",
-      "quotaDocs_one": "{{count}} doc",
-      "quotaDocs_other": "{{count}} docs",
-      "quotaQuestionsPerMonth_one": "{{count}} q/mo",
-      "quotaQuestionsPerMonth_other": "{{count}} q/mo",
       "unlimited": "Unlimited",
       "tierFree": "Free",
       "tierStarter": "Starter",
@@ -1535,48 +1499,6 @@
       "notFound": "Institution not found",
       "failedLoad": "Failed to load institution",
       "failedUpdate": "Failed to update institution"
-    },
-    "roleManagement": {
-      "title": "Roles & Permissions",
-      "subtitle": "Manage roles and their feature assignments for your team."
-    },
-    "roleList": {
-      "title": "Role Management",
-      "btnCreate": "Create New Role",
-      "tooltipSystemRole": "System role (not editable)",
-      "tooltipEditSystemRole": "System role (edit with caution)",
-      "tooltipEditRole": "Edit role",
-      "featuresCount": "Features ({{count}})",
-      "noFeatures": "No features assigned",
-      "moreFeatures_one": "+{{count}} more",
-      "moreFeatures_other": "+{{count}} more",
-      "active": "Active",
-      "inactive": "Inactive",
-      "emptyTitle": "No roles found",
-      "emptySubtitle": "Create a new role to get started.",
-      "btnCreateFirst": "Create First Role",
-      "failedLoad": "Failed to load roles"
-    },
-    "roleEditor": {
-      "titleEdit": "Edit Role: {{name}}",
-      "titleCreate": "Create New Role",
-      "systemRoleWarning": "⚠️ Warning: You are editing a system role. Changes may affect the application's functionality. Only add/remove features if you know what you are doing.",
-      "nameLabel": "Role Name (technical)",
-      "namePlaceholder": "e.g., custom_reviewer",
-      "nameHint": "Lowercase letters, numbers and underscores only",
-      "displayNameLabel": "Display Name",
-      "displayNamePlaceholder": "e.g., Custom Reviewer",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Optional description of the role",
-      "featuresHeader_one": "Assign Features ({{count}} selected)",
-      "featuresHeader_other": "Assign Features ({{count}} selected)",
-      "selectAll": "Select all",
-      "deselectAll": "Deselect all",
-      "cancel": "Cancel",
-      "save": "Save",
-      "create": "Create",
-      "failedLoad": "Failed to load features",
-      "failedSave": "Failed to save role"
     },
     "roleAssignment": {
       "title": "Manage User Roles",
@@ -1681,13 +1603,9 @@
       "btnSaving": "Saving...",
       "btnSave": "Save",
       "sectionDetails": "Prompt Details",
-      "nameLabel": "Name",
       "fieldName": "Name",
-      "namePlaceholder": "e.g., system_prompt_question_generation",
       "fieldNamePlaceholder": "e.g., system_prompt_question_generation",
-      "descriptionLabel": "Description",
       "fieldDescription": "Description",
-      "descriptionPlaceholder": "Short description of the prompt",
       "fieldDescriptionPlaceholder": "Short description of the prompt",
       "tabEdit": "Edit",
       "tabPreview": "Preview",
@@ -1700,7 +1618,6 @@
       "categoryFewShot": "Few-Shot Example",
       "categoryTemplate": "Template",
       "useCaseLabel": "Use Case (Question Type)",
-      "useCaseNone": "No specific use case",
       "useCaseGeneral": "Question Generation (general)",
       "useCaseMultipleChoice": "Single Choice",
       "useCaseOpenEnded": "Open-Ended Question",
@@ -1718,7 +1635,6 @@
       "orgUnitsLoadError": "Couldn't load your teams. Please try again later.",
       "teamOrgUnitRequired": "Please select an Org-Unit for team visibility.",
       "tagsLabel": "Tags",
-      "tagPlaceholder": "New tag",
       "activeLabel": "Active",
       "versionHistoryTitle": "Version History",
       "currentVersion": "Current version: v{{version}}",
@@ -1845,7 +1761,6 @@
       "segmentFromGrade": "From grade",
       "segmentToGrade": "To grade",
       "segmentAdd": "Add segment",
-      "segmentRemove": "Remove",
       "roundTo": "Round to",
       "passGradeLabel": "Pass grade label",
       "stepsHeader": "Steps",
@@ -1853,7 +1768,6 @@
       "stepGradeLabel": "Grade label",
       "stepIsPassing": "Passing",
       "stepAdd": "Add step",
-      "stepRemove": "Remove",
       "previewTitle": "Live Preview",
       "validationNameRequired": "Name is required.",
       "validationSegmentsRequired": "At least one segment is required.",
@@ -1866,8 +1780,6 @@
       "title": "Organizational Units",
       "subtitle": "Manage departments and teams within the institution.",
       "btnCreate": "+ Create",
-      "btnEdit": "Edit",
-      "btnDelete": "Delete",
       "colName": "Name",
       "colType": "Type",
       "colParent": "Parent",
@@ -1977,9 +1889,6 @@
     "documentLibrary": {
       "title_one": "Document Library ({{count}} document)",
       "title_other": "Document Library ({{count}} documents)",
-      "selected_one": "{{count}} selected",
-      "selected_other": "{{count}} selected",
-      "createRAGExam": "Create RAG Exam",
       "statusUploaded": "Uploaded",
       "statusProcessing": "Processing...",
       "statusProcessed": "Processed",
@@ -1989,7 +1898,6 @@
       "statsProcessed": "Processed",
       "statsWithVectors": "With Vectors",
       "statsInProgress": "In Progress",
-      "errorTitle": "Processing error",
       "errorTooltip": "Error type: {{code}} · File: {{filename}}",
       "errorMessages": {
         "legacy_doc_format": "Legacy Word format (.doc) detected — please save as .docx and re-upload.",
@@ -2014,7 +1922,6 @@
       },
       "quality": {
         "limited": "Limited text quality",
-        "limitedTooltip": "Automatic text extraction was insufficient.",
         "reasonScannedLowText": "Almost no extractable text — likely a scan. Text recognition (OCR) is being applied.",
         "reasonSingleChunkLargeFile": "Large file, but almost no text content extracted.",
         "reasonGarbageExtraction": "Extracted text appears unusable (many unreadable characters).",
@@ -2124,8 +2031,7 @@
         }
       },
       "pagination": {
-        "pageSizeLabel": "Per page",
-        "of": "of"
+        "pageSizeLabel": "Per page"
       },
       "empty": {
         "searchNoHits": "No results for „{{query}}“",
@@ -2268,7 +2174,6 @@
       "filterEasy": "Easy",
       "filterMedium": "Medium",
       "filterHard": "Hard",
-      "filterMultipleChoice": "Single Choice",
       "filterSingleChoice": "Single Choice",
       "filterMultipleResponse": "Multiple Choice",
       "filterOpenEnded": "Open Ended",
@@ -2362,7 +2267,6 @@
     },
     "examDisplay": {
       "questionNumber": "Question {{number}}",
-      "multipleChoice": "Single Choice",
       "singleChoice": "Single Choice",
       "multipleResponse": "Multiple Choice",
       "openQuestion": "Open Question",
@@ -2562,7 +2466,6 @@
       "questionCount_other": "{{count}} questions",
       "pointsCount_one": "{{count}} point",
       "pointsCount_other": "{{count}} points",
-      "confirmDelete": "Really delete this exam?",
       "delete": "Delete",
       "dialogTitle": "Create New Exam",
       "fieldTitle": "Title",
@@ -2669,16 +2572,13 @@
       "errorExport": "Export failed. Please try again."
     },
     "questionPool": {
-      "panelTitle": "Question Pool",
       "autoFill": "Auto-Fill",
       "searchPlaceholder": "Search questions...",
       "documentFilterLabel": "Document filter",
-      "documentFilterAll": "All documents",
       "documentFilterRemove": "Remove",
       "loading": "Loading questions...",
       "errorLoadingQuestions": "Could not load questions.",
       "errorLoadingDocuments": "Could not load documents.",
-      "empty": "No approved questions found.",
       "available_one": "{{count}} question available",
       "available_other": "{{count}} questions available",
       "difficultyEasy": "Easy",
@@ -2689,8 +2589,6 @@
       "typeTrueFalse": "T/F",
       "typeOpenEnded": "Open",
       "added": "Added",
-      "addQuestion": "+ Add",
-      "autoFillDialogTitle": "Auto-Fill Criteria",
       "autoFillCount": "Number of questions",
       "autoFillTopic": "Topic (optional)",
       "autoFillDifficulty": "Difficulty",
@@ -2699,7 +2597,6 @@
       "autoFillRunning": "Filling...",
       "autoFillStart": "Start Auto-Fill",
       "cancel": "Cancel",
-      "errorAutoFill": "Auto-Fill failed. Not enough matching questions?",
       "title": "Question Pool",
       "noQuestions": "No approved questions found.",
       "add": "Add",
@@ -3062,14 +2959,11 @@
       "sourceDocuments_one": "{{count}} source document",
       "sourceDocuments_other": "{{count}} source documents",
       "quality": "Quality:",
-      "confidence": "Confidence",
       "confidencePercent": "{{value}}% confidence",
-      "sourceCoverage": "Source Coverage",
       "sourceCoveragePercent": "{{value}}% source coverage",
       "chunksUsed_one": "{{count}} text chunk used",
       "chunksUsed_other": "{{count}} text chunks used",
       "questionNumber": "Question {{number}}",
-      "modelAnswer": "Model Answer:",
       "back": "Back",
       "exportJson": "Export as JSON",
       "exportMarkdown": "Export as Markdown",
@@ -3080,14 +2974,7 @@
       "subtitle": "Ask questions about your uploaded documents",
       "yourSessions": "Your Chat Sessions",
       "noSessions": "No chat sessions yet. Create a new session to chat with your documents.",
-      "newSession": "New Session",
-      "minutesAgo": "{{count}} min ago",
-      "hoursAgo": "{{count}} hours ago",
-      "messages_one": "{{count}} message",
-      "messages_other": "{{count}} messages",
       "errorCreatingSession": "Error creating session",
-      "errorLoadingSession": "Error loading session",
-      "errorLoadingSessions": "Error loading sessions",
       "confirmDeleteSession": "Are you sure you want to delete this chat session?",
       "deleteChat": "Delete Chat",
       "errorDeletingSession": "Error deleting session",
@@ -3098,19 +2985,11 @@
       "sessionInfo": "{{messages}} messages · {{documents}} document(s)"
     },
     "chatInterface": {
-      "errorSending": "Error sending message. Please try again.",
-      "errorExporting": "Error exporting",
-      "exportChat": "Export Chat",
-      "exportAsMarkdown": "Export as Markdown",
-      "exportAsJson": "Export as JSON",
       "cancel": "Cancel",
       "thinking": "Thinking...",
       "placeholder": "Ask a question about your documents...",
       "sources": "Sources",
       "confidence": "Confidence",
-      "errorNoToken": "Session expired. Please log in again.",
-      "copy": "Copy",
-      "copied": "Copied!",
       "document": "Document",
       "download": "Download",
       "errorSendingMessage": "Error sending message",
@@ -3127,8 +3006,6 @@
     },
     "documentSelector": {
       "heading": "Select documents for chat",
-      "label": "Select documents",
-      "placeholder": "Search documents...",
       "defaultTitle": "Untitled Document",
       "startChat": "Start Chat",
       "chatTitleLabel": "Chat Title",
@@ -3256,7 +3133,6 @@
     },
     "rag": {
       "examGenerationFailed": "The exam could not be generated.",
-      "statusFailed": "The generation status could not be loaded.",
       "retryFailed": "The retry failed.",
       "activeTasksFailed": "Running generations could not be loaded.",
       "taskResultFailed": "The generation result could not be loaded.",
@@ -3264,7 +3140,6 @@
       "questionTypesFailed": "The question types could not be loaded.",
       "healthCheckFailed": "The RAG service is currently unavailable.",
       "contextPreviewFailed": "The context could not be analysed.",
-      "connectionLost": "The connection to the generation was lost.",
       "notAvailableInCore": "This feature is not available in the Core edition."
     },
     "help": {
@@ -3821,7 +3696,6 @@
     "rateLimited": "You've reached the question limit. Please try again later.",
     "sessionExpired": "Your session has expired. Please reload the page.",
     "chatPlaceholder": "Ask a question...",
-    "send": "Send",
     "newConversation": "New Conversation",
     "thinking": "Thinking…",
     "catchUp": {
@@ -3842,10 +3716,6 @@
       "chat": "Chat"
     },
     "onboarding": {
-      "skip": "Skip",
-      "next": "Next",
-      "finish": "Done",
-      "resume": "Continue later",
       "later": "Later",
       "startTour": "Start tour",
       "closeTour": "End tour",
@@ -3862,7 +3732,6 @@
     },
     "context": {
       "understood": "Got it",
-      "learnMore": "Learn more",
       "dontShowAgain": "Don't show again"
     },
     "feedback": {

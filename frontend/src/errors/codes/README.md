@@ -118,6 +118,7 @@ Two kinds of code, and the distinction matters when reading `documents.ts`:
   is the accept-list for all three: a code that is not in it falls back to the
   caller's fallback code rather than reaching `translateError` untranslated.
 
-`legacy.ts` holds the 22 dot-notation camelCase codes from TF-671. They predate
-ADR 0005 and do not follow the identity rule. TF-775 decides whether they get
+`legacy.ts` holds the 20 remaining dot-notation camelCase codes from TF-671
+(22 until TF-775 Teil B removed the two nothing threw). They predate
+ADR 0005 and do not follow the identity rule. TF-996 decides whether they get
 migrated; until then they are frozen — do not add to that file.

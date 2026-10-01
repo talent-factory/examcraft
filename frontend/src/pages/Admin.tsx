@@ -117,7 +117,7 @@ export const Admin: React.FC = () => {
     { key: 'roles', label: t('pages.admin.tabRoles'), visible: isSuperuser, scope: 'platform', categoryId: 'security' },
     { key: 'system-health', label: t('pages.admin.tabSystemHealth'), visible: showSystemHealth, scope: 'platform', categoryId: 'system' },
     { key: 'live-activity', label: t('pages.admin.tabLiveActivity'), visible: showLiveActivity, scope: 'platform', categoryId: 'system' },
-    { key: 'help-feedback', label: 'Help Feedback', visible: isSuperuser, scope: 'platform', categoryId: 'support' },
+    { key: 'help-feedback', label: t('pages.admin.tabHelpFeedback'), visible: isSuperuser, scope: 'platform', categoryId: 'support' },
   ].filter((tab): tab is TabConfig => tab.visible);
 
   const institutionTabs = tabs.filter((tab) => tab.scope === 'institution');

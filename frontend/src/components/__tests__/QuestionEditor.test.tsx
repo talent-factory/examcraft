@@ -32,14 +32,9 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 /**
- * QuestionEditor Tests - TEMPORARILY DISABLED
- *
- * These tests are currently disabled due to:
- * 1. Component UI changes
- * 2. Form validation changes
- * 3. State management complexity
- *
- * TODO: Re-enable and update tests when component is stable
+ * QuestionEditor tests. The suite below sat on `describe.skip` with English
+ * labels until TF-775; it now asserts the German copy the global i18n mock in
+ * setupTests.ts renders from de/translation.json.
  */
 
 // Sample test data
@@ -63,7 +58,7 @@ const mockQuestion: QuestionReview = {
   updated_at: '2025-10-19T10:00:00Z'
 };
 
-describe.skip('QuestionEditor', () => {
+describe('QuestionEditor', () => {
   const mockOnClose = jest.fn();
   const mockOnSave = jest.fn().mockResolvedValue(undefined);
 
@@ -84,7 +79,7 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByText(/Edit Question #1/i)).toBeInTheDocument();
+      expect(screen.getByText(/Frage #1 bearbeiten/i)).toBeInTheDocument();
     });
 
     it('does not render when closed', () => {
@@ -99,7 +94,7 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      expect(screen.queryByText(/Edit Question #1/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Frage #1 bearbeiten/i)).not.toBeInTheDocument();
     });
 
     it('renders all form fields', () => {
@@ -114,12 +109,12 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByLabelText(/Question Text/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Correct Answer/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Explanation/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Difficulty/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Bloom's Taxonomy Level/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Estimated Time/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Fragetext/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Korrekte Antwort/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Erklärung/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Schwierigkeit/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Bloom-Taxonomiestufe/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Geschätzte Zeit/i)).toBeInTheDocument();
     });
 
     it('pre-fills form with question data', () => {
@@ -134,10 +129,10 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i) as HTMLInputElement;
+      const questionTextInput = screen.getByLabelText(/Fragetext/i) as HTMLInputElement;
       expect(questionTextInput.value).toBe('What is a heap data structure?');
 
-      const explanationInput = screen.getByLabelText(/Explanation/i) as HTMLTextAreaElement;
+      const explanationInput = screen.getByLabelText(/Erklärung/i) as HTMLTextAreaElement;
       expect(explanationInput.value).toBe('A heap is a specialized tree-based data structure.');
     });
   });
@@ -155,7 +150,7 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i);
+      const questionTextInput = screen.getByLabelText(/Fragetext/i);
       fireEvent.change(questionTextInput, { target: { value: 'Updated question text' } });
 
       expect((questionTextInput as HTMLInputElement).value).toBe('Updated question text');
@@ -173,13 +168,13 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const difficultySelect = screen.getByLabelText(/Difficulty/i);
+      const difficultySelect = screen.getByLabelText(/Schwierigkeit/i);
       fireEvent.mouseDown(difficultySelect);
 
-      const hardOption = screen.getByRole('option', { name: /Hard/i });
+      const hardOption = screen.getByRole('option', { name: /Schwer/i });
       fireEvent.click(hardOption);
 
-      expect(difficultySelect).toHaveTextContent('Hard');
+      expect(difficultySelect).toHaveTextContent('Schwer');
     });
 
     it('allows changing Bloom level', () => {
@@ -194,13 +189,13 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const bloomSelect = screen.getByLabelText(/Bloom's Taxonomy Level/i);
+      const bloomSelect = screen.getByLabelText(/Bloom-Taxonomiestufe/i);
       fireEvent.mouseDown(bloomSelect);
 
-      const level5Option = screen.getByRole('option', { name: /5 - Evaluate/i });
+      const level5Option = screen.getByRole('option', { name: /5 - Bewerten/i });
       fireEvent.click(level5Option);
 
-      expect(bloomSelect).toHaveTextContent('5 - Evaluate');
+      expect(bloomSelect).toHaveTextContent('5 - Bewerten');
     });
   });
 
@@ -217,7 +212,9 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByText('A tree-based structure')).toBeInTheDocument();
+      // The correct answer shows twice: in the option list and as the value
+      // of the correct-answer select.
+      expect(screen.getAllByText('A tree-based structure')).toHaveLength(2);
       expect(screen.getByText('A linear structure')).toBeInTheDocument();
       expect(screen.getByText('A graph structure')).toBeInTheDocument();
     });
@@ -234,10 +231,10 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const newOptionInput = screen.getByPlaceholderText(/Add new option/i);
+      const newOptionInput = screen.getByPlaceholderText(/Neue Option hinzufügen/i);
       fireEvent.change(newOptionInput, { target: { value: 'New option' } });
 
-      const addButton = screen.getByRole('button', { name: /Add/i });
+      const addButton = screen.getByRole('button', { name: /Hinzufügen/i });
       fireEvent.click(addButton);
 
       await waitFor(() => {
@@ -280,14 +277,14 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i);
+      const questionTextInput = screen.getByLabelText(/Fragetext/i);
       fireEvent.change(questionTextInput, { target: { value: '' } });
 
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      const saveButton = screen.getByRole('button', { name: /Änderungen speichern/i });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Question text must be at least 10 characters/i)).toBeInTheDocument();
+        expect(screen.getByText(/Der Fragetext muss mindestens 10 Zeichen lang sein/i)).toBeInTheDocument();
       });
 
       expect(mockOnSave).not.toHaveBeenCalled();
@@ -310,11 +307,15 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      // Save stays disabled until something changed, so change something first.
+      fireEvent.change(screen.getByLabelText(/Fragetext/i), {
+        target: { value: 'What is a heap data structure, exactly?' },
+      });
+      const saveButton = screen.getByRole('button', { name: /Änderungen speichern/i });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Multiple choice questions need at least 2 options/i)).toBeInTheDocument();
+        expect(screen.getByText(/Multiple-Choice-Fragen benötigen mindestens 2 Optionen/i)).toBeInTheDocument();
       });
 
       expect(mockOnSave).not.toHaveBeenCalled();
@@ -334,10 +335,10 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i);
+      const questionTextInput = screen.getByLabelText(/Fragetext/i);
       fireEvent.change(questionTextInput, { target: { value: 'Updated question text for testing' } });
 
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      const saveButton = screen.getByRole('button', { name: /Änderungen speichern/i });
       fireEvent.click(saveButton);
 
       await waitFor(() => {
@@ -362,7 +363,7 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      const cancelButton = screen.getByRole('button', { name: /Abbrechen/i });
       fireEvent.click(cancelButton);
 
       expect(mockOnClose).toHaveBeenCalled();
@@ -383,10 +384,10 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i);
+      const questionTextInput = screen.getByLabelText(/Fragetext/i);
       fireEvent.change(questionTextInput, { target: { value: 'Changed text' } });
 
-      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      const cancelButton = screen.getByRole('button', { name: /Abbrechen/i });
       fireEvent.click(cancelButton);
 
       expect(confirmSpy).toHaveBeenCalled();
@@ -407,7 +408,7 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      const saveButton = screen.getByRole('button', { name: /Änderungen speichern/i });
       expect(saveButton).toBeDisabled();
     });
 
@@ -423,10 +424,10 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      const questionTextInput = screen.getByLabelText(/Question Text/i);
+      const questionTextInput = screen.getByLabelText(/Fragetext/i);
       fireEvent.change(questionTextInput, { target: { value: 'Updated question' } });
 
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+      const saveButton = screen.getByRole('button', { name: /Änderungen speichern/i });
       expect(saveButton).not.toBeDisabled();
     });
   });
@@ -445,9 +446,9 @@ describe.skip('QuestionEditor', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByLabelText(/Question Text/i)).toBeDisabled();
-      expect(screen.getByLabelText(/Explanation/i)).toBeDisabled();
-      expect(screen.getByRole('button', { name: /Save Changes/i })).toBeDisabled();
+      expect(screen.getByLabelText(/Fragetext/i)).toBeDisabled();
+      expect(screen.getByLabelText(/Erklärung/i)).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Änderungen speichern/i })).toBeDisabled();
     });
   });
 });
@@ -455,8 +456,8 @@ describe.skip('QuestionEditor', () => {
 /**
  * TF-403: multi-answer `multiple_choice` correct-answer editing + validation.
  *
- * Separate, NON-skipped block (the legacy suite above is `describe.skip`ed for
- * unrelated reasons). i18n is mocked in setupTests to return the real German
+ * Separate, NON-skipped block (the suite above was `describe.skip`ed until
+ * TF-775). i18n is mocked in setupTests to return the real German
  * strings, so assertions use the German labels/messages.
  */
 describe('QuestionEditor — TF-403 multiple_choice', () => {

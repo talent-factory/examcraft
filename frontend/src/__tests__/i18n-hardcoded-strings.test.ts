@@ -47,15 +47,21 @@
  *
  * No mapping table, no rewrite into dot notation. Rules that follow from it:
  *
- * 1. Sort new keys alphabetically into the `errors` block of all four locales.
- *    Because the backend prefixes (`auth_`, `documents_`, `rbac_`, …) cluster
- *    alphabetically, work split across branches lands in disjoint line ranges
- *    and merges without conflicts.
+ * 1. Add new keys to the matching domain block of all four locales, without
+ *    re-sorting anything: the locale files are grouped by domain, and a
+ *    re-sort turns a one-line change into a diff nobody can review. In the
+ *    flat part of the `errors` block, codes sharing a backend prefix (`auth_`,
+ *    `documents_`, `rbac_`, …) sit next to each other anyway, so work split
+ *    across branches still lands in disjoint line ranges.
  * 2. Every key exists in de, en, fr AND it. Not optional.
  * 3. Interpolation differs between the two systems: the backend writes
  *    `%{name}`, i18next writes `{{name}}`. Rewrite when copying a text over.
- * 4. Existing NESTED keys (`errors.help.*`, `errors.rag.*`, …) are NOT migrated
- *    to the flat form here. Their fate belongs to TF-775.
+ * 4. Most NESTED keys (`errors.help.*`, `errors.rag.*`, …) belong to the 20
+ *    frozen dot-notation codes in `src/errors/codes/legacy.ts`. TF-775 kept
+ *    them (and deleted two nothing threw). `errors.oauth.*` and
+ *    `errors.chat.conversionFailed` are plain fallback keys outside the
+ *    registry (see `chat.ts`). Migrating all of them to the flat form is
+ *    TF-996. Do not add to them.
  *
  * ---------------------------------------------------------------------------
  * Reach of this scan — what it does not see, and why

@@ -10,7 +10,6 @@ import {
   absentScanRoots,
   analyzeLocaleDirs,
   collectI18nKeys,
-  compareWithBaseline,
   coveredBy,
   diffLocale,
   effectivePrefixes,
@@ -463,20 +462,6 @@ describe('coveredBy / findUnreferencedKeys — which locale keys are live (TF-77
   it('reports what nothing covers, and only that', () => {
     const keys = ['a.exact', 'a.plural_one', 'a.dead', 'a.dyn.x', 'b.dead_one'];
     expect(findUnreferencedKeys(keys, live)).toEqual(['a.dead', 'b.dead_one']);
-  });
-});
-
-describe('compareWithBaseline — the unreferenced-key ratchet only shrinks (TF-775 B)', () => {
-  it('passes when current and baseline agree', () => {
-    expect(compareWithBaseline(['a', 'b'], ['a', 'b'])).toEqual({ added: [], stale: [] });
-  });
-
-  it('reports a newly unreferenced key', () => {
-    expect(compareWithBaseline(['a', 'new'], ['a'])).toEqual({ added: ['new'], stale: [] });
-  });
-
-  it('reports a baseline entry that is referenced again or was deleted', () => {
-    expect(compareWithBaseline(['a'], ['a', 'gone'])).toEqual({ added: [], stale: ['gone'] });
   });
 });
 

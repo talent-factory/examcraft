@@ -1,7 +1,7 @@
 /**
  * ExamCraft AI — the frontend i18n key gate (TF-670, consolidated in TF-772)
  *
- * The single gate for the frontend locale files. It answers two questions:
+ * The single gate for the frontend locale files. It answers three questions:
  *
  *   A. Are the four locales complete and in sync?
  *      1. Every expected language has its translation.json — a deleted file OR a
@@ -43,6 +43,10 @@
  *           live by design (TF-772 #255: unused but working service methods);
  *         - `i18n_key` values from the data files the source reads keys from
  *           (DATA_KEY_SOURCES).
+ *         Whatever none of these covers fails the gate. There is no
+ *         allowlist: TF-775 B deleted the 121 dead keys it found (and the two
+ *         legacy codes nothing threw), so a dead key is always a new one.
+ *         The fix is to delete it from all four locales, or to reference it.
  *         Skipped, with a notice, when every tier outside core/ is absent —
  *         the public mirror (`subtree split --prefix=core`) has no premium/
  *         or enterprise/, and every key only they spend would read as dead
@@ -52,10 +56,6 @@
  *         only some tiers are absent (a renamed or removed tier, not a
  *         mirror) and when I18N_REQUIRE_ALL_TIERS is set — the private CI
  *         sets it, so a core-only checkout cannot turn the check off.
- *         Whatever none of these covers is reported. Keys listed in
- *         i18n-unreferenced-keys.baseline.json are the known backlog and do
- *         not fail; any other unreferenced key does, and so does a baseline
- *         entry that is referenced again or gone — the baseline only shrinks.
  *
  *      Regex, not an AST, on purpose (measured in TF-775 B): the literal rule
  *      matches a key-shaped run between two equal quotes directly, not by
@@ -97,7 +97,9 @@
  * the five guards asks.
  *
  * Frontend locales only. The backend's `core/backend/locales/t.<lang>.json`
- * are gated by `core/backend/tests/test_locale_parity.py` (TF-773 Part C).
+ * are gated by `core/backend/tests/test_locale_parity.py` (TF-773 Part C, the
+ * counterpart of A) and `core/backend/tests/test_locale_keys_referenced.py`
+ * (TF-775 B, the counterpart of C).
  *
  * Usage:
  *   bun run i18n:check        (runs the self-test below first, then the gate)
@@ -514,23 +516,6 @@ export function findUnreferencedKeys(keys: Iterable<string>, live: Liveness): st
   return [...keys].filter((key) => coveredBy(key, live) === null);
 }
 
-/**
- * The ratchet: an unreferenced key outside the baseline fails, and so does a
- * baseline entry that is no longer unreferenced (live again, or deleted) —
- * otherwise the file would keep listing keys long after they were cleaned up.
- */
-export function compareWithBaseline(
-  unreferenced: readonly string[],
-  baseline: readonly string[]
-): { added: string[]; stale: string[] } {
-  const current = new Set(unreferenced);
-  const known = new Set(baseline);
-  return {
-    added: unreferenced.filter((key) => !known.has(key)),
-    stale: baseline.filter((key) => !current.has(key)),
-  };
-}
-
 /** Every `i18n_key` string anywhere in a parsed JSON document. */
 export function collectI18nKeys(node: unknown, out: string[] = []): string[] {
   if (Array.isArray(node)) {
@@ -823,9 +808,7 @@ interface SpentKeys {
 
 const WIDE_PREFIX_MIN = 20;
 
-const BASELINE_FILE = path.resolve(import.meta.dir, 'i18n-unreferenced-keys.baseline.json');
-
-/** Part C: every reference-locale key is spent somewhere, or on the baseline. */
+/** Part C: every reference-locale key is spent somewhere. */
 async function checkUnreferenced(
   bundles: Map<string, unknown>,
   spent: SpentKeys
@@ -869,12 +852,10 @@ async function checkUnreferenced(
   const prefixes = effectivePrefixes(spent.prefixes.map((ref) => ref.key));
   const referenceKeys = [...flatten(bundles.get(REFERENCE)).keys()];
   const unreferenced = findUnreferencedKeys(referenceKeys, { exact, prefixes });
-  const baseline: string[] = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
-  const { added, stale } = compareWithBaseline(unreferenced, baseline);
 
   console.log(
     `\ni18n unreferenced keys — ${prefixes.length} dynamic prefix(es), ${APP_ERROR_CODES.length} registry ` +
-      `code(s), ${dataKeys} data-file key(s); ${unreferenced.length} unreferenced, ${baseline.length} on the baseline\n`
+      `code(s), ${dataKeys} data-file key(s); ${unreferenced.length} unreferenced\n`
   );
   // A prefix exempts everything under it from this check, so a broad one
   // (`` t(`pages.${x}`) ``) must be visible in the log, not just counted.
@@ -883,16 +864,11 @@ async function checkUnreferenced(
     console.log(`  prefixes covering ≥ ${WIDE_PREFIX_MIN} keys:`);
     for (const { prefix, covers } of wide) console.log(`    ${prefix}* — ${covers}`);
   }
-  if (added.length) {
-    failures.push(`${added.length} key(s) in ${REFERENCE} are not referenced anywhere`);
+  if (unreferenced.length) {
+    failures.push(`${unreferenced.length} key(s) in ${REFERENCE} are not referenced anywhere`);
     console.log(
-      `  ✗ unreferenced — delete from all four locales, or reference them (${added.length}):\n${sample(added)}`
-    );
-  }
-  if (stale.length) {
-    failures.push(`${stale.length} baseline entr(y/ies) no longer unreferenced`);
-    console.log(
-      `  ✗ referenced again or deleted — remove from ${path.basename(BASELINE_FILE)} (${stale.length}):\n${sample(stale)}`
+      `  ✗ unreferenced — delete from all four locales, or reference them (${unreferenced.length}):\n` +
+        sample(unreferenced)
     );
   }
   return { failures, skipped: false };
@@ -909,7 +885,8 @@ if (import.meta.main) {
     console.error('\nFAIL — frontend i18n is out of sync:');
     for (const failure of failures) console.error(`  - ${failure}`);
     console.error(
-      `\nAdd the missing translations to the locale file(s) named above.\n` +
+      `\nAdd the missing translations to the locale file(s) named above, and delete\n` +
+        `unreferenced keys from all four locales.\n` +
         `A missing key falls back to the reference language at runtime, so users\n` +
         `see the wrong language rather than a visible error — that is why this\n` +
         `check is a hard gate.`
@@ -921,6 +898,6 @@ if (import.meta.main) {
     '\nOK — all four locales complete and in sync, every static source reference resolves, ' +
       (unreferenced.skipped
         ? 'unreferenced-key check SKIPPED (tiers absent, see above).'
-        : 'no unreferenced key beyond the baseline.')
+        : 'no unreferenced key.')
   );
 }

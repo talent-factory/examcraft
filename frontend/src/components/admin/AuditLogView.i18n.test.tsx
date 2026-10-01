@@ -15,10 +15,12 @@ import AuditLogView from './AuditLogView';
 import * as auditService from '../../services/auditService';
 import { AuditLogItem, AuditLogListResponse } from '../../types/audit';
 
-const row = (id: number, status: string): AuditLogItem => ({
+const row = (id: number, status: string, category = 'business'): AuditLogItem => ({
   id, created_at: '2026-06-13T10:00:00Z', user_id: 5, actor: 'Test User',
   impersonator: null,
-  action: 'create_document', category: 'business', resource_type: 'document',
+  // category: same cast as status below — the type rules out a value the
+  // backend could in principle still send.
+  action: 'create_document', category: category as AuditLogItem['category'], resource_type: 'document',
   resource_id: '42',
   // The DB column is a free String(20); the cast lets a test feed the value
   // the type rules out but the backend could still send.
@@ -85,5 +87,37 @@ describe('AuditLogView — German copy (TF-775)', () => {
     const flagged = await screen.findByTitle('Unbekannter Status — kein bekannter Wert für dieses Feld.');
     expect(flagged).toHaveTextContent(status);
     expect(screen.queryByText(/pages\.admin\.audit\.status/)).not.toBeInTheDocument();
+  });
+
+  it('shows the category column with the same words as the filter', async () => {
+    jest.spyOn(auditService, 'fetchAuditLogs').mockResolvedValue(
+      response([
+        row(1, 'success', 'business'),
+        row(2, 'success', 'admin'),
+        row(3, 'success', 'auth'),
+        row(4, 'success', 'security'),
+      ]),
+    );
+    render(<AuditLogView isSuperuser />);
+
+    const table = await screen.findByRole('table', { name: 'Audit-Log' });
+    await within(table).findByText('Geschäftlich');
+    for (const label of ['Geschäftlich', 'Administration', 'Authentifizierung', 'Sicherheit']) {
+      expect(within(table).getByText(label)).toBeInTheDocument();
+    }
+    for (const raw of ['business', 'admin', 'auth', 'security']) {
+      expect(within(table).queryByText(raw)).not.toBeInTheDocument();
+    }
+  });
+
+  it('shows an unknown category value raw instead of a key path, and logs it', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(auditService, 'fetchAuditLogs').mockResolvedValue(response([row(1, 'success', 'billing')]));
+    render(<AuditLogView isSuperuser />);
+
+    const table = await screen.findByRole('table', { name: 'Audit-Log' });
+    expect(await within(table).findByText('billing')).toBeInTheDocument();
+    expect(screen.queryByText(/pages\.admin\.audit\.category/)).not.toBeInTheDocument();
+    expect(warn).toHaveBeenCalledWith('[audit] Unknown category value:', 'billing');
   });
 });
