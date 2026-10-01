@@ -9,6 +9,44 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.13.4] - 2026-09-30
+
+### Security
+
+- **Wissenssuche nur noch in eigenen Dokumenten (TF-980):** Die
+  semantische Suche über die MCP-Schnittstelle lehnt Dokumente ab, die
+  nicht dem Benutzer gehören, statt sie stillschweigend zu ignorieren.
+  Eine leere Dokumentauswahl liefert keine Treffer mehr, statt über alle
+  Dokumente zu suchen.
+
+## [1.13.3] - 2026-09-30
+
+### Security
+
+- **Dokumentauswahl bei KI-Generierung und Chat durchgängig geprüft
+  (TF-969):** Fragengenerierung, Kontextvorschau, erneute Generierung,
+  Chat und die MCP-Fragengenerierung verwenden nur noch Dokumente, die
+  für den jeweiligen Benutzer sichtbar sind. `document_ids` ist bei
+  `POST /api/v1/rag/generate-exam` und `/api/v1/rag/retrieve-context`
+  jetzt Pflicht (mindestens ein Dokument, sonst 422). Eine erneute
+  Generierung prüft die gespeicherte Dokumentauswahl erneut und wird mit
+  `rag_retry_documents_unavailable` abgelehnt, wenn Dokumente fehlen
+  oder nicht mehr verfügbar sind.
+
+## [1.13.2] - 2026-09-29
+
+### Fixed
+
+- **Celery: sporadische `PGRES_TUPLES_OK`-Fehler (TF-963):** Seit
+  v1.13.1 schlugen Celery-Tasks (u. a. die Maintenance-Watchdogs)
+  sporadisch mit `psycopg2.DatabaseError: error with status
+  PGRES_TUPLES_OK and no message from the libpq` fehl. Jeder
+  geforkte Worker-Prozess erhält jetzt über `worker_process_init`
+  einen eigenen Datenbank-Pool (`engine.dispose(close=False)`),
+  statt den Pool samt offener Verbindungen vom Parent zu erben.
+  SQLAlchemy ist auf `<2.1` begrenzt (zurück auf 2.0.x, wie bis
+  v1.13.0), `psycopg2-binary` auf `<2.10`.
+
 ## [1.13.1] - 2026-09-29
 
 ### Fixed
