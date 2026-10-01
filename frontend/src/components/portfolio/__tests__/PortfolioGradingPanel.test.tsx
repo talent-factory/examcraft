@@ -4,7 +4,7 @@
  * «KI-Vorschlag – nicht final» marking.
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import PortfolioAssessmentDetailPage from '../../../pages/portfolio/PortfolioAssessmentDetailPage';
@@ -15,6 +15,7 @@ import type {
   PortfolioAssessmentJob,
   PortfolioAssessmentStatus,
   PortfolioPhaseResult,
+  PortfolioPhaseResultCompleted,
   PortfolioTemplate,
 } from '../../../types/portfolio';
 
@@ -35,6 +36,7 @@ jest.mock('../../../api/portfolioApi', () => ({
     getAssessment: jest.fn(),
     getTemplate: jest.fn(),
     startGrading: jest.fn(),
+    approvePhaseResult: jest.fn(),
   },
 }));
 
@@ -260,9 +262,14 @@ describe('PortfolioGradingPanel', () => {
     );
     renderPage();
 
-    expect(await screen.findByText('Zeitplan')).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Kriterien und Begründungen anzeigen' }),
+    );
+    expect(screen.getByText('Zeitplan')).toBeInTheDocument();
     expect(screen.getByText(/Verwaltungsrecht/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Bewertung/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Übernehmen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anpassen' })).not.toBeInTheDocument();
   });
 
   it('zeigt während einer laufenden Bewertung keinen Start-Button', async () => {
@@ -299,8 +306,11 @@ describe('PortfolioGradingPanel', () => {
     expect(screen.getByTestId('portfolio-grading-ai-notice')).toHaveTextContent(
       'KI-Vorschlag – nicht final',
     );
-    expect(screen.queryByText('5.0')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Note/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/5\.0/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-aggregate-grade')).not.toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-aggregate-provisional')).toHaveTextContent(
+      'Vorläufig – KI-Vorschlag, nicht final',
+    );
     expect(screen.queryByRole('button', { name: /Bewertung/ })).not.toBeInTheDocument();
   });
 
@@ -312,6 +322,7 @@ describe('PortfolioGradingPanel', () => {
     renderPage();
 
     expect(await screen.findByText(/Das Template konnte nicht geladen werden/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Kriterien und Begründungen anzeigen' }));
     expect(screen.getByText('Unbekannte Phase')).toBeInTheDocument();
     expect(screen.getByText('Unbekanntes Kriterium')).toBeInTheDocument();
     expect(screen.getByText('Punkte: 1')).toBeInTheDocument();
@@ -340,5 +351,189 @@ describe('PortfolioGradingPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Bewertung starten' }));
 
     expect(await screen.findByText('Benötigter Tarif')).toBeInTheDocument();
+  });
+});
+
+describe('PortfolioGradingPanel – Review und Noten-Gate (TF-992)', () => {
+  const completedRealisation: PortfolioPhaseResult = {
+    ...completedPlanning,
+    id: 'pr-2',
+    phase_id: 'p-2',
+    criterion_results: [
+      {
+        criterion_id: 'c-2',
+        score: 2,
+        rationale: 'Solide umgesetzt.',
+        checklist: {},
+        strengths: [],
+        improvements: [],
+      },
+    ],
+    total_points: 2,
+    max_points: 3,
+  };
+
+  function reviewed(result: PortfolioPhaseResult): PortfolioPhaseResult {
+    if (result.status !== 'completed') throw new Error('fixture');
+    return { ...result, review_status: 'approved', reviewer_id: 1, reviewed_at: '2026-10-01T08:00:00' };
+  }
+
+  function expandPhase(phaseId: string) {
+    const card = screen.getByTestId(`portfolio-phase-result-${phaseId}`);
+    fireEvent.click(
+      within(card).getByRole('button', { name: 'Kriterien und Begründungen anzeigen' }),
+    );
+    return card;
+  }
+
+  it('zeigt bei partially_reviewed keine Note, auch wenn die Daten eine enthielten', async () => {
+    api.getAssessment.mockResolvedValue(
+      assessment('completed', {
+        grading_scheme_id: 3,
+        review_status: 'partially_reviewed',
+        phase_results: [reviewed(completedPlanning), completedRealisation],
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+        overall_percentage: 60,
+        // Defensive: the backend never sends this before `fully_reviewed`.
+        overall_grade: '4.5',
+      }),
+    );
+    renderPage();
+
+    const aggregate = await screen.findByTestId('portfolio-aggregate');
+    expect(within(aggregate).getByText('3 / 5 Punkte · 60 %')).toBeInTheDocument();
+    expect(within(aggregate).getByText('1 von 2 Phasen überprüft')).toBeInTheDocument();
+    expect(within(aggregate).getByText('Vorläufig – KI-Vorschlag')).toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-aggregate-provisional')).toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-aggregate-grade')).not.toBeInTheDocument();
+    expect(screen.queryByText(/4\.5/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Note:/)).not.toBeInTheDocument();
+    // Nothing claims to be final before the gate.
+    expect(screen.queryByText(/(?<!nicht )final/i)).not.toBeInTheDocument();
+  });
+
+  it('zeigt die Note erst bei fully_reviewed', async () => {
+    api.getAssessment.mockResolvedValue(
+      assessment('completed', {
+        grading_scheme_id: 3,
+        review_status: 'fully_reviewed',
+        phase_results: [reviewed(completedPlanning), reviewed(completedRealisation)],
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+        overall_percentage: 60,
+        overall_grade: '4.5',
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByTestId('portfolio-aggregate-grade')).toHaveTextContent('Note: 4.5');
+    expect(screen.getByText('Alle Phasen überprüft')).toBeInTheDocument();
+    expect(screen.getByText('2 von 2 Phasen überprüft')).toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-aggregate-provisional')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-grading-ai-notice')).not.toBeInTheDocument();
+  });
+
+  it('erklärt bei fully_reviewed ohne Notenschema, warum keine Note erscheint', async () => {
+    api.getAssessment.mockResolvedValue(
+      assessment('completed', {
+        review_status: 'fully_reviewed',
+        phase_results: [reviewed(completedPlanning)],
+        overall_points_awarded: 1,
+        overall_points_max: 2,
+        overall_percentage: 50,
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByText(/kein Notenschema hinterlegt/)).toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-aggregate-grade')).not.toBeInTheDocument();
+  });
+
+  it('übernimmt das Aggregat aus der Approve-Antwort ohne erneuten GET', async () => {
+    api.getAssessment.mockResolvedValue(
+      assessment('completed', {
+        grading_scheme_id: 3,
+        phase_results: [completedPlanning, completedRealisation],
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+        overall_percentage: 60,
+      }),
+    );
+    api.approvePhaseResult.mockResolvedValue({
+      ...(reviewed(completedPlanning) as PortfolioPhaseResultCompleted),
+      assessment: {
+        review_status: 'partially_reviewed',
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+        overall_percentage: 60,
+      },
+    });
+    renderPage();
+
+    // The cards wait for the template.
+    await screen.findByTestId('portfolio-phase-result-p-1');
+    expect(screen.getByText('0 von 2 Phasen überprüft')).toBeInTheDocument();
+    const planning = expandPhase('p-1');
+    fireEvent.click(within(planning).getByRole('button', { name: 'Übernehmen' }));
+
+    expect(await screen.findByText('1 von 2 Phasen überprüft')).toBeInTheDocument();
+    expect(within(planning).getByText('Von Lehrperson übernommen')).toBeInTheDocument();
+    expect(api.approvePhaseResult).toHaveBeenCalledWith('a-1', 'pr-1');
+    expect(api.getAssessment).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('portfolio-aggregate-grade')).not.toBeInTheDocument();
+  });
+
+  it('lädt die Note nach, sobald die letzte Phase übernommen ist', async () => {
+    const before = assessment('completed', {
+      grading_scheme_id: 3,
+      review_status: 'partially_reviewed',
+      phase_results: [reviewed(completedPlanning), completedRealisation],
+      overall_points_awarded: 3,
+      overall_points_max: 5,
+      overall_percentage: 60,
+    });
+    api.getAssessment.mockResolvedValueOnce(before).mockResolvedValue({
+      ...before,
+      review_status: 'fully_reviewed',
+      phase_results: [reviewed(completedPlanning), reviewed(completedRealisation)],
+      overall_grade: '4.5',
+    });
+    api.approvePhaseResult.mockResolvedValue({
+      ...(reviewed(completedRealisation) as PortfolioPhaseResultCompleted),
+      assessment: {
+        review_status: 'fully_reviewed',
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+        overall_percentage: 60,
+      },
+    });
+    renderPage();
+
+    // The cards wait for the template.
+    await screen.findByTestId('portfolio-phase-result-p-1');
+    fireEvent.click(within(expandPhase('p-2')).getByRole('button', { name: 'Übernehmen' }));
+
+    expect(await screen.findByTestId('portfolio-aggregate-grade')).toHaveTextContent('Note: 4.5');
+    expect(api.getAssessment).toHaveBeenCalledTimes(2);
+  });
+
+  it('bietet kein «Alle übernehmen» an', async () => {
+    api.getAssessment.mockResolvedValue(
+      assessment('completed', {
+        phase_results: [completedPlanning, completedRealisation],
+        overall_points_awarded: 3,
+        overall_points_max: 5,
+      }),
+    );
+    renderPage();
+
+    // The cards wait for the template.
+    await screen.findByTestId('portfolio-phase-result-p-1');
+    expect(screen.queryByRole('button', { name: /übernehmen/i })).not.toBeInTheDocument();
+    expandPhase('p-1');
+    expandPhase('p-2');
+    expect(screen.getAllByRole('button', { name: 'Übernehmen' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /alle/i })).not.toBeInTheDocument();
   });
 });

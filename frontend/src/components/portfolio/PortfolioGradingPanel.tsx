@@ -11,8 +11,13 @@
  *
  * The phase results carry ids only, so the template is loaded for names,
  * `max_points` and rubric texts. Everything shown here is the LLM's proposal
- * (EU AI Act, TF-947) and there is no grade — the review actions and the
- * grade behind the human-in-the-loop gate follow in P5b (TF-992).
+ * (EU AI Act, TF-947) until a teacher reviews it.
+ *
+ * Review (TF-992, P5b): approve/override per phase on the cards, and the
+ * aggregate card on top, which shows a grade only once every phase is
+ * reviewed. Approve/override answer with the phase and the recomputed
+ * aggregate, which go straight into the cache; only the grade needs another
+ * GET (the endpoints leave it out), so that happens once `fully_reviewed`.
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,11 +34,13 @@ import {
 import type {
   PortfolioAssessmentDetail,
   PortfolioPhaseResult,
+  PortfolioPhaseReviewResponse,
   PortfolioTemplatePhase,
 } from '../../types/portfolio';
+import { PortfolioAggregateCard } from './PortfolioAggregateCard';
 import { portfolioTemplateQueryKey } from './PortfolioClassificationPanel';
 import { PortfolioMutationError } from './PortfolioMutationError';
-import { PortfolioPhaseResultCard } from './PortfolioPhaseResultCard';
+import { PortfolioPhaseResultCard, type PortfolioPhaseReviewProps } from './PortfolioPhaseResultCard';
 
 interface OrderedPhaseResult {
   result: PortfolioPhaseResult;
@@ -65,6 +72,7 @@ export const PortfolioGradingPanel: React.FC<PortfolioGradingPanelProps> = ({ as
   const { hasPermission } = useAuth();
   const canManage = hasPermission('portfolio_assessments:manage');
 
+  const detailKey = portfolioAssessmentQueryKey(assessment.id);
   const phaseResults = assessment.phase_results;
   const templateQuery = useQuery({
     queryKey: portfolioTemplateQueryKey(assessment.template_id),
@@ -78,18 +86,45 @@ export const PortfolioGradingPanel: React.FC<PortfolioGradingPanelProps> = ({ as
       // The summary's `queued` job switches polling on at once; the refetch
       // brings the phase rows the endpoint has just created.
       queryClient.setQueryData<PortfolioAssessmentDetail>(
-        portfolioAssessmentQueryKey(assessment.id),
+        detailKey,
         (current) => (current ? { ...current, ...summary } : current),
       );
-      void queryClient.invalidateQueries({ queryKey: portfolioAssessmentQueryKey(assessment.id) });
+      void queryClient.invalidateQueries({ queryKey: detailKey });
       void queryClient.invalidateQueries({ queryKey: portfolioAssessmentsQueryKey });
     },
     // A 409 can mean another tab started it meanwhile, and a 503 has already
     // failed a job: reload so the job panel shows what is true now.
     onError: () => {
-      void queryClient.invalidateQueries({ queryKey: portfolioAssessmentQueryKey(assessment.id) });
+      void queryClient.invalidateQueries({ queryKey: detailKey });
     },
   });
+
+  const review: PortfolioPhaseReviewProps | undefined = canManage
+    ? {
+        assessmentId: assessment.id,
+        onReviewed: ({ assessment: aggregate, ...phaseResult }: PortfolioPhaseReviewResponse) => {
+          queryClient.setQueryData<PortfolioAssessmentDetail>(detailKey, (current) =>
+            current
+              ? {
+                  ...current,
+                  ...aggregate,
+                  phase_results: current.phase_results.map((r) =>
+                    r.id === phaseResult.id ? phaseResult : r,
+                  ),
+                }
+              : current,
+          );
+          // The grade is not part of the review response.
+          if (aggregate.review_status === 'fully_reviewed') {
+            void queryClient.invalidateQueries({ queryKey: detailKey });
+          }
+          void queryClient.invalidateQueries({ queryKey: portfolioAssessmentsQueryKey });
+        },
+        onReviewFailed: () => {
+          void queryClient.invalidateQueries({ queryKey: detailKey });
+        },
+      }
+    : undefined;
 
   const jobActive = isPortfolioJobActive(assessment.job);
   const canStart = assessment.status === 'ready_to_grade' && !jobActive;
@@ -157,6 +192,8 @@ export const PortfolioGradingPanel: React.FC<PortfolioGradingPanelProps> = ({ as
               })}
             </Typography>
 
+            <PortfolioAggregateCard assessment={assessment} />
+
             {hasProposals && (
               <Alert severity="info" data-testid="portfolio-grading-ai-notice">
                 {t('pages.portfolio.grading.aiNotice')}
@@ -186,7 +223,12 @@ export const PortfolioGradingPanel: React.FC<PortfolioGradingPanelProps> = ({ as
               <CircularProgress size={24} />
             ) : (
               ordered.map(({ result, phase }) => (
-                <PortfolioPhaseResultCard key={result.id} result={result} phase={phase} />
+                <PortfolioPhaseResultCard
+                  key={result.id}
+                  result={result}
+                  phase={phase}
+                  review={review}
+                />
               ))
             )}
           </>

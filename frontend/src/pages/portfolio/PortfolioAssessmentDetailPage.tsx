@@ -5,7 +5,8 @@
  * panel; the body branches on the current step. The upload step is the
  * ingestion panel (TF-989), the classification step the review panel
  * (TF-990); grading and review show the grading panel with the phase
- * results (TF-991). The review actions follow in P5b (TF-992).
+ * results (TF-991) and, per phase, the review actions plus the overall
+ * result behind the human-in-the-loop gate (TF-992).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
