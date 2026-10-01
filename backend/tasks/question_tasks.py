@@ -272,7 +272,9 @@ def _safe_update_job_status(task_id: str, status: str) -> JobStatusWrite:
 # rejected without running, i.e. the original run plus at most N-1
 # redelivered runs. A redelivery happens whenever the worker is lost
 # mid-task (see reject_on_worker_lost on the task): an OOM kill of the
-# prefork child, but also a worker restart during a deploy. Guards against a
+# prefork child or a worker restart during a deploy. RabbitMQ also
+# redelivers when the broker connection drops; Celery then cancels the
+# original run (TF-1009). Guards against a
 # loop where every attempt is killed the same way.
 _MAX_REDELIVERIES = 3
 

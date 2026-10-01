@@ -43,6 +43,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: examcraft
       RABBITMQ_DEFAULT_PASS: examcraft_dev  # pragma: allowlist secret
+      # TF-1009: consumer_timeout (Default 30 min) über task_time_limit
+      # (3600 s, celery_app.py) heben, sonst stellt RabbitMQ acks_late-Tasks
+      # über 30 min erneut zu. Wert wie infra/rabbitmq/rabbitmq.conf (Full-
+      # Stack/Fly); core/ mountet diese Datei nicht, weil sie im Mirror fehlt.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 7200000"
     ports:
       - "5672:5672"
       - "15672:15672"
