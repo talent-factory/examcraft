@@ -1,34 +1,22 @@
 /**
- * One flat code plus two backend-specific ones, next to eight legacy siblings
- * (TF-772 PR 4).
+ * Error codes of `HelpService` — one fallback per method, plus the backend
+ * codes `core/backend/api/v1/help.py` sends.
  *
- * `HelpService` has nine throw sites. Eight became `AppError('help.…')` in
- * TF-671 and live in `legacy.ts` as dot-notation camelCase;
- * `updateTrackStep` was added afterwards (TF-625) and kept
- * `throw new Error('Failed to update onboarding track step')` — the last
- * English literal in the file, and the reason the guard still listed it.
+ * Eight of the fallbacks were TF-671 dot-notation codes (`help.statusFailed`
+ * …) until TF-996 moved them here in the flat form every other file uses;
+ * `help_onboarding_track_step_failed` was added flat in TF-772 PR 4.
  *
- * It does NOT join its eight siblings: `legacy.ts` is frozen, and TF-996 owns
- * the question of whether that whole family migrates to flat snake_case. So
- * this code takes the current shape and sits alone in its own file. One flat
- * `help_*` code beside eight `help.*` ones looks inconsistent because it *is*
- * inconsistent — that inconsistency is TF-996's input, not something to hide by
- * writing a ninth legacy-style code.
- *
- * BACKEND COUNTERPART. All nine `HelpService` methods now route through
+ * BACKEND COUNTERPART. All nine `HelpService` methods route through
  * `appErrorFromResponse()`, so every one of them accepts a specific backend
- * code where `core/backend/api/v1/help.py` sends one. Two of the endpoints it
- * hits do: `PUT /help/onboarding/track/{track_id}/step` (`updateTrackStep`)
- * can answer `help_track_id_invalid` or `help_too_many_tracks`, and
- * `POST /help/message` (`sendMessage`) can answer `help_rate_limit_exceeded`.
- * The other six methods' endpoints (`/help/status`, `/onboarding/status`,
- * `/onboarding/step`, `/onboarding/skip`, `/context/{route}`,
- * `/context/dismiss`, `/feedback`) still raise no `error_code`, so their
- * legacy fallback in `legacy.ts` is what actually renders.
+ * code where `help.py` sends one. Two of the endpoints it hits do:
+ * `PUT /help/onboarding/track/{track_id}/step` (`updateTrackStep`) can answer
+ * `help_track_id_invalid` or `help_too_many_tracks`, and `POST /help/message`
+ * (`sendMessage`) can answer `help_rate_limit_exceeded`. The other seven
+ * endpoints raise no `error_code`, so their fallback is what a consumer gets.
  *
  * `help.py` also backs six admin-only endpoints under `/help/admin/*`
  * (feedback moderation, reindexing, FAQ candidates, doc-gap clusters) with
- * five more real codes — `help_feedback_not_found`,
+ * seven more real codes — `help_superadmin_required`, `help_feedback_not_found`,
  * `help_reindex_full_mode_only`, `help_reindex_conflict`,
  * `help_reindex_unavailable`, `help_faq_candidate_not_found`,
  * `help_cluster_not_found`. Deliberately not registered here: `HelpService.ts`
@@ -38,16 +26,73 @@
  * silent drift this file exists to avoid; migrating that admin surface is its
  * own follow-up.
  *
- * REACHABILITY. `useHelpContext.updateTrackStep` catches this, logs it and
- * hands it to Sentry — it never reaches a `t()` call today. The code is still
- * the right shape rather than a permanent English string: this is a user
- * action failing (a deep-dive's progress is not saved), not a programming
- * error like `apiClient`'s "No token refresh callback registered", and the day
- * it does get surfaced it should already have a sentence in four languages.
+ * SHOWN OR SILENT (TF-996). Every code below is thrown, so every one needs
+ * its four-locale text whether or not a consumer renders it. Three are shown:
+ *
+ *   help_hint_dismiss_failed  `HelpContextHint` — «Nicht mehr anzeigen» failed,
+ *                             the hint stays; without a message the click
+ *                             looked ignored
+ *   help_feedback_failed      `HelpFeedback` — the rating was lost while the
+ *                             widget already said thanks
+ *   help_rate_limit_exceeded  `HelpChat` on a 429 — the backend sentence
+ *                             names the cap and the window, which the generic
+ *                             `help.rateLimited` does not. The IP limiter's
+ *                             429 carries no code and keeps the generic one
+ *
+ * The other nine are silent ON PURPOSE — the user either sees something
+ * better or has nothing to do. Where each failure goes instead is named per
+ * code: six reach client error reporting (`reportHandledError`, Specula),
+ * three only the browser console. Silent codes outside this file:
+ * `compliance_load_failed` (`compliance.ts`) and `features_load_failed`
+ * (`features.ts`).
+ *
+ *   help_status_failed             `useHelpContext` falls back to onboarding
+ *                                  and context on, chat off — a safe
+ *                                  degradation, though in full mode the chat
+ *                                  stays hidden until the next mount. Console
+ *                                  only
+ *   help_onboarding_status_failed  `useHelpContext`: the tour is not offered;
+ *                                  reported, because a read that keeps
+ *                                  failing would otherwise withhold the tour
+ *                                  from every new user unnoticed. The next
+ *                                  full reload asks again
+ *   help_context_hint_failed       `useHelpContext`: no hint; failures are
+ *                                  not cached, the next navigation retries.
+ *                                  Console only
+ *   help_onboarding_step_failed,   `useHelpContext` writers never reject, so
+ *   help_onboarding_skip_failed,   the tour cannot get stuck; they are
+ *   help_onboarding_track_step_failed,  reported, and a later successful
+ *   help_track_id_invalid          write catches the progress up (after a
+ *                                  failed last step nothing does — the
+ *                                  report is the trace). `help_track_id_invalid`
+ *                                  is a frontend bug (track ids come from
+ *                                  `public/help-onboarding-steps.json`), not
+ *                                  something the user could fix
+ *   help_too_many_tracks           Same writer. Unreachable through the UI:
+ *                                  the backend allows 20 tracks per user
+ *                                  (`MAX_TRACKS_PER_USER`), the steps file
+ *                                  defines six distinct track ids across both
+ *                                  roles. It would take a frontend bug to hit
+ *                                  it, so error reporting is the right
+ *                                  audience
+ *   help_message_failed            `HelpChat` maps the HTTP status to its own
+ *                                  sentences (429 `help.rateLimited`, 401/403
+ *                                  `help.sessionExpired`, else
+ *                                  `help.chatUnavailable`), which say more
+ *                                  than the operation fallback would.
+ *                                  Console only
  */
 export const HELP_ERROR_CODES = [
+  'help_context_hint_failed',
+  'help_feedback_failed',
+  'help_hint_dismiss_failed',
+  'help_message_failed',
+  'help_onboarding_skip_failed',
+  'help_onboarding_status_failed',
+  'help_onboarding_step_failed',
   'help_onboarding_track_step_failed',
   'help_rate_limit_exceeded',
+  'help_status_failed',
   'help_too_many_tracks',
   'help_track_id_invalid',
 ] as const;

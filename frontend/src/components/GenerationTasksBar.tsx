@@ -44,7 +44,7 @@ const GenerationTasksBar: React.FC = () => {
       await retryTask(taskId);
     } catch (err) {
       console.error('[GenerationTasks] Retry failed:', err);
-      setRetryError({ taskId, message: translateError(err, t, 'errors.rag.retryFailed') });
+      setRetryError({ taskId, message: translateError(err, t, 'errors.rag_retry_failed') });
     } finally {
       setRetryingTaskId(null);
     }

@@ -92,7 +92,7 @@ export const useFeatures = (): UseFeaturesReturn => {
       });
 
       if (!response.ok) {
-        throw new AppError('features.loadFailed', response.statusText, response.status);
+        throw new AppError('features_load_failed', response.statusText, response.status);
       }
 
       const featuresData: UserFeatures = await response.json();
@@ -105,7 +105,7 @@ export const useFeatures = (): UseFeaturesReturn => {
 
       setData(featuresData);
     } catch (err) {
-      setError(translateError(err, t, 'errors.features.loadFailed'));
+      setError(translateError(err, t, 'errors.features_load_failed'));
       console.error('[useFeatures] Error fetching features:', err);
     } finally {
       setIsLoading(false);

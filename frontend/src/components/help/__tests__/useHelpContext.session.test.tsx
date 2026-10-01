@@ -3,6 +3,7 @@ import { renderHook, waitFor, act, render } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { useHelpContext } from '../useHelpContext';
 import { helpService, ContextHint } from '../../../services/HelpService';
+import { reportHandledError } from '../../../utils/errorReporting';
 
 jest.mock('../../../services/HelpService', () => ({
   helpService: {
@@ -10,6 +11,10 @@ jest.mock('../../../services/HelpService', () => ({
     getOnboardingStatus: jest.fn(),
     getContextHint: jest.fn(),
   },
+}));
+
+jest.mock('../../../utils/errorReporting', () => ({
+  reportHandledError: jest.fn(),
 }));
 
 jest.mock('../../../contexts/AuthContext', () => ({
@@ -162,4 +167,25 @@ test('a same-mount route revisit is served from cache, not refetched', async () 
     expect(results[results.length - 1].contextHint?.hint_id).toBe(7)
   );
   expect(mocked.getContextHint).toHaveBeenCalledTimes(2);
+});
+
+/**
+ * TF-996: a status read that keeps failing silently withholds the tour from
+ * every new user, and the backend never sees network or CORS failures — so
+ * the failure is reported, not only logged.
+ */
+test('reports a failed onboarding-status read and offers no tour', async () => {
+  const failure = new Error('network down');
+  mocked.getOnboardingStatus.mockRejectedValue(failure);
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+  const { result } = renderHook(() => useHelpContext(), { wrapper: wrapper('/documents') });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.onboardingStatus).toBeNull();
+  expect(reportHandledError).toHaveBeenCalledWith(failure, {
+    feature: 'onboarding',
+    action: 'getStatus',
+  });
+  warn.mockRestore();
 });

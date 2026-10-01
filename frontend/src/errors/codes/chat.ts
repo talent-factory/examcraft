@@ -16,18 +16,12 @@
  * `chat_export_failed` is the `/to-document` endpoint, matching
  * `ChatService.exportToDocument`.
  *
- * NOT LISTED, AND DELIBERATELY SO: `chat.downloadFailed` and
- * `chat.conversionFailed`, both thrown and translated inside `ChatInterface`
- * itself — the download there bypasses `ChatService` and calls `fetch`
- * directly, because it needs the Blob and the filename dialog. Only
- * `chat.downloadFailed` is a TF-671 dot-notation code registered in
- * `legacy.ts`; `chat.conversionFailed` is never constructed as an `AppError`
- * at all — it is only ever a plain `fallbackKey` string passed to
- * `translateError`, so it needs no registration in either file.
- * `chat_download_failed` below belongs to `ChatService.downloadChat`, a
- * different call site with no consumer today. Two codes for what reads like
- * one operation is the honest state; merging them would mean touching
- * `legacy.ts`, which is frozen until TF-996.
+ * `ChatInterface` downloads with its own `fetch` instead of
+ * `ChatService.downloadChat`, but it hits the same endpoint, so it throws the
+ * same `chat_download_failed`. Until TF-996 it had a TF-671 code of its own
+ * (`chat.downloadFailed`), and its conversion fallback key was the nested
+ * `errors.chat.conversionFailed`; that one is now `errors.chat_export_failed`,
+ * which `ChatService.exportToDocument` already throws for the same request.
  */
 export const CHAT_ERROR_CODES = [
   'chat_create_session_failed',
