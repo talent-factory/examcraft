@@ -1103,9 +1103,6 @@
         "back": "Zurück zur Übersicht",
         "sections": {
           "upload": "Das Portfolio wurde noch nicht hochgeladen. Den Upload startet eine Lehrperson mit Verwaltungsrecht.",
-          "classification": "Hier folgt die Überprüfung der Datei-Zuordnung zu den Phasen.",
-          "grading": "Hier folgen Start und Fortschritt der Bewertung.",
-          "review": "Hier folgen die Phasenergebnisse und deren Überprüfung.",
           "uploadRunning": "Das Portfolio wird importiert. Den Fortschritt siehst du oben."
         },
         "retry": "Erneut versuchen",
@@ -1203,6 +1200,42 @@
         "portfolio_ingestion_timeout": "Das Einlesen hat das Zeitlimit überschritten.",
         "portfolio_ingestion_too_many_files": "Das Archiv enthält zu viele Dateien.",
         "portfolio_ingestion_watchdog_reaped": "Das Einlesen hing zu lange und wurde automatisch abgebrochen. Bitte lade das Archiv erneut hoch."
+      },
+      "grading": {
+        "title": "Bewertung",
+        "readyHint": "Die Datei-Zuordnung ist bestätigt. Die KI bewertet nun jede Phase anhand der Kriterien des Templates.",
+        "start": "Bewertung starten",
+        "resume": "Bewertung fortsetzen",
+        "resumeHint": "Die Bewertung wurde nicht abgeschlossen. Beim Fortsetzen werden nur die noch offenen Phasen bewertet; bereits bewertete Phasen bleiben erhalten.",
+        "manageRequired": "Starten oder fortsetzen kann die Bewertung eine Lehrperson mit Verwaltungsrecht.",
+        "phasesDone": "{{done}} von {{total}} Phasen bewertet",
+        "aiNotice": "KI-Vorschlag – nicht final: Punkte und Begründungen hat ein KI-Modell vorgeschlagen. Sie werden erst verbindlich, wenn eine Lehrperson sie überprüft hat.",
+        "aiProposal": "KI-Vorschlag – nicht final",
+        "templateFailed": "Das Template konnte nicht geladen werden; Namen und Rubriken der Kriterien fehlen. {{reason}}",
+        "unknownPhase": "Unbekannte Phase",
+        "unknownCriterion": "Unbekanntes Kriterium",
+        "points": "{{score}} / {{max}} Punkte",
+        "pointsWithoutMax": "Punkte: {{score}}",
+        "rubric": "Rubrik für diese Punktzahl: {{text}}",
+        "rationale": "Begründung",
+        "checklist": "Checkliste",
+        "checklistFulfilled": "erfüllt",
+        "checklistNotFulfilled": "nicht erfüllt",
+        "strengths": "Stärken",
+        "improvements": "Verbesserungsmöglichkeiten",
+        "phaseFailed": "Die Bewertung dieser Phase ist fehlgeschlagen. Setze die Bewertung fort, um sie erneut zu versuchen.",
+        "phaseRunning": "Diese Phase wird gerade bewertet …"
+      },
+      "phaseStatus": {
+        "pending": "Ausstehend",
+        "running": "Wird bewertet",
+        "completed": "Bewertet",
+        "failed": "Fehlgeschlagen"
+      },
+      "phaseReviewStatus": {
+        "proposed": "KI-Vorschlag",
+        "approved": "Von Lehrperson übernommen",
+        "manual_override": "Von Lehrperson angepasst"
       },
       "unknownValue": "Unbekannt ({{value}})",
       "create": {

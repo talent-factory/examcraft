@@ -1103,9 +1103,6 @@
         "back": "Back to overview",
         "sections": {
           "upload": "The portfolio has not been uploaded yet. A teacher with management rights starts the upload.",
-          "classification": "The review of the file-to-phase assignment will appear here.",
-          "grading": "Starting the grading and its progress will appear here.",
-          "review": "The phase results and their review will appear here.",
           "uploadRunning": "The portfolio is being imported. You can see the progress above."
         },
         "retry": "Try again",
@@ -1203,6 +1200,42 @@
         "portfolio_ingestion_timeout": "The import exceeded its time limit.",
         "portfolio_ingestion_too_many_files": "The archive contains too many files.",
         "portfolio_ingestion_watchdog_reaped": "The import was stuck for too long and was cancelled automatically. Please upload the archive again."
+      },
+      "grading": {
+        "title": "Grading",
+        "readyHint": "The file assignment is confirmed. The AI now grades each phase against the template's criteria.",
+        "start": "Start grading",
+        "resume": "Resume grading",
+        "resumeHint": "The grading did not finish. Resuming grades only the phases still open; phases already graded are kept.",
+        "manageRequired": "A teacher with management rights can start or resume the grading.",
+        "phasesDone": "{{done}} of {{total}} phases graded",
+        "aiNotice": "AI proposal – not final: an AI model proposed these points and rationales. They only become binding once a teacher has reviewed them.",
+        "aiProposal": "AI proposal – not final",
+        "templateFailed": "The template could not be loaded; criterion names and rubrics are missing. {{reason}}",
+        "unknownPhase": "Unknown phase",
+        "unknownCriterion": "Unknown criterion",
+        "points": "{{score}} / {{max}} points",
+        "pointsWithoutMax": "Points: {{score}}",
+        "rubric": "Rubric for this score: {{text}}",
+        "rationale": "Rationale",
+        "checklist": "Checklist",
+        "checklistFulfilled": "fulfilled",
+        "checklistNotFulfilled": "not fulfilled",
+        "strengths": "Strengths",
+        "improvements": "Suggested improvements",
+        "phaseFailed": "Grading this phase failed. Resume the grading to try again.",
+        "phaseRunning": "This phase is being graded …"
+      },
+      "phaseStatus": {
+        "pending": "Pending",
+        "running": "Grading",
+        "completed": "Graded",
+        "failed": "Failed"
+      },
+      "phaseReviewStatus": {
+        "proposed": "AI proposal",
+        "approved": "Accepted by teacher",
+        "manual_override": "Adjusted by teacher"
       },
       "unknownValue": "Unknown ({{value}})",
       "create": {

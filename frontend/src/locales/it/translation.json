@@ -1103,9 +1103,6 @@
         "back": "Torna alla panoramica",
         "sections": {
           "upload": "Il portfolio non è ancora stato caricato. Il caricamento viene avviato da un docente con diritti di gestione.",
-          "classification": "Qui apparirà la verifica dell'assegnazione dei file alle fasi.",
-          "grading": "Qui appariranno l'avvio e l'avanzamento della valutazione.",
-          "review": "Qui appariranno i risultati delle fasi e la loro revisione.",
           "uploadRunning": "Il portfolio è in fase di importazione. L'avanzamento è visibile qui sopra."
         },
         "retry": "Riprova",
@@ -1203,6 +1200,42 @@
         "portfolio_ingestion_timeout": "L'importazione ha superato il limite di tempo.",
         "portfolio_ingestion_too_many_files": "L'archivio contiene troppi file.",
         "portfolio_ingestion_watchdog_reaped": "L'importazione è rimasta bloccata troppo a lungo ed è stata interrotta automaticamente. Carica di nuovo l'archivio."
+      },
+      "grading": {
+        "title": "Valutazione",
+        "readyHint": "L'assegnazione dei file è confermata. L'IA valuta ora ogni fase in base ai criteri del modello.",
+        "start": "Avvia valutazione",
+        "resume": "Riprendi valutazione",
+        "resumeHint": "La valutazione non è stata completata. Riprendendola vengono valutate solo le fasi ancora aperte; le fasi già valutate restano invariate.",
+        "manageRequired": "Un docente con diritti di gestione può avviare o riprendere la valutazione.",
+        "phasesDone": "{{done}} di {{total}} fasi valutate",
+        "aiNotice": "Proposta dell'IA – non definitiva: punti e motivazioni sono stati proposti da un modello di IA. Diventano vincolanti solo dopo la verifica da parte di un docente.",
+        "aiProposal": "Proposta dell'IA – non definitiva",
+        "templateFailed": "Non è stato possibile caricare il modello; mancano nomi e rubriche dei criteri. {{reason}}",
+        "unknownPhase": "Fase sconosciuta",
+        "unknownCriterion": "Criterio sconosciuto",
+        "points": "{{score}} / {{max}} punti",
+        "pointsWithoutMax": "Punti: {{score}}",
+        "rubric": "Rubrica per questo punteggio: {{text}}",
+        "rationale": "Motivazione",
+        "checklist": "Lista di controllo",
+        "checklistFulfilled": "soddisfatto",
+        "checklistNotFulfilled": "non soddisfatto",
+        "strengths": "Punti di forza",
+        "improvements": "Possibili miglioramenti",
+        "phaseFailed": "La valutazione di questa fase non è riuscita. Riprendi la valutazione per riprovare.",
+        "phaseRunning": "Questa fase è in corso di valutazione …"
+      },
+      "phaseStatus": {
+        "pending": "In attesa",
+        "running": "In valutazione",
+        "completed": "Valutata",
+        "failed": "Non riuscita"
+      },
+      "phaseReviewStatus": {
+        "proposed": "Proposta dell'IA",
+        "approved": "Accettata dal docente",
+        "manual_override": "Modificata dal docente"
       },
       "unknownValue": "Sconosciuto ({{value}})",
       "create": {

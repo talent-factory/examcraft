@@ -1103,9 +1103,6 @@
         "back": "Retour à l'aperçu",
         "sections": {
           "upload": "Le portfolio n'a pas encore été téléversé. Le téléversement est lancé par un·e enseignant·e disposant du droit de gestion.",
-          "classification": "La vérification de l'attribution des fichiers aux phases apparaîtra ici.",
-          "grading": "Le lancement et la progression de l'évaluation apparaîtront ici.",
-          "review": "Les résultats des phases et leur vérification apparaîtront ici.",
           "uploadRunning": "Le portfolio est en cours d'import. La progression est affichée ci-dessus."
         },
         "retry": "Réessayer",
@@ -1203,6 +1200,42 @@
         "portfolio_ingestion_timeout": "L'importation a dépassé la limite de temps.",
         "portfolio_ingestion_too_many_files": "L'archive contient trop de fichiers.",
         "portfolio_ingestion_watchdog_reaped": "L'importation est restée bloquée trop longtemps et a été interrompue automatiquement. Téléverse à nouveau l'archive."
+      },
+      "grading": {
+        "title": "Évaluation",
+        "readyHint": "L'attribution des fichiers est confirmée. L'IA évalue maintenant chaque phase selon les critères du modèle.",
+        "start": "Lancer l'évaluation",
+        "resume": "Reprendre l'évaluation",
+        "resumeHint": "L'évaluation ne s'est pas terminée. La reprise n'évalue que les phases encore ouvertes ; les phases déjà évaluées sont conservées.",
+        "manageRequired": "Un enseignant disposant des droits de gestion peut lancer ou reprendre l'évaluation.",
+        "phasesDone": "{{done}} phase(s) évaluée(s) sur {{total}}",
+        "aiNotice": "Proposition de l'IA – non définitive : un modèle d'IA a proposé ces points et justifications. Ils ne deviennent contraignants qu'après vérification par un enseignant.",
+        "aiProposal": "Proposition de l'IA – non définitive",
+        "templateFailed": "Le modèle n'a pas pu être chargé ; les noms et rubriques des critères manquent. {{reason}}",
+        "unknownPhase": "Phase inconnue",
+        "unknownCriterion": "Critère inconnu",
+        "points": "{{score}} / {{max}} points",
+        "pointsWithoutMax": "Points : {{score}}",
+        "rubric": "Rubrique pour ce score : {{text}}",
+        "rationale": "Justification",
+        "checklist": "Liste de contrôle",
+        "checklistFulfilled": "rempli",
+        "checklistNotFulfilled": "non rempli",
+        "strengths": "Points forts",
+        "improvements": "Pistes d'amélioration",
+        "phaseFailed": "L'évaluation de cette phase a échoué. Reprenez l'évaluation pour réessayer.",
+        "phaseRunning": "Cette phase est en cours d'évaluation …"
+      },
+      "phaseStatus": {
+        "pending": "En attente",
+        "running": "En cours d'évaluation",
+        "completed": "Évaluée",
+        "failed": "Échouée"
+      },
+      "phaseReviewStatus": {
+        "proposed": "Proposition de l'IA",
+        "approved": "Reprise par l'enseignant",
+        "manual_override": "Ajustée par l'enseignant"
       },
       "unknownValue": "Inconnu ({{value}})",
       "create": {

@@ -4,8 +4,8 @@
  * Owns polling (`usePortfolioAssessment`), the status stepper and the job
  * panel; the body branches on the current step. The upload step is the
  * ingestion panel (TF-989), the classification step the review panel
- * (TF-990); the others are placeholders the later packages replace:
- * grading → P5a (TF-991), review → P5b (TF-992).
+ * (TF-990); grading and review show the grading panel with the phase
+ * results (TF-991). The review actions follow in P5b (TF-992).
  */
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ import {
   isPortfolioTierError,
 } from '../../components/portfolio/PortfolioGate';
 import { PortfolioClassificationPanel } from '../../components/portfolio/PortfolioClassificationPanel';
+import { PortfolioGradingPanel } from '../../components/portfolio/PortfolioGradingPanel';
 import { PortfolioIngestionPanel } from '../../components/portfolio/PortfolioIngestionPanel';
 import { PortfolioJobPanel } from '../../components/portfolio/PortfolioJobPanel';
 import {
@@ -99,6 +100,10 @@ const PortfolioAssessmentDetailPage: React.FC = () => {
             <Box data-testid="portfolio-detail-section-classification">
               <PortfolioClassificationPanel assessment={assessment} />
             </Box>
+          ) : step === 'grading' || step === 'review' ? (
+            <Box data-testid={`portfolio-detail-section-${step}`}>
+              <PortfolioGradingPanel assessment={assessment} />
+            </Box>
           ) : step ? (
             <Paper
               variant="outlined"
@@ -106,10 +111,12 @@ const PortfolioAssessmentDetailPage: React.FC = () => {
               data-testid={`portfolio-detail-section-${step}`}
             >
               <Typography color="textSecondary">
+                {/* Only the upload step still ends up here: for readers, or
+                    while its job runs. */}
                 {t(
-                  step === 'upload' && isPortfolioJobActive(assessment.job)
+                  isPortfolioJobActive(assessment.job)
                     ? 'pages.portfolio.detail.sections.uploadRunning'
-                    : `pages.portfolio.detail.sections.${step}`,
+                    : 'pages.portfolio.detail.sections.upload',
                 )}
               </Typography>
             </Paper>

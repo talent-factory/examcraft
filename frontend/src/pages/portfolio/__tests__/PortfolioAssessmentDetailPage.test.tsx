@@ -25,7 +25,7 @@ jest.mock('../../../contexts/AuthContext', () => ({
 }));
 
 jest.mock('../../../api/portfolioApi', () => ({
-  // getTemplate: the classification step loads the phase names (TF-990).
+  // getTemplate: the classification and grading steps load phase names (TF-990, TF-991).
   portfolioApi: { getAssessment: jest.fn(), getTemplate: jest.fn() },
 }));
 

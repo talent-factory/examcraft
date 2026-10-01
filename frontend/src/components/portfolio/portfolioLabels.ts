@@ -8,7 +8,7 @@ import type { TFunction } from 'i18next';
  */
 export function portfolioLabel(
   t: TFunction,
-  group: 'status' | 'reviewStatus' | 'job.status' | 'job.type',
+  group: 'status' | 'reviewStatus' | 'job.status' | 'job.type' | 'phaseStatus' | 'phaseReviewStatus',
   value: string,
   known: readonly string[],
 ): string {
@@ -33,3 +33,7 @@ export const REVIEW_STATUSES = ['pending_review', 'partially_reviewed', 'fully_r
 export const JOB_STATUSES = ['queued', 'running', 'completed', 'failed'] as const;
 
 export const JOB_TYPES = ['ingest', 'classify', 'grade'] as const;
+
+export const PHASE_STATUSES = ['pending', 'running', 'completed', 'failed'] as const;
+
+export const PHASE_REVIEW_STATUSES = ['proposed', 'approved', 'manual_override'] as const;
