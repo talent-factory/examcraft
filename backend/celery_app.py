@@ -257,6 +257,17 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,  # Fair distribution
     worker_max_tasks_per_child=50,  # Prevent memory leaks
     task_acks_late=True,  # Acknowledge after task completion
+    # TF-1009: after a broker connection loss (RabbitMQ restart/deploy,
+    # missed heartbeats) an acks_late task can no longer ack and RabbitMQ
+    # redelivers its message. Without this flag the original run would keep
+    # going next to the redelivered copy, and the idempotency guards in the
+    # portfolio tasks ("running on start = previous attempt crashed") would
+    # fail a still-live run. Second line of defence only: a channel closed by
+    # RabbitMQ's consumer_timeout is a channel error, which does not reach
+    # this cancel path (broker_channel_error_retry is off). The main guard is
+    # consumer_timeout (infra/rabbitmq/rabbitmq.conf) staying above
+    # task_time_limit, enforced by tests/test_rabbitmq_consumer_timeout.py.
+    worker_cancel_long_running_tasks_on_connection_loss=True,
     worker_disable_rate_limits=False,
 )
 
