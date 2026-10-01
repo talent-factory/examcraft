@@ -50,6 +50,10 @@ and this project adheres to
 - **Keine doppelten Fragen nach Unterbrüchen:** Wird eine
   Fragengenerierung durch einen Serverneustart unterbrochen, entstehen
   beim erneuten Anlauf keine doppelten Fragen mehr.
+- **Lange Verarbeitungen laufen zuverlässig durch:** Aufträge, die
+  länger als eine halbe Stunde dauern, z. B. umfangreiche
+  Portfolio-Bewertungen, werden nicht mehr abgebrochen und doppelt
+  gestartet.
 
 ## [1.13.4] - 2026-09-30
 
