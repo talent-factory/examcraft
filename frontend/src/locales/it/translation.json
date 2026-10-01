@@ -1152,6 +1152,7 @@
         "classifying": "Classificazione",
         "ready_to_grade": "Pronto per la valutazione",
         "grading": "Valutazione in corso",
+        "grading_failed": "Non riuscito · riprendibile",
         "completed": "Valutato",
         "failed": "Non riuscito"
       },

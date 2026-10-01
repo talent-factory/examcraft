@@ -1152,6 +1152,7 @@
         "classifying": "Classification",
         "ready_to_grade": "Ready to grade",
         "grading": "Grading",
+        "grading_failed": "Failed · resumable",
         "completed": "Graded",
         "failed": "Failed"
       },

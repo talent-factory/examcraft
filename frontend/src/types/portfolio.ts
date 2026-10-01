@@ -28,6 +28,13 @@ export type PortfolioAssessmentStatus =
   | 'completed'
   | 'failed';
 
+/**
+ * List filter value: the stored statuses plus `grading_failed`, which the
+ * backend derives (TF-1000) -- status `grading` whose newest job is a failed
+ * grade job. Never returned as an assessment's `status`.
+ */
+export type PortfolioAssessmentStatusFilter = PortfolioAssessmentStatus | 'grading_failed';
+
 export type PortfolioJobType = 'ingest' | 'classify' | 'grade';
 
 export type PortfolioJobStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -367,7 +374,7 @@ export interface PortfolioAssessmentListPage {
 
 /** Query filters and pagination of the list endpoint (`limit` 1–200, default 50). */
 export interface PortfolioAssessmentListParams {
-  status?: PortfolioAssessmentStatus;
+  status?: PortfolioAssessmentStatusFilter;
   review_status?: PortfolioAssessmentReviewStatus;
   template_id?: string;
   limit?: number;

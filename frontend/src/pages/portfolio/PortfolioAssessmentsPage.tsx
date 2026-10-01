@@ -58,7 +58,7 @@ import type {
   PortfolioAssessmentListItem,
   PortfolioAssessmentListParams,
   PortfolioAssessmentReviewStatus,
-  PortfolioAssessmentStatus,
+  PortfolioAssessmentStatusFilter,
 } from '../../types/portfolio';
 
 export { portfolioAssessmentsQueryKey };
@@ -67,16 +67,36 @@ const LIST_REFRESH_MS = 5000;
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
 
 const STATUS_COLOR: Record<
-  PortfolioAssessmentStatus,
+  PortfolioAssessmentStatusFilter,
   'default' | 'info' | 'primary' | 'success' | 'error'
 > = {
   uploading: 'default',
   classifying: 'info',
   ready_to_grade: 'primary',
   grading: 'info',
+  grading_failed: 'error',
   completed: 'success',
   failed: 'error',
 };
+
+/**
+ * TF-1000: a failed grade run leaves the assessment on `grading` so it can be
+ * resumed. The list shows that as its own value (derived from the newest job,
+ * the same one the backend's `grading_failed` filter looks at) instead of
+ * «Bewertung läuft».
+ */
+const STATUS_FILTERS: readonly PortfolioAssessmentStatusFilter[] = [
+  ...ASSESSMENT_STATUSES.slice(0, ASSESSMENT_STATUSES.indexOf('grading') + 1),
+  'grading_failed',
+  ...ASSESSMENT_STATUSES.slice(ASSESSMENT_STATUSES.indexOf('grading') + 1),
+];
+
+function displayStatus(item: PortfolioAssessmentListItem): PortfolioAssessmentStatusFilter {
+  const job = item.job;
+  return item.status === 'grading' && job?.job_type === 'grade' && job.status === 'failed'
+    ? 'grading_failed'
+    : item.status;
+}
 
 const REVIEW_COLOR: Record<PortfolioAssessmentReviewStatus, 'default' | 'warning' | 'success'> = {
   pending_review: 'default',
@@ -118,7 +138,7 @@ const PortfolioAssessmentsPage: React.FC = () => {
   const { tier } = useFeatures();
   const canManage = hasPermission('portfolio_assessments:manage');
 
-  const [status, setStatus] = useState<PortfolioAssessmentStatus | ''>('');
+  const [status, setStatus] = useState<PortfolioAssessmentStatusFilter | ''>('');
   const [reviewStatus, setReviewStatus] = useState<PortfolioAssessmentReviewStatus | ''>('');
   const [templateId, setTemplateId] = useState('');
   const [page, setPage] = useState(0);
@@ -209,11 +229,11 @@ const PortfolioAssessmentsPage: React.FC = () => {
             labelId="portfolio-filter-status-label"
             label={t('pages.portfolio.list.filterStatus')}
             value={status}
-            onChange={(e) => onFilter(setStatus)(e.target.value as PortfolioAssessmentStatus | '')}
+            onChange={(e) => onFilter(setStatus)(e.target.value as PortfolioAssessmentStatusFilter | '')}
             data-testid="portfolio-filter-status"
           >
             <MenuItem value="">{t('pages.portfolio.list.filterAll')}</MenuItem>
-            {ASSESSMENT_STATUSES.map((value) => (
+            {STATUS_FILTERS.map((value) => (
               <MenuItem key={value} value={value}>
                 {t(`pages.portfolio.status.${value}`)}
               </MenuItem>
@@ -333,8 +353,8 @@ const PortfolioAssessmentsPage: React.FC = () => {
                     <TableCell>
                       <Chip
                         size="small"
-                        color={STATUS_COLOR[item.status] ?? 'default'}
-                        label={portfolioLabel(t, 'status', item.status, ASSESSMENT_STATUSES)}
+                        color={STATUS_COLOR[displayStatus(item)] ?? 'default'}
+                        label={portfolioLabel(t, 'status', displayStatus(item), STATUS_FILTERS)}
                       />
                     </TableCell>
                     <TableCell>

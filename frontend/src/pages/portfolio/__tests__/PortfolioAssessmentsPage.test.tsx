@@ -157,6 +157,48 @@ describe('PortfolioAssessmentsPage', () => {
     );
   });
 
+  it('zeigt eine fehlgeschlagene Bewertung als «fortsetzbar» statt «läuft» (TF-1000)', async () => {
+    api.listAssessments.mockResolvedValue(
+      page([
+        item({
+          id: 'a-1',
+          status: 'grading',
+          job: job({ job_type: 'grade', status: 'failed', files_total: null }),
+        }),
+        item({
+          id: 'a-2',
+          status: 'grading',
+          job: job({ id: 'job-2', job_type: 'grade', status: 'running', files_total: null }),
+        }),
+      ]),
+    );
+    renderPage();
+
+    const failedRow = await screen.findByTestId('portfolio-row-a-1');
+    expect(within(failedRow).getByText('Fehlgeschlagen · fortsetzbar')).toBeInTheDocument();
+    expect(within(failedRow).queryByText('Bewertung läuft')).not.toBeInTheDocument();
+    // A grade run still in flight keeps the stored status.
+    expect(
+      within(screen.getByTestId('portfolio-row-a-2')).getByText('Bewertung läuft'),
+    ).toBeInTheDocument();
+  });
+
+  it('filtert serverseitig nach fehlgeschlagener Bewertung (TF-1000)', async () => {
+    api.listAssessments.mockResolvedValue(page([item()]));
+    renderPage();
+    await screen.findByTestId('portfolio-row-a-1');
+
+    fireEvent.mouseDown(within(screen.getByTestId('portfolio-filter-status')).getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Fehlgeschlagen · fortsetzbar' }));
+    await waitFor(() =>
+      expect(api.listAssessments).toHaveBeenLastCalledWith({
+        status: 'grading_failed',
+        limit: 25,
+        offset: 0,
+      }),
+    );
+  });
+
   it('filtert nach Template und Review-Status', async () => {
     api.listAssessments.mockResolvedValue(page([item()]));
     renderPage();

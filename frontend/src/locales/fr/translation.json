@@ -1152,6 +1152,7 @@
         "classifying": "Classification",
         "ready_to_grade": "Prêt pour l'évaluation",
         "grading": "Évaluation en cours",
+        "grading_failed": "Échec · reprise possible",
         "completed": "Évalué",
         "failed": "Échec"
       },
