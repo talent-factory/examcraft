@@ -54,6 +54,9 @@ and this project adheres to
   länger als eine halbe Stunde dauern, z. B. umfangreiche
   Portfolio-Bewertungen, werden nicht mehr abgebrochen und doppelt
   gestartet.
+- **Rückmeldungen im Hilfe-Bereich:** Schlägt das Ausblenden eines
+  Hinweises oder das Senden einer Rückmeldung fehl, erscheint jetzt
+  eine Fehlermeldung, statt dass die Aktion scheinbar gelingt.
 
 ## [1.13.4] - 2026-09-30
 
