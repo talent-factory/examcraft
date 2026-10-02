@@ -1782,3 +1782,107 @@ def test_commit_writes_single_audit_entry_after_retry_on_same_job(
         .count()
         == 1
     )
+
+
+# ---------------------------------------------------------------------------
+# TF-749: hashed source_attempt_id — re-import after the data migration
+# ---------------------------------------------------------------------------
+
+
+def _run_tf749_migration(test_db: Session) -> None:
+    import importlib.util
+    from pathlib import Path
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic/versions/2026_10_02_tf749_hash_source_attempt_id.py"
+    )
+    spec = importlib.util.spec_from_file_location("tf749_migration", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    with Operations.context(MigrationContext.configure(test_db.connection())):
+        migration.upgrade()
+    test_db.expire_all()
+
+
+def test_reimport_after_tf749_migration_creates_no_duplicates(
+    test_db: Session, exam_with_questions: Exam, monkeypatch
+) -> None:
+    """Legacy import (plain e-mail key) → migration → re-import with the
+    hashing driver must recognise every attempt and skip it."""
+    from services.import_drivers.moodle_json_driver import MoodleJsonDriver
+
+    service = ImportService(test_db)
+    source = _json_two_students()
+
+    # 1) Import as before TF-749: the driver stored the composed key verbatim.
+    with monkeypatch.context() as m:
+        m.setattr(
+            MoodleJsonDriver, "hash_source_attempt_key", staticmethod(lambda k: k)
+        )
+        first = service.commit(
+            exam=exam_with_questions,
+            driver_name="moodle_json",
+            source=source,
+            triggered_by=None,
+        )
+    assert first.rows_processed == 2
+    legacy_keys = {a.source_attempt_id for a in test_db.query(Attempt).all()}
+    assert all("@example.org|" in k for k in legacy_keys)
+
+    # 2) Data migration hashes the stored keys.
+    _run_tf749_migration(test_db)
+    migrated = {a.source_attempt_id for a in test_db.query(Attempt).all()}
+    assert len(migrated) == 2
+    assert all(k.startswith("sha256:") and "@" not in k for k in migrated)
+
+    # The primary dedup lookup must match the incoming (hashed) keys against
+    # the migrated rows. Without this check the test would also pass via the
+    # (submission_id, attempt_number) constraint fallback, which only works
+    # while Moodle keeps the attempt numbering stable.
+    incoming = service.preview(
+        exam=exam_with_questions, driver_name="moodle_json", source=source
+    )
+    assert service._load_existing_source_ids(incoming, exam=exam_with_questions) == {
+        ("moodle_json", key) for key in migrated
+    }
+
+    # 3) Re-import with the current (hashing) driver: everything is a duplicate.
+    second = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=source,
+        triggered_by=None,
+    )
+    assert second.status == "succeeded"
+    assert second.rows_processed == 0
+    assert test_db.query(Attempt).count() == 2
+    assert {a.source_attempt_id for a in test_db.query(Attempt).all()} == migrated
+
+
+def test_reimport_with_hashing_driver_is_idempotent(
+    test_db: Session, exam_with_questions: Exam
+) -> None:
+    """New imports store the hash, and a second import matches against it."""
+    service = ImportService(test_db)
+    source = _json_two_students()
+    service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=source,
+        triggered_by=None,
+    )
+    again = service.commit(
+        exam=exam_with_questions,
+        driver_name="moodle_json",
+        source=source,
+        triggered_by=None,
+    )
+    assert again.rows_processed == 0
+    assert test_db.query(Attempt).count() == 2
+    assert all(
+        a.source_attempt_id.startswith("sha256:") for a in test_db.query(Attempt).all()
+    )

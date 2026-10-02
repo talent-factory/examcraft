@@ -13,6 +13,8 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from sqlalchemy.orm import Session
 
 from models.auth import Institution
@@ -609,3 +611,43 @@ def test_resolve_llm_grader_warns_when_exam_not_loaded(
     assert result is service.llm_grader
     mock_log.warning.assert_called_once()
     assert "no loaded exam relationship" in mock_log.warning.call_args[0][0]
+
+
+# ---------------------------------------------------------------------------
+# TF-749: the student's own name/e-mail never reaches the grading prompt
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", ["inline", "precompute"])
+def test_open_ended_grading_redacts_student_identifiers(
+    test_db: Session, path: str
+) -> None:
+    submission, answer = _seed_open_ended_submission(
+        test_db,
+        given_answer=("Ich, Jennifer Meyer (s@example.org), erkläre OOP: Kapselung."),
+    )
+    submission.student.display_name = "Jennifer Meyer"
+    test_db.commit()
+
+    fake_llm = MagicMock(spec=LlmGrader)
+    fake_llm.grade.return_value = LlmGradeOutcome(
+        points_awarded=1.0,
+        points_max=4.0,
+        confidence=0.5,
+        rationale="ok",
+        matched_aspects=[],
+        missing_aspects=[],
+    )
+    service = GradingService(test_db, llm_grader=fake_llm)
+    if path == "inline":
+        service.grade_submission(submission.id)
+    else:
+        service.precompute_open_ended_outcomes([submission.id])
+
+    sent = fake_llm.grade.call_args.kwargs["given_answer"]
+    assert "Jennifer" not in sent and "Meyer" not in sent
+    assert "s@example.org" not in sent
+    assert "Kapselung" in sent
+    # Only the prompt is redacted, the stored answer stays verbatim.
+    test_db.refresh(answer)
+    assert "Jennifer Meyer" in answer.given_answer

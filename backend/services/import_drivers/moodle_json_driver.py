@@ -177,6 +177,9 @@ _MIN_CONTAINMENT_LEN = 3
 _MARKDOWN_MARKERS = re.compile(r"[*_`#>]+")
 _HTML_TAG = re.compile(r"<[^>]+>")
 
+# Stored idempotency keys are hashes of the composed key (TF-749).
+_HASHED_KEY_PREFIX = "sha256:"
+
 
 def _normalize_text(text: object) -> str:
     """Collapse a question/answer string to a comparable plain form.
@@ -654,7 +657,10 @@ class MoodleJsonDriver(BaseImportDriver):
         ``(institution_id, source, source_attempt_id)`` duplicate check on
         re-import — its format must stay stable.
 
-        When ``started_at`` is present the key is ``email|isoformat|N``. When
+        The composed key below is stored only as its SHA-256
+        (``hash_source_attempt_key``, TF-749), so the key itself no longer
+        carries the e-mail into API responses or logs. When ``started_at`` is present the
+        composed key is ``email|isoformat|N``. When
         it is **missing** the ``attempt_number`` is the only distinguishing
         component, and it is assigned from row order — which is *not* stable
         across Moodle re-exports, so a purely positional key could renumber
@@ -665,10 +671,24 @@ class MoodleJsonDriver(BaseImportDriver):
         the safe choice, since nothing in the source tells them apart.)
         """
         if started_at:
-            return f"{external_id}|{started_at.isoformat()}|{attempt_number}"
-        digest = hashlib.sha256()
-        for answer in answers:
-            digest.update(
-                f"{answer.exam_question_id}\x1f{answer.given_answer or ''}\x1e".encode()
-            )
-        return f"{external_id}|h:{digest.hexdigest()[:16]}"
+            key = f"{external_id}|{started_at.isoformat()}|{attempt_number}"
+        else:
+            digest = hashlib.sha256()
+            for answer in answers:
+                digest.update(
+                    f"{answer.exam_question_id}\x1f{answer.given_answer or ''}\x1e".encode()
+                )
+            key = f"{external_id}|h:{digest.hexdigest()[:16]}"
+        return MoodleJsonDriver.hash_source_attempt_key(key)
+
+    @staticmethod
+    def hash_source_attempt_key(key: str) -> str:
+        """SHA-256 of the composed key, so it never carries the e-mail (TF-749).
+
+        Migration ``tf749_hash_source_attempt_id`` applies the same function
+        to stored keys; both must stay identical or re-imports duplicate
+        attempts. Idempotent: an already hashed key is returned unchanged.
+        """
+        if key.startswith(_HASHED_KEY_PREFIX):
+            return key
+        return _HASHED_KEY_PREFIX + hashlib.sha256(key.encode()).hexdigest()

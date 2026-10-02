@@ -213,9 +213,10 @@ class Attempt(Base):
     submitted_at = Column(DateTime(timezone=True), nullable=True)
 
     source = Column(String(30), nullable=False)
-    # 512 covers the worst-case composed key: RFC 5321 max email (254) +
-    # ISO timestamp + separators + attempt_number. ``MoodleJsonDriver._compose_source_attempt_id``
-    # documents the format; changing it is a data-migration boundary.
+    # Moodle JSON/CSV: ``sha256:<hex>`` of the composed key (TF-749,
+    # ``MoodleJsonDriver.hash_source_attempt_key``); moodle_api: Moodle's numeric
+    # attempt id. 512 is historical headroom from the former plain e-mail key.
+    # Changing the format is a data-migration boundary (``tf749_hash_source_attempt_id``).
     source_attempt_id = Column(String(512), nullable=True)
     raw_payload = Column(JSON, nullable=True)
 

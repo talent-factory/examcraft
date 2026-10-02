@@ -900,7 +900,7 @@ class ImportService:
         """Existing ``(source, source_attempt_id)`` pairs for THIS exam.
 
         TF-500: scoped to the target exam via ``submissions.exam_id``. The same
-        Moodle attempt (same ``source_attempt_id`` = email|start|N) may
+        Moodle attempt (same ``source_attempt_id``, the hash of email|start|N) may
         legitimately be imported into a *different* exam of the same
         institution, so the idempotency lookup must not reach across exams —
         otherwise the second exam's import is silently skipped to zero rows.

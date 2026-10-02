@@ -10,6 +10,7 @@ mode the bare-CSV driver could only guard against, never resolve.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -619,9 +620,47 @@ def test_source_attempt_id_without_start_uses_content_hash():
     exam = _exam([_question(1, 1, "Frage A")])
     student = {"e-mail-adresse": "a@example.ch", "frage1": "Frage A", "antwort1": "x"}
     sid = _parse([student], exam).attempts[0].source_attempt_id
-    assert sid.startswith("a@example.ch|h:")
+    assert sid == MoodleJsonDriver.hash_source_attempt_key(
+        "a@example.ch|h:" + sid_content_hash(exam, student)
+    )
     # Deterministic across re-parses (idempotent re-import).
     assert sid == _parse([student], exam).attempts[0].source_attempt_id
+
+
+def sid_content_hash(exam, student):
+    import hashlib
+
+    digest = hashlib.sha256()
+    digest.update(f"{exam.questions[0].id}\x1f{student['antwort1']}\x1e".encode())
+    return digest.hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
+# TF-749: the idempotency key carries no e-mail address
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("with_start", [True, False])
+def test_source_attempt_id_contains_no_email(with_start):
+    exam = _exam([_question(1, 1, "Frage A")])
+    student = {
+        "e-mail-adresse": "jennifer.meyer@schule.ch",
+        "frage1": "Frage A",
+        "antwort1": "x",
+    }
+    if with_start:
+        student["begonnen"] = "12. Juni 2026 10:30"
+    sid = _parse([student], exam).attempts[0].source_attempt_id
+    assert "@" not in sid and "jennifer" not in sid
+    assert re.fullmatch(r"sha256:[0-9a-f]{64}", sid)
+
+
+def test_hash_source_attempt_key_is_stable_and_idempotent():
+    """The migration re-hashes stored plaintext keys with this function, so it
+    must equal what the driver writes and leave already-hashed keys alone."""
+    key = "a@example.ch|2026-06-12T10:30:00+00:00|1"
+    hashed = MoodleJsonDriver.hash_source_attempt_key(key)
+    assert hashed == MoodleJsonDriver.hash_source_attempt_key(key)
+    assert MoodleJsonDriver.hash_source_attempt_key(hashed) == hashed
+    assert len(hashed) <= 512
 
 
 def test_timestampless_key_is_stable_under_row_reordering():
@@ -657,3 +696,22 @@ def test_distinct_answers_without_start_yield_distinct_keys():
     ]
     ids = [att.source_attempt_id for att in _parse(students, exam).attempts]
     assert len(set(ids)) == 2
+
+
+def test_migration_hashes_keys_like_the_driver():
+    """tf749 re-hashes stored keys; a drift would duplicate re-imports."""
+    import importlib.util
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic/versions/2026_10_02_tf749_hash_source_attempt_id.py"
+    )
+    spec = importlib.util.spec_from_file_location("tf749_migration", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    for key in ("a@example.ch|2026-06-12T10:30:00+00:00|1", "a@example.ch|h:0f"):
+        expected = MoodleJsonDriver.hash_source_attempt_key(key)
+        assert migration.hash_source_attempt_key(key) == expected
+        assert migration.hash_source_attempt_key(expected) == expected

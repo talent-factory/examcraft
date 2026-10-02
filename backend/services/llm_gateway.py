@@ -20,6 +20,8 @@ import threading
 
 import httpx
 
+from services.llm_pii import AsyncRedactingTransport, RedactingTransport
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,19 +168,36 @@ def is_permanent_status(status_code: int) -> bool:
     return 400 <= status_code < 500 and status_code != 429
 
 
+def _network_transport() -> httpx.BaseTransport:
+    """Real network layer below the redacting transport (patched in tests)."""
+    return httpx.HTTPTransport()
+
+
+def _async_network_transport() -> httpx.AsyncBaseTransport:
+    """Async counterpart of ``_network_transport``."""
+    return httpx.AsyncHTTPTransport()
+
+
 def make_openai_client():
     """OpenAI-SDK-Client gegen den Gateway (Grading + Embeddings).
 
     Setzt ein Default-Timeout (``gateway_timeout``), damit kein Call-Site
     auf dem ~600-s-SDK-Default einen Celery-Worker blockiert; engere
     Per-Call-Overrides (z. B. Grading) bleiben möglich.
+
+    Every request passes ``RedactingTransport`` (TF-749): e-mail addresses
+    and AHV numbers are removed from prompts and embedding inputs before
+    they leave ExamCraft.
     """
-    from openai import OpenAI
+    from openai import DefaultHttpxClient, OpenAI
 
     return OpenAI(
         base_url=gateway_base_url(),
         api_key=_require_gateway_key(),
         timeout=gateway_timeout(),
+        http_client=DefaultHttpxClient(
+            transport=RedactingTransport(_network_transport())
+        ),
     )
 
 
@@ -201,8 +220,11 @@ def make_pydantic_model(
     ``gateway_portfolio_grading_timeout``'s Docstring für die Rechnung).
     ``None`` behält den SDK-Default bei, um bestehende Call-Sites
     unverändert zu lassen.
+
+    Requests pass ``AsyncRedactingTransport`` (TF-749), as in
+    ``make_openai_client``.
     """
-    from openai import AsyncOpenAI
+    from openai import AsyncOpenAI, DefaultAsyncHttpxClient
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -210,6 +232,9 @@ def make_pydantic_model(
         "base_url": gateway_base_url(),
         "api_key": _require_gateway_key(),
         "timeout": timeout if timeout is not None else gateway_timeout(),
+        "http_client": DefaultAsyncHttpxClient(
+            transport=AsyncRedactingTransport(_async_network_transport())
+        ),
     }
     if max_retries is not None:
         client_kwargs["max_retries"] = max_retries

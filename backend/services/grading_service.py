@@ -41,6 +41,7 @@ from services.grading.deterministic_grader import (
     GradeOutcome,
 )
 from services.grading.llm_grader import LlmGradeOutcome, LlmGrader
+from services.llm_pii import redact_known
 
 
 logger = logging.getLogger(__name__)
@@ -210,7 +211,10 @@ class GradingService:
 
         attempts = (
             self.db.query(Attempt)
-            .options(joinedload(Attempt.answers).joinedload(AttemptAnswer.grade))
+            .options(
+                joinedload(Attempt.answers).joinedload(AttemptAnswer.grade),
+                joinedload(Attempt.submission).joinedload(Submission.student),
+            )
             .filter(Attempt.submission_id.in_(submission_ids))
             .all()
         )
@@ -305,11 +309,21 @@ class GradingService:
     @staticmethod
     def _open_ended_inputs(qmeta: _QuestionMeta, answer: AttemptAnswer) -> dict:
         """Keyword args for ``LlmGrader.grade`` — shared by the parallel and
-        inline paths so they stay in lockstep."""
+        inline paths so they stay in lockstep.
+
+        The student's own name and e-mail are removed from the answer before
+        it goes to the LLM (TF-749); grading never needs them.
+        """
+        student = answer.attempt.submission.student
+        given_answer = answer.given_answer
+        if given_answer and student is not None:
+            given_answer = redact_known(
+                given_answer, [student.display_name, student.external_id]
+            )
         return dict(
             question_text=qmeta.question_text or "",
             correct_answer=qmeta.correct_answer or "",
-            given_answer=answer.given_answer,
+            given_answer=given_answer,
             points_max=qmeta.points,
             explanation=qmeta.explanation,
             difficulty=qmeta.difficulty,
