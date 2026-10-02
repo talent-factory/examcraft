@@ -42,6 +42,10 @@ def subscribe_to_newsletter(
     """
     Subscribe a user to the SubscribeFlow newsletter.
 
+    Only queue this after documented marketing consent. Not queued
+    anywhere since TF-777 removed the automatic call on email verification;
+    the real opt-in is TF-1020.
+
     Runs as a Celery task with retries to handle cold-starting services.
     Uses exponential backoff: 10s, 20s, 40s, 80s, 160s.
 

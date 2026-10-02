@@ -2,7 +2,9 @@
 SubscribeFlow Service for ExamCraft
 
 Manages user subscriptions to the marketing newsletter via the SubscribeFlow SDK.
-Triggered when a user verifies their email (status: pending → active).
+Only call this after documented marketing consent. No production code path
+triggers it today: the automatic subscription on email verification was
+removed (TF-777) until the real opt-in (TF-1020) exists.
 """
 
 import os

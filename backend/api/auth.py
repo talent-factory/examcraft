@@ -1193,21 +1193,8 @@ async def verify_email(token: str, request: Request, db: Session = Depends(get_d
         logger.error(f"Failed to send welcome email to {user.email}: {str(e)}")
         # Don't fail verification if welcome email fails
 
-    # Subscribe to SubscribeFlow newsletter (async via Celery)
-    try:
-        from tasks.notification_tasks import subscribe_to_newsletter
-
-        subscribe_to_newsletter.delay(
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            user_id=str(user.id),
-            source="email_verification",
-        )
-        logger.info(f"SubscribeFlow subscription task queued for {user.email}")
-    except Exception as e:
-        logger.error(f"Failed to queue SubscribeFlow task for {user.email}: {str(e)}")
-        # Don't fail verification if task queuing fails
+    # No newsletter subscription here: registration collects no marketing
+    # consent (TF-777). The real opt-in is tracked in TF-1020.
 
     logger.info(f"Email verified for user: {user.email} (ID: {user.id})")
 

@@ -7,9 +7,12 @@ deliberate, separate step (via the SubscribeFlow admin UI, or a future
 dedicated script written only when explicitly asked for) so that a
 newsletter is never sent as a side effect of provisioning it.
 
-Recipients are resolved via the existing "examcraft" tag: every
-ExamCraft user is subscribed to it automatically on email verification
-(see services/subscribeflow_service.py, SubscribeFlowService.subscribe_user).
+Recipients are resolved via the existing "examcraft" tag (see
+services/subscribeflow_service.py, SubscribeFlowService.subscribe_user).
+Email verification no longer subscribes users automatically (TF-777).
+Existing tagged subscribers have no documented marketing consent, so do
+not send a campaign to the "examcraft" tag until the real opt-in (TF-1020)
+exists and those existing subscribers have been cleaned up (TF-777).
 This script does not create or modify that tag beyond looking it up.
 
 NOTE: this does NOT use `client.tags.get_or_create()`. The server's Tag

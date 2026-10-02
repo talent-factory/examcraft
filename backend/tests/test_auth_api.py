@@ -560,6 +560,65 @@ def test_verify_email_logs_warning_when_welcome_email_skipped(test_client, db):
     assert "Welcome email sent" not in info_text
 
 
+def test_verify_email_does_not_subscribe_to_newsletter(test_client, db):
+    """Verification must not enrol the user in the newsletter (TF-777).
+
+    There is no consent for marketing mail at registration, so the
+    automatic SubscribeFlow subscription was removed. The welcome mail
+    is transactional and must still go out.
+    """
+    from celery_app import celery_app
+    from models.auth import EmailVerificationToken
+    from services.email_service import EmailService
+    from services.subscribeflow_service import SubscribeFlowService
+    from tasks.notification_tasks import subscribe_to_newsletter
+
+    with patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""):
+        register_response = test_client.post(
+            "/api/auth/register",
+            json={
+                "email": "no-newsletter@example.com",
+                "password": "SecurePass123!",
+                "first_name": "No",
+                "last_name": "Newsletter",
+            },
+        )
+    assert register_response.status_code == 201
+
+    email_token = (
+        db.query(EmailVerificationToken)
+        .join(User)
+        .filter(User.email == "no-newsletter@example.com")
+        .first()
+    )
+    assert email_token is not None
+
+    # apply_async also covers .delay(); send_task and subscribe_user catch
+    # a reintroduction that bypasses the task object.
+    with (
+        patch.object(subscribe_to_newsletter, "apply_async") as mock_apply_async,
+        patch.object(celery_app, "send_task") as mock_send_task,
+        patch.object(
+            SubscribeFlowService, "subscribe_user", new=AsyncMock()
+        ) as mock_subscribe_user,
+        patch.object(
+            EmailService,
+            "send_welcome_email",
+            new=AsyncMock(return_value={"status": "sent"}),
+        ) as mock_welcome,
+    ):
+        response = test_client.post(
+            "/api/auth/verify-email", params={"token": email_token.token}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["user"]["is_email_verified"] is True
+    mock_welcome.assert_awaited_once()
+    mock_apply_async.assert_not_called()
+    mock_send_task.assert_not_called()
+    mock_subscribe_user.assert_not_called()
+
+
 def test_resend_verification_logs_warning_when_email_skipped(test_client, test_user):
     with (
         patch("services.email_service.SUBSCRIBEFLOW_EMAILS_API_KEY", ""),

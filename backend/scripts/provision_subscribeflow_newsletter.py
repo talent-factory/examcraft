@@ -9,9 +9,12 @@ marketing sends. This script only creates/updates EmailTemplate rows
 (category="marketing"), matched by slug and idempotent, same as the
 templates loop in the transactional script.
 
-Recipients already exist as SubscribeFlow Subscribers: every user is
-subscribed with the "examcraft" tag on email verification (see
+Recipients are SubscribeFlow Subscribers with the "examcraft" tag (see
 services/subscribeflow_service.py, SubscribeFlowService.subscribe_user).
+Email verification no longer subscribes users automatically (TF-777).
+Existing tagged subscribers have no documented marketing consent, so do
+not send a campaign to the "examcraft" tag until the real opt-in (TF-1020)
+exists and those existing subscribers have been cleaned up (TF-777).
 A campaign for a given issue is created separately (not by this script)
 via `client.campaigns.create(name=..., template_id=..., tag_filter=
 {"include_tags": [<id of the "examcraft" tag>]})` and triggered with
