@@ -132,6 +132,26 @@ def test_tom_names_specula_as_the_self_hosted_error_tracking_system() -> None:
     assert "selbst betrieben" in tom_text
 
 
+def test_llm_subprocessors_document_the_actual_processing_path() -> None:
+    """Regression test (TF-748): the LLM providers are reached via the
+    self-hosted gateway in Frankfurt, but inference itself leaves the EU.
+    The entries must not drift back to an unspecified "Prüfung offen".
+    """
+    content = get_compliance_content()
+    by_name = {sp.name: sp for sp in content.subprocessors}
+    anthropic = next(sp for name, sp in by_name.items() if "Anthropic" in name)
+    openai = next(sp for name, sp in by_name.items() if "OpenAI" in name)
+    fly = next(sp for name, sp in by_name.items() if name.startswith("Fly.io, Inc."))
+
+    for sp in (anthropic, openai):
+        assert "LLM-Gateway" in sp.location
+        assert "Frankfurt" in sp.location
+        assert "Modelltraining" in sp.transfer_mechanism
+        assert "Landesspezifika" not in sp.location
+    assert "keine EU-Inferenzoption" in anthropic.location
+    assert "LLM-Gateway" in fly.purpose
+
+
 def test_every_subprocessor_documents_location_and_change_notice() -> None:
     content = get_compliance_content()
 

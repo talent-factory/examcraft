@@ -380,28 +380,42 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
     return (
         Subprocessor(
             name="Anthropic PBC",
-            purpose="KI-gestützte Fragengenerierung und Korrekturvorschläge "
-            "(Claude-Modelle)",
-            location="USA (Sub-Verarbeiter/Rechenzentren; Prüfung EU-"
-            "Inferenzoption offen — siehe Landesspezifika)",
+            purpose="KI-gestützte Fragengenerierung, Korrektur- und "
+            "Bewertungsvorschläge (inkl. Portfolio-Vorbewertung), Hilfe- "
+            "und Dokumenten-Chat sowie Prompt-Assistent (Claude-Modelle)",
+            location="USA; die Anthropic-API verarbeitet Anfragen "
+            "standardmässig in Rechenzentren weltweit und bietet keine "
+            "EU-Inferenzoption. Anfragen laufen über das selbst betriebene "
+            "LLM-Gateway in Frankfurt am Main (Fly.io).",
             transfer_mechanism="EU-Standardvertragsklauseln (SCC); "
-            "Zero-Data-Retention ist für die eingesetzten Modelle nicht "
-            "durchgängig verfügbar und daher aktuell nicht vertraglich "
-            "zugesichert",
+            "laut Anbieterrichtlinien (Stand Oktober 2026) werden Ein- und "
+            "Ausgaben standardmässig innerhalb von 30 Tagen gelöscht, mit "
+            "Ausnahmen u. a. bei Verstössen gegen die Nutzungsrichtlinie, "
+            "gesetzlichen Pflichten oder aktiv übermitteltem Feedback, und "
+            "standardmässig nicht zum Modelltraining verwendet. "
+            "Zero-Data-Retention ist aktuell nicht vertraglich zugesichert.",
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
             name="OpenAI, L.L.C.",
-            purpose="Embeddings für die semantische Dokumentensuche (RAG)",
-            location="USA (Prüfung EU-Projekt/Azure-OpenAI offen — siehe "
-            "Landesspezifika)",
-            transfer_mechanism="EU-Standardvertragsklauseln (SCC)",
+            purpose="Embeddings für die semantische Dokumentensuche (RAG) "
+            "und die Suche in Prompt-Vorlagen",
+            location="USA; eine EU-Datenresidenz ist nicht eingerichtet. "
+            "Anfragen laufen über das selbst betriebene LLM-Gateway in "
+            "Frankfurt am Main (Fly.io).",
+            transfer_mechanism="EU-Standardvertragsklauseln (SCC); "
+            "laut Anbieterrichtlinien (Stand Oktober 2026) werden Ein- und "
+            "Ausgaben standardmässig bis zu 30 Tage zur Missbrauchserkennung "
+            "gespeichert (länger bei gesetzlicher Pflicht) und "
+            "standardmässig nicht zum Modelltraining verwendet. Ob eine "
+            "reduzierte Aufbewahrung (Zero-Data-Retention) vereinbart ist, "
+            "wird derzeit geprüft.",
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
             name="Fly.io, Inc.",
             purpose="Hosting der Plattform (Applikationsserver, "
-            "Datenbank, Vektor-Datenbank, Warteschlange)",
+            "Datenbank, Vektor-Datenbank, Warteschlange, LLM-Gateway)",
             location='Frankfurt am Main, Deutschland (EU) — primary_region "fra"',
             transfer_mechanism="Verarbeitung innerhalb der EU, kein Drittlandtransfer",
             change_notice=_CHANGE_NOTICE_STANDARD,
