@@ -17,6 +17,7 @@ from services.exam_export_service import (
     MoodleXmlExporter,
     IliasQtiExporter,
 )
+from services.grading.deterministic_grader import _FALSE_TOKENS, _TRUE_TOKENS
 
 
 @pytest.fixture
@@ -179,11 +180,20 @@ class TestMoodleXmlExporter:
         xml = MoodleXmlExporter.export(exam_data)
         assert 'type="truefalse"' in xml
 
-    def test_true_false_recognizes_grader_synonym_tokens(self):
-        """true_false must recognize the same DE/EN synonym set as
-        DeterministicGrader._to_bool (e.g. "ja"), not just wahr/true/richtig
-        (TF-822: mirrors the bug fixed in the ILIAS exporter by TF-782 —
-        the exported key used to be inverted for tokens like "ja")."""
+    @pytest.mark.parametrize(
+        ("token", "expected_true"),
+        [(t, True) for t in sorted(_TRUE_TOKENS)]
+        + [(t, False) for t in sorted(_FALSE_TOKENS)],
+    )
+    def test_true_false_recognizes_grader_synonym_tokens(self, token, expected_true):
+        """true_false must recognize every token of the DE/EN synonym set
+        DeterministicGrader._to_bool uses (e.g. "ja"), not just
+        wahr/true/richtig (TF-822: mirrors the bug fixed in the ILIAS
+        exporter by TF-782 — the exported key used to be inverted for
+        tokens like "ja"). Parses the XML and checks the fraction per
+        answer: a string-index check passed even with the inverted key."""
+        import xml.etree.ElementTree as ET
+
         exam_data = {
             "title": "TF Synonym Test",
             "course": None,
@@ -202,18 +212,22 @@ class TestMoodleXmlExporter:
                     "question_type": "true_false",
                     "difficulty": "easy",
                     "options": None,
-                    "correct_answer": "ja",
+                    "correct_answer": token,
                     "explanation": None,
                 }
             ],
         }
-        xml = MoodleXmlExporter.export(exam_data)
-        true_index = xml.index("<text>true</text>")
-        false_index = xml.index("<text>false</text>")
-        fraction_100 = xml.index('fraction="100"')
-        # "true" must come first and be the option scoring 100.
-        assert true_index < false_index
-        assert fraction_100 < false_index
+        root = ET.fromstring(MoodleXmlExporter.export(exam_data))
+        question = root.find("question[@type='truefalse']")
+        assert question is not None
+        fractions = {
+            answer.findtext("text"): answer.get("fraction")
+            for answer in question.findall("answer")
+        }
+        if expected_true:
+            assert fractions == {"true": "100", "false": "0"}
+        else:
+            assert fractions == {"true": "0", "false": "100"}
 
     def test_true_false_unrecognized_token_skips_with_warning(self, monkeypatch):
         """A correct_answer that matches neither token set is a
