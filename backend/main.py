@@ -108,6 +108,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Claude model startup validation skipped: {str(e)}")
 
+    # Startup: Check that the gateway key's scope covers every ExamCraft alias
+    # (TF-999). Runs in a background thread so an unreachable gateway never
+    # delays startup; the result is reported by /api/v1/health.
+    try:
+        from services import llm_gateway
+
+        llm_gateway.start_key_alias_scope_check()
+    except Exception as e:
+        print(f"⚠️  LLM gateway key scope check skipped: {str(e)}")
+
     # Startup: Seed default roles
     try:
         from utils.seed_roles import seed_default_roles
@@ -1077,6 +1087,13 @@ async def api_health_check():
     health_status["services"]["claude_api"] = (
         "configured" if llm_gateway.gateway_enabled() else "not_configured"
     )
+
+    # Gateway key scope (TF-999): result of the startup check. Only missing
+    # aliases or a rejected key degrade; an unreachable gateway stays neutral.
+    key_scope = llm_gateway.last_key_alias_scope()
+    health_status["services"]["llm_gateway_key_scope"] = key_scope
+    if key_scope["status"] in ("missing_aliases", "key_rejected"):
+        health_status["status"] = "degraded"
 
     # Check Document Processor
     processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")

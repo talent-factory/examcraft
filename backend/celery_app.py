@@ -121,6 +121,24 @@ def _validate_claude_model(**_kwargs):
         )
 
 
+@celeryd_init.connect
+def _check_gateway_key_scope(**_kwargs):
+    """Check the gateway key's alias scope at worker boot (TF-999).
+
+    The worker runs the portfolio classification/grading calls and has its
+    own ``LLM_GATEWAY_API_KEY`` secret, so it checks independently of the API.
+    Runs in a daemon thread: an unreachable gateway must not delay the boot.
+    """
+    from services import llm_gateway
+
+    try:
+        llm_gateway.start_key_alias_scope_check()
+    except Exception:
+        logger.warning(
+            "LLM gateway key scope check failed in worker (ignored)", exc_info=True
+        )
+
+
 @worker_process_init.connect
 def _dispose_inherited_db_pool(**_kwargs):
     """Give every forked pool child its own SQLAlchemy connection pool (TF-963).

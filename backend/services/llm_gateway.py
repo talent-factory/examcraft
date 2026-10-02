@@ -14,7 +14,13 @@ zum 1-Zeilen-Config-Edit am Gateway statt zum App-Incident (TF-437/438).
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+
+import httpx
+
+logger = logging.getLogger(__name__)
 
 
 # Logische Aliase (siehe Gateway-config.yaml + Virtual-Key-Allowlist).
@@ -38,6 +44,24 @@ ALIAS_PORTFOLIO_CLASSIFICATION = "examcraft/portfolio-classification"
 # and the many small classification calls, and should be routable
 # independently on the gateway.
 ALIAS_PORTFOLIO_GRADING = "examcraft/portfolio-grading"
+
+# Every alias above must be in the Virtual Key's model scope; otherwise the
+# gateway answers 403 key_model_access_denied (TF-999). Checked at startup by
+# ``log_key_alias_scope``.
+REQUIRED_ALIASES = (
+    ALIAS_GENERATION,
+    ALIAS_GRADING,
+    ALIAS_EMBEDDING,
+    ALIAS_CHAT,
+    ALIAS_WIZARD,
+    ALIAS_PORTFOLIO_CLASSIFICATION,
+    ALIAS_PORTFOLIO_GRADING,
+)
+
+# LiteLLM: an empty model list or this wildcard means "all models allowed".
+_UNRESTRICTED_SCOPE = "all-proxy-models"
+
+_last_key_scope: dict = {"status": "pending", "missing_aliases": []}
 
 
 def gateway_enabled() -> bool:
@@ -191,3 +215,99 @@ def make_pydantic_model(
         client_kwargs["max_retries"] = max_retries
     client = AsyncOpenAI(**client_kwargs)
     return OpenAIChatModel(alias, provider=OpenAIProvider(openai_client=client))
+
+
+def _key_scope_result(status: str, missing: list[str] | None = None) -> dict:
+    return {"status": status, "missing_aliases": missing or []}
+
+
+def check_key_alias_scope(
+    *, timeout: float = 5.0, transport: httpx.BaseTransport | None = None
+) -> dict:
+    """Compare ``REQUIRED_ALIASES`` against the Virtual Key's scope (TF-999).
+
+    Reads ``GET /key/info`` with the key itself (read-only, no master key
+    needed). Never raises: an unreachable gateway yields ``unreachable`` so
+    the caller can continue (fail-open, like the TF-438 startup hook).
+    ``transport`` exists for tests (``httpx.MockTransport``).
+    """
+    if not gateway_enabled() or not gateway_api_key():
+        return _key_scope_result("not_configured")
+
+    root = gateway_base_url().removesuffix("/v1")
+    try:
+        with httpx.Client(timeout=timeout, transport=transport) as client:
+            response = client.get(
+                f"{root}/key/info",
+                headers={"Authorization": f"Bearer {gateway_api_key()}"},
+            )
+    except httpx.HTTPError:
+        return _key_scope_result("unreachable")
+
+    if response.status_code >= 500 or response.status_code == 429:
+        return _key_scope_result("unreachable")
+    if response.status_code in (401, 403):
+        return _key_scope_result("key_rejected")
+    try:
+        response.raise_for_status()
+        models = response.json()["info"].get("models") or []
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
+        return _key_scope_result("unknown")
+
+    if not models or _UNRESTRICTED_SCOPE in models:
+        return _key_scope_result("ok")
+    missing = [alias for alias in REQUIRED_ALIASES if alias not in models]
+    return _key_scope_result("missing_aliases" if missing else "ok", missing)
+
+
+def log_key_alias_scope(**kwargs) -> dict:
+    """Startup hook: run ``check_key_alias_scope``, log and cache the result.
+
+    Missing aliases or a rejected key are logged as errors (the affected
+    features fail with 403/401 on every call); an unreachable gateway only
+    warns. The cached result is reported by ``/api/v1/health``.
+    """
+    global _last_key_scope
+    result = check_key_alias_scope(**kwargs)
+    _last_key_scope = result
+
+    status = result["status"]
+    if status == "missing_aliases":
+        logger.error(
+            "LLM gateway key lacks aliases %s — calls to them fail with 403 "
+            "key_model_access_denied. Extend the Virtual Key's scope via "
+            "/key/update (TF-999).",
+            ", ".join(result["missing_aliases"]),
+        )
+    elif status == "key_rejected":
+        logger.error(
+            "LLM gateway rejected LLM_GATEWAY_API_KEY on /key/info — all "
+            "LLM calls will fail (TF-999)."
+        )
+    elif status in ("unreachable", "unknown"):
+        logger.warning(
+            "LLM gateway key scope check skipped (%s) — aliases not verified (TF-999).",
+            status,
+        )
+    elif status == "ok":
+        logger.info("LLM gateway key scope covers all ExamCraft aliases")
+    return result
+
+
+def last_key_alias_scope() -> dict:
+    """Result of the last ``log_key_alias_scope`` run (``pending`` before)."""
+    return dict(_last_key_scope)
+
+
+def start_key_alias_scope_check() -> threading.Thread:
+    """Run ``log_key_alias_scope`` in a daemon thread.
+
+    Startup must not wait for the gateway: with an unreachable gateway the
+    check would otherwise hold the FastAPI lifespan / worker boot for the
+    full timeout.
+    """
+    thread = threading.Thread(
+        target=log_key_alias_scope, name="llm-gateway-key-scope", daemon=True
+    )
+    thread.start()
+    return thread
