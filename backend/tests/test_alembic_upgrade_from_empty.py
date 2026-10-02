@@ -19,6 +19,9 @@ must not leak into the test process) and then checks:
 4. Constraints that only the migration path can get wrong: prompt names are
    unique per institution, not globally (TF-961 — ``create_all`` never built
    the global unique index production had).
+5. Every PK/FK/UNIQUE carries the name the models give it (TF-339) —
+   autogenerate compares foreign keys by columns, not by name, so check 3
+   misses a migration that names a constraint differently.
 """
 
 import importlib
@@ -39,6 +42,10 @@ from sqlalchemy.exc import IntegrityError
 
 from database import Base
 from db_seed import SYSTEM_GRADING_SCHEMES
+from tests.test_constraint_naming_convention import (
+    db_constraint_names,
+    model_constraint_names,
+)
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -178,6 +185,7 @@ def test_upgrade_head_from_empty_database(empty_db_url):
                 },
             )
             actual = {_diff_key(d) for d in compare_metadata(ctx, Base.metadata)}
+            replayed_names = db_constraint_names(conn, model_tables)
 
         # prompts is created by the baseline, so it exists even core-only.
         if "prompts" in inspect(engine).get_table_names():
@@ -186,6 +194,10 @@ def test_upgrade_head_from_empty_database(empty_db_url):
                 tx.rollback()
     finally:
         engine.dispose()
+
+    model_names = model_constraint_names()
+    assert sorted(replayed_names - model_names) == [], "named only by migrations"
+    assert sorted(model_names - replayed_names) == [], "named only by the models"
 
     expected = {key for key in EXPECTED_DIFFS if key[1] in model_tables}
     unexpected = sorted(actual - expected)

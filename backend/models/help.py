@@ -204,11 +204,15 @@ class HelpFaqCache(Base):
     last_used = Column(DateTime(timezone=True), nullable=True)
     stale = Column(Boolean, default=False, nullable=False)
     approved_by = Column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_faq_approved_by"),
+        nullable=True,
     )
     cluster_id = Column(
         Integer,
-        ForeignKey("feedback_clusters.id", ondelete="SET NULL"),
+        ForeignKey(
+            "feedback_clusters.id", ondelete="SET NULL", name="fk_faq_cluster_id"
+        ),
         nullable=True,
         index=True,
     )

@@ -5,7 +5,7 @@ SQLAlchemy setup and session management
 
 import logging
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
@@ -75,8 +75,22 @@ engine = create_engine(
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Constraint naming convention (TF-339). It reproduces PostgreSQL's own
+# default names, so ``create_all`` and ``alembic upgrade head`` name every
+# unnamed PK/FK/UNIQUE identically and production keeps its existing names —
+# no rename migration needed. Explicit names (``name=...``) still win; FKs
+# that a migration created under an explicit name carry that name in the
+# model too. CHECK constraints are left out on purpose: a ``ck`` template with
+# ``%(constraint_name)s`` would rewrite every explicitly named CHECK.
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",  # SQLAlchemy's default, kept as is
+    "uq": "%(table_name)s_%(column_0_N_name)s_key",
+    "fk": "%(table_name)s_%(column_0_N_name)s_fkey",
+    "pk": "%(table_name)s_pkey",
+}
+
 # Create Base class
-Base = declarative_base()
+Base = declarative_base(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 
 
 def get_db():

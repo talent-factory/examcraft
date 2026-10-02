@@ -51,6 +51,28 @@ cd packages/core/backend
 alembic upgrade head
 ```
 
+#### Constraint-Namen (TF-339)
+
+`Base.metadata` hat eine `naming_convention` (`database.py`), die die
+Standardnamen von PostgreSQL nachbildet: `<tabelle>_pkey`,
+`<tabelle>_<spalten>_fkey`, `<tabelle>_<spalten>_key`. Dadurch heissen
+unbenannte PK-, FK- und UNIQUE-Constraints nach `create_all()` und nach
+`alembic upgrade head` gleich, und Migrationen dürfen sie direkt über diesen
+Namen ansprechen. Für neue Migrationen gilt:
+
+- Constraint unbenannt lassen (`op.create_foreign_key(None, ...)`) oder den
+  Namen nach diesem Schema wählen.
+- Wer einen abweichenden Namen vergibt, muss ihn auch im Modell setzen
+  (`ForeignKey(..., name="...")`). Sonst schlägt
+  `tests/test_alembic_upgrade_from_empty.py` fehl.
+- CHECK-Constraints sind von der Convention ausgenommen und brauchen immer
+  einen expliziten Namen.
+
+Achtung: Ältere, per `create_all()` gebootstrappte Datenbanken können für
+die explizit benannten FKs (z. B. `fk_exams_grading_scheme`) noch den
+PostgreSQL-Autonamen tragen. Eine Migration, die einen dieser FKs löscht,
+sucht ihn deshalb weiterhin über die Spalte (Vorbild: `tf335`-Migration).
+
 ### 5. Backend starten
 
 ```bash

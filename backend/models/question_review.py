@@ -111,7 +111,11 @@ class QuestionReview(Base):
     # __table_args__).
     competency_id = Column(
         Integer,
-        ForeignKey("competencies.id", ondelete="SET NULL"),
+        ForeignKey(
+            "competencies.id",
+            ondelete="SET NULL",
+            name="fk_question_reviews_competency_id_competencies",
+        ),
         nullable=True,
         index=True,
     )
@@ -202,7 +206,13 @@ class QuestionReview(Base):
     # review_status stays unchanged. Partial index, see __table_args__.
     archived_at = Column(DateTime, nullable=True)
     archived_by = Column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_question_reviews_archived_by_users",
+        ),
+        nullable=True,
     )
     archive_reason = Column(Text, nullable=True)
 

@@ -133,7 +133,11 @@ class Institution(Base):
         # loss surprise. The API's DELETE endpoint pre-checks this so
         # the user gets a friendly 409, not a 500 from a raw constraint
         # violation.
-        ForeignKey("grading_schemes.id", ondelete="RESTRICT"),
+        ForeignKey(
+            "grading_schemes.id",
+            ondelete="RESTRICT",
+            name="fk_institutions_default_grading_scheme",
+        ),
         nullable=True,
     )
 
@@ -500,7 +504,14 @@ class AuditLog(Base):
     # Not yet populated by this PR — auto-filled by AuditService.log_action
     # from a context-local value set during impersonated requests, see TF-742.
     impersonator_user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_audit_logs_impersonator_user_id_users",
+        ),
+        nullable=True,
+        index=True,
     )
 
     # Action Details
@@ -584,10 +595,24 @@ class ImpersonationSession(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     admin_user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_impersonation_sessions_admin_user_id_users",
+        ),
+        nullable=True,
+        index=True,
     )
     target_user_id = Column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_impersonation_sessions_target_user_id_users",
+        ),
+        nullable=True,
+        index=True,
     )
 
     reason = Column(Text, nullable=False)

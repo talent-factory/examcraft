@@ -94,7 +94,11 @@ class Exam(Base):
         # an exam would silently break the export contract (Note column
         # would render "—" for every row). Force the lehrperson to
         # detach first.
-        ForeignKey("grading_schemes.id", ondelete="RESTRICT"),
+        ForeignKey(
+            "grading_schemes.id",
+            ondelete="RESTRICT",
+            name="fk_exams_grading_scheme",
+        ),
         nullable=True,
     )
 
@@ -154,7 +158,7 @@ class Exam(Base):
     archived_at = Column(DateTime(), nullable=True)
     archived_by = Column(
         Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_exams_archived_by_users"),
         nullable=True,
     )
     archive_reason = Column(Text, nullable=True)

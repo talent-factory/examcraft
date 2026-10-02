@@ -74,7 +74,12 @@ class Submission(Base):
     # created independently; the FK is added afterwards via ALTER.
     graded_attempt_id = Column(
         Integer,
-        ForeignKey("attempts.id", ondelete="SET NULL", use_alter=True),
+        ForeignKey(
+            "attempts.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_submissions_graded_attempt",
+        ),
         nullable=True,
     )
 
