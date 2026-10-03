@@ -49,8 +49,12 @@ export interface ImportRowError {
   reason: string;
   /** Pipeline step that produced the error (job-level failures only). */
   step?: string | null;
-  /** Structured diagnostic context (job-level failures only). */
-  details?: Record<string, unknown> | null;
+  /**
+   * ADR 0005 code beside `reason` (TF-971). Set on every job-level entry and
+   * on rows whose cause the backend only logs; driver row errors have none.
+   */
+  error_code?: string | null;
+  error_params?: Record<string, unknown> | null;
 }
 
 export interface ImportPayloadStudent {

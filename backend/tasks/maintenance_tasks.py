@@ -270,6 +270,9 @@ def reap_stuck_import_jobs() -> dict[str, int]:
             existing.append(
                 {
                     "row_index": 0,
+                    # The response renders the code; ``reason`` is log text
+                    # and stays in the DB row (TF-971).
+                    "code": "submissions_import_interrupted",
                     "reason": (
                         "Import-Job in nicht-terminalem Status "
                         f"({prior_status!r}) seit über "

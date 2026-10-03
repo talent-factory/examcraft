@@ -49,6 +49,7 @@ from models.exam import Exam, ExamQuestion, ExamVisibility
 from models.question_review import QuestionReview
 from models.student import Student
 from models.submission import MoodleConnection, Submission
+from tests.test_error_codes_contract import IMPORT_JOB_LOG_WRITERS
 from utils.auth_utils import get_current_active_user, get_current_user
 from utils.secret_encryption import encrypt_secret, reset_cache_for_tests
 
@@ -284,6 +285,86 @@ def test_keine_rohe_exception_mehr_in_den_routern() -> None:
                 ):
                     treffer.append(f"{rel}:{node.lineno} (str(...) im detail)")
     assert not treffer, "Rohe Exception-Texte in der Antwort: " + ", ".join(treffer)
+
+
+# ``IMPORT_JOB_LOG_WRITERS``: alle Stellen, die Einträge in
+# ``ImportJob.error_log`` schreiben (TF-971). Deren Zeilen gehen über
+# ``GET /import-jobs/{id}`` an den Client — mit Status 200, also an
+# ``HTTPException`` vorbei, die der Wächter oben prüft. Die Liste teilt sich
+# der Wächter mit dem Frontend-Vertrag in ``test_error_codes_contract.py``.
+
+
+def _bound_exception_names(tree: ast.Module) -> set[str]:
+    return {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ExceptHandler) and node.name
+    }
+
+
+def _mentions(node: ast.AST, names: set[str]) -> bool:
+    return any(isinstance(sub, ast.Name) and sub.id in names for sub in ast.walk(node))
+
+
+def test_import_job_eintraege_tragen_einen_code() -> None:
+    """Jeder Import-Job-Eintrag hat einen Code; kein Zeilenfehler zitiert eine
+    Exception ohne einen.
+
+    Zwei Formen schreiben ins ``error_log``: Dict-Literale mit ``row_index``
+    (Job-Ebene) und ``ImportRowError(...)`` (Zeilen-Ebene). Ein Dict ohne
+    ``"code"`` würde mit seinem ``reason`` beantwortet — so stand der
+    ``f"{type(exc).__name__}: {exc}"`` des Celery-Tasks im Dialog. Ein
+    ``ImportRowError`` darf einen festen Satz tragen (Treiberzeilen), aber
+    keinen, der aus einer abgefangenen Exception gebaut ist, es sei denn mit
+    ``code=``: dann übersetzt die Antwort den Code statt des ``reason``.
+    """
+    treffer: list[str] = []
+    for rel in IMPORT_JOB_LOG_WRITERS:
+        tree = ast.parse((BACKEND_ROOT / rel).read_text(encoding="utf-8"))
+        exc_names = _bound_exception_names(tree)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Dict):
+                keys = {
+                    k.value
+                    for k in node.keys
+                    if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                }
+                if {"row_index", "reason"} <= keys and "code" not in keys:
+                    treffer.append(f"{rel}:{node.lineno} (Job-Eintrag ohne code)")
+            elif (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "id", "") == "ImportRowError"
+            ):
+                kwargs = {k.arg: k.value for k in node.keywords}
+                reason = kwargs.get("reason")
+                if (
+                    reason is not None
+                    and "code" not in kwargs
+                    and _mentions(reason, exc_names)
+                ):
+                    treffer.append(
+                        f"{rel}:{node.lineno} (Exception im reason ohne code)"
+                    )
+    assert not treffer, "Import-Job-Einträge ohne Code: " + ", ".join(treffer)
+
+
+def test_import_job_wachter_sieht_seine_dateien() -> None:
+    """Sanity-Check der Scan-Wurzeln: ohne ihn bliebe der Wächter oben nach
+    einer Umbenennung still grün, weil er nichts mehr fände."""
+    gefunden = 0
+    for rel in IMPORT_JOB_LOG_WRITERS:
+        tree = ast.parse((BACKEND_ROOT / rel).read_text(encoding="utf-8"))
+        gefunden += sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Dict)
+            and any(
+                isinstance(k, ast.Constant) and k.value == "row_index"
+                for k in node.keys
+            )
+        )
+    # enqueue (api), watchdog (main), grading (service), task, reaper
+    assert gefunden >= 5, f"nur {gefunden} Job-Einträge gefunden"
 
 
 def test_kein_core_router_wirft_nackte_http_exception() -> None:

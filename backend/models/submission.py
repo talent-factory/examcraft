@@ -467,8 +467,11 @@ class ImportJob(Base):
     graded_total = Column(Integer, nullable=True)
     graded_done = Column(Integer, default=0, nullable=False)
     # error_log shape: list of {row_index: int, reason: str, step?: str,
-    # details?: object}. Format intentionally documented by keys, not by
-    # producer name — ImportService and the import drivers populate it.
+    # code?: str, params?: object, details?: object}. Format intentionally
+    # documented by keys, not by producer name — ImportService, the import
+    # drivers, the Celery task and the watchdogs populate it. ``reason`` and
+    # ``details`` are log/DB-only wherever ``code`` is set; the API answers
+    # with the translation of ``code`` (TF-971).
     error_log = Column(JSON, nullable=True)
     source_metadata = Column(JSON, nullable=True)
 

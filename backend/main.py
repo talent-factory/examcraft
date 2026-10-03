@@ -696,6 +696,9 @@ async def lifespan(app: FastAPI):
                 existing.append(
                     {
                         "row_index": 0,
+                        # The response renders the code; ``reason`` is log
+                        # text and stays in the DB row (TF-971).
+                        "code": "submissions_import_interrupted",
                         "reason": (
                             "Worker wahrscheinlich vor Abschluss beendet "
                             "(OOM/Deploy/Kill)."

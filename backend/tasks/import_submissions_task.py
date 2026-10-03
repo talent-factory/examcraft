@@ -31,7 +31,7 @@ from database import SessionLocal
 from enums import ImportJobStatus
 from models.exam import Exam
 from models.submission import ImportJob
-from services.import_service import ImportService
+from services.import_service import ImportService, job_failure_code
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,11 @@ Base64Str = NewType("Base64Str", str)
 # retry, otherwise the same broken CSV burns three retries before the
 # operator sees the failure.
 _TRANSIENT_ERRORS = (OperationalError, DatabaseError, ConnectionError)
+
+# Steps ``ImportService._fail_job`` records a job-level failure under. An
+# entry with one of them and the same code means the service already
+# logged this failure.
+_SERVICE_FAILURE_STEPS = frozenset({"validate", "pipeline"})
 
 
 @celery_app.task(
@@ -184,6 +189,16 @@ def _mark_terminal_failure(
     The periodic ``reap_stuck_import_jobs`` watchdog (Celery Beat, every
     5 min) age-fails any row left in ``queued``/``running``, so the job
     still converges on a terminal status even if this write is lost.
+
+    The entry carries a code from ``job_failure_code``; the exception text
+    goes to the log and, with the traceback, to the DB row only — it used to
+    be the ``reason`` the import dialog showed (TF-971). When
+    ``ImportService._fail_job`` already recorded this failure (the task
+    re-raises what ``commit`` raised), no second entry is added: it would
+    repeat the same code as a second line in the dialog. The match is on the
+    code, not just the step: a service entry left by an earlier Celery
+    attempt (the exam lookup on a retry runs before ``commit`` resets
+    ``error_log``) must not swallow a different cause.
     """
     try:
         job = db.query(ImportJob).filter(ImportJob.id == import_job_id).one_or_none()
@@ -194,20 +209,37 @@ def _mark_terminal_failure(
                 import_job_id,
             )
             return
+        code, params, diagnostic = job_failure_code(exc)
+        logger.warning(
+            "Import-Job %s terminal gescheitert (step=%s, %s): %s",
+            import_job_id,
+            step,
+            code,
+            diagnostic,
+        )
         job.status = ImportJobStatus.FAILED.value
         job.finished_at = datetime.now(timezone.utc)
         existing = list(job.error_log or [])
-        existing.append(
-            {
-                "row_index": 0,
-                "reason": f"{type(exc).__name__}: {exc}",
-                "step": step,
-                "exception_type": type(exc).__name__,
-                "traceback": "".join(
-                    traceback.format_exception(type(exc), exc, exc.__traceback__)
-                ),
-            }
+        already_recorded = any(
+            isinstance(entry, dict)
+            and entry.get("code") == code
+            and entry.get("step") in _SERVICE_FAILURE_STEPS
+            for entry in existing
         )
+        if not already_recorded:
+            existing.append(
+                {
+                    "row_index": 0,
+                    "code": code,
+                    "params": params,
+                    "reason": diagnostic,
+                    "step": step,
+                    "exception_type": type(exc).__name__,
+                    "traceback": "".join(
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    ),
+                }
+            )
         job.error_log = existing
         db.commit()
     except Exception:  # noqa: BLE001 — we are already in error path

@@ -86,6 +86,23 @@
  * and tables («MoodleApiDriver braucht eine DB-Session …»). Those now go to
  * the log.
  *
+ * JOB CODES (TF-971). Five codes that never arrive as `error_code` on a
+ * failed response, but as `error_code` of a row in `ImportJob.error_log` —
+ * the async import ran in the worker and the job poll answered 200:
+ *
+ *   ..._database_error       DB failure, also after Celery's retries
+ *   ..._grading_failed       one submission imported but not graded
+ *   ..._interrupted          worker gone; set by the two watchdogs
+ *   ..._row_persist_failed   one attempt not saved (unexpected constraint)
+ *   ..._timeout              Celery's soft time limit hit
+ *
+ * Unlike the portfolio job codes (`PORTFOLIO_JOB_CODES`, see README) they
+ * are registered here, because a failed job's row carries the driver codes
+ * above just as often — the worker re-runs the parse — and a second list
+ * would need a second copy of all of their texts. `ImportDialog` renders
+ * every row through `translateError` (`importRowErrorMessage.ts`).
+ * `..._internal_error` and the driver codes are reachable on that path too.
+ *
  * FRONTEND-ONLY FALLBACKS, one per operation a component renders a failure
  * for:
  *
@@ -113,6 +130,7 @@ export const SUBMISSIONS_ERROR_CODES = [
   'submissions_grade_export_failed',
   'submissions_import_attempt_without_user',
   'submissions_import_commit_failed',
+  'submissions_import_database_error',
   'submissions_import_delete_failed',
   'submissions_import_driver_unknown',
   'submissions_import_enqueue_failed',
@@ -122,7 +140,9 @@ export const SUBMISSIONS_ERROR_CODES = [
   'submissions_import_file_not_json',
   'submissions_import_file_not_utf8',
   'submissions_import_file_too_large',
+  'submissions_import_grading_failed',
   'submissions_import_internal_error',
+  'submissions_import_interrupted',
   'submissions_import_job_not_found',
   'submissions_import_json_structure_invalid',
   'submissions_import_moodle_auth_failed',
@@ -137,6 +157,8 @@ export const SUBMISSIONS_ERROR_CODES = [
   'submissions_import_question_mapping_failed',
   'submissions_import_question_texts_missing',
   'submissions_import_quiz_not_found',
+  'submissions_import_row_persist_failed',
   'submissions_import_summary_load_failed',
+  'submissions_import_timeout',
   'submissions_list_failed',
 ] as const;

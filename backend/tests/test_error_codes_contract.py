@@ -444,6 +444,17 @@ def test_import_fehlercodes_sind_echte_schluessel():
 
 FRONTEND_CODES_FILE = "core/frontend/src/errors/codes/submissions.ts"
 
+#: Modules (relative to ``core/backend``) that write ``ImportJob.error_log``
+#: rows (TF-971). ``test_core_router_error_codes.py`` imports this list for
+#: its static guard, so the two scans cannot drift apart.
+IMPORT_JOB_LOG_WRITERS = (
+    "api/submissions.py",
+    "main.py",
+    "services/import_service.py",
+    "tasks/import_submissions_task.py",
+    "tasks/maintenance_tasks.py",
+)
+
 
 def test_import_codes_sind_im_frontend_registriert():
     """A backend code the frontend does not list is invisible to the user.
@@ -479,6 +490,22 @@ def test_import_codes_sind_im_frontend_registriert():
     # The endpoint raises this one itself (broker outage), outside the driver
     # exceptions the scan above sees.
     raised.add("submissions_import_enqueue_failed")
+    # The async job path (TF-971): codes written into ``ImportJob.error_log``
+    # rows reach ``ImportDialog`` through the job poll and are rendered via
+    # ``translateError`` — an unregistered one falls back to ``reason``
+    # silently, just like a dropped ``error_code``. Every
+    # ``submissions_import_*`` literal in the modules that write those rows
+    # counts; a broader net than "dict values under ``code``" on purpose, so a
+    # code moved into a helper or a constant stays covered.
+    for rel in IMPORT_JOB_LOG_WRITERS:
+        tree = ast.parse((REPO_ROOT / "core/backend" / rel).read_text(encoding="utf-8"))
+        raised |= {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and re.fullmatch(r"submissions_import_[a-z0-9_]+", node.value)
+        }
 
     registered_source = (REPO_ROOT / FRONTEND_CODES_FILE).read_text(encoding="utf-8")
     registered = set(re.findall(r"'(submissions_[a-z0-9_]+)'", registered_source))

@@ -21,10 +21,11 @@ of raw text would stay green if every failure collapsed onto one code.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import pathlib
-from datetime import date
+from datetime import date, datetime, timezone
 from io import BytesIO
 from unittest.mock import patch
 
@@ -34,6 +35,7 @@ import respx
 from sqlalchemy.orm import Session
 
 from models.exam import Exam
+from models.submission import ImportJob
 from services.import_drivers import ImportDriverError, MoodleApiDriver
 from tests.test_moodle_api_driver import (  # noqa: F401 -- _crypto_env is autouse
     _crypto_env,
@@ -936,6 +938,373 @@ def test_ungueltige_quiz_id_scheitert_an_pydantic(test_db: Session, quiz_id) -> 
     # test_unbrauchbare_quiz_id_hat_eigenen_code above.
 
 
+# ---------------------------------------------------------------------------
+# Async job path (TF-971)
+#
+# The worker's failures reach the client through ``GET /import-jobs/{id}``,
+# not as an ``error_code`` on a failed response: ``error_log`` rows carry a
+# code beside ``reason`` (ADR 0005), and the raw exception text goes to the
+# log. Each case below raises inside the real pipeline with a marker in the
+# exception text, then reads the job through the real endpoint.
+# ---------------------------------------------------------------------------
+
+
+def _job_owner(test_db: Session, slug: str):
+    inst = _make_institution(test_db, slug=slug)
+    user = _make_user(test_db, inst.id, email=f"{slug}@test.ch")
+    exam = _make_exam(test_db, inst.id)
+    test_db.commit()
+    return _client(test_db, user), exam
+
+
+def _run_commit(test_db: Session, exam) -> ImportJob:
+    from services.import_service import ImportService
+
+    try:
+        ImportService(test_db).commit(
+            exam=exam,
+            driver_name="moodle_json",
+            source=_JSON_FIXTURE.encode("utf-8"),
+            triggered_by=None,
+        )
+    except Exception:  # noqa: BLE001 — the job row is what is under test
+        test_db.rollback()
+    return (
+        test_db.query(ImportJob)
+        .filter(ImportJob.exam_id == exam.id)
+        .order_by(ImportJob.id.desc())
+        .first()
+    )
+
+
+def _raise_in_pipeline(monkeypatch, exc: BaseException) -> None:
+    def _boom(*_args, **_kwargs):
+        raise exc
+
+    monkeypatch.setattr("services.import_service.ImportService._upsert_students", _boom)
+
+
+def _raise_in_grading(monkeypatch, exc: BaseException) -> None:
+    def _boom(*_args, **_kwargs):
+        raise exc
+
+    monkeypatch.setattr(
+        "services.grading_service.GradingService.grade_submission", _boom
+    )
+
+
+def _raise_on_attempt_insert(monkeypatch, exc: BaseException) -> None:
+    from models.submission import Attempt
+
+    def _boom(*_args, **_kwargs):
+        raise exc
+
+    monkeypatch.setattr(Attempt, "__init__", _boom)
+
+
+def _job_cases():
+    from celery.exceptions import SoftTimeLimitExceeded
+    from sqlalchemy.exc import IntegrityError, OperationalError
+
+    # code -> (arm the failure, exception, raw marker, exception class name)
+    return {
+        "submissions_import_database_error": (
+            _raise_in_pipeline,
+            OperationalError(
+                "SELECT * FROM students", {}, Exception("RAW-DB-971 server closed")
+            ),
+            "RAW-DB-971",
+            "OperationalError",
+        ),
+        "submissions_import_timeout": (
+            _raise_in_pipeline,
+            SoftTimeLimitExceeded("RAW-TIMEOUT-971"),
+            "RAW-TIMEOUT-971",
+            "SoftTimeLimitExceeded",
+        ),
+        "submissions_import_internal_error": (
+            _raise_in_pipeline,
+            RuntimeError("RAW-INTERNAL-971 'NoneType' has no attribute"),
+            "RAW-INTERNAL-971",
+            "RuntimeError",
+        ),
+        "submissions_import_grading_failed": (
+            _raise_in_grading,
+            RuntimeError("RAW-GRADING-971 table grades_x"),
+            "RAW-GRADING-971",
+            "RuntimeError",
+        ),
+        "submissions_import_row_persist_failed": (
+            _raise_on_attempt_insert,
+            IntegrityError(
+                "INSERT INTO attempts",
+                {},
+                Exception('violates check constraint "ck_raw_persist_971"'),
+            ),
+            "ck_raw_persist_971",
+            "IntegrityError",
+        ),
+    }
+
+
+_JOB_FAELLE = sorted(_job_cases())
+
+
+@pytest.mark.parametrize("code", _JOB_FAELLE)
+def test_job_codes_loggen_interna_statt_sie_zu_antworten(
+    test_db: Session, monkeypatch, caplog, code
+) -> None:
+    arm, exc, raw, exc_name = _job_cases()[code]
+    client, exam = _job_owner(test_db, f"job-{code[len('submissions_import_') :]}")
+    arm(monkeypatch, exc)
+
+    with caplog.at_level(logging.WARNING):
+        job = _run_commit(test_db, exam)
+
+    assert job is not None
+    response = client.get(f"/api/v1/submissions/import-jobs/{job.id}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    codes = [e["error_code"] for e in body["error_log"] or []]
+    assert code in codes, f"{code} fehlt in {codes}"
+    _assert_log_not_body(caplog, body, code, raw)
+    assert exc_name not in json.dumps(body), f"{code}: {exc_name} in der Antwort"
+
+
+def test_unterbrochener_job_nennt_den_watchdog_nicht(test_db: Session) -> None:
+    """``submissions_import_interrupted`` comes from the reaper, not from an
+    exception — there is no raw exception text to log. What must stay out of
+    the response is the reaper's operator sentence (status, threshold)."""
+    from enums import ImportJobStatus
+    from tasks.maintenance_tasks import _IMPORT_STUCK_THRESHOLD, reap_stuck_import_jobs
+
+    client, exam = _job_owner(test_db, "job-interrupted")
+    job = ImportJob(
+        institution_id=exam.institution_id,
+        exam_id=exam.id,
+        driver_name="moodle_json",
+        status=ImportJobStatus.RUNNING.value,
+        rows_processed=0,
+        rows_failed=0,
+        error_log=[],
+        source_metadata={},
+        created_at=datetime.now(timezone.utc) - _IMPORT_STUCK_THRESHOLD * 2,
+    )
+    test_db.add(job)
+    test_db.commit()
+
+    with (
+        patch("tasks.maintenance_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+    ):
+        assert reap_stuck_import_jobs.run()["reaped"] >= 1
+
+    body = client.get(f"/api/v1/submissions/import-jobs/{job.id}").json()
+    (entry,) = body["error_log"]
+    assert entry["error_code"] == "submissions_import_interrupted"
+    assert entry["reason"].startswith("Der Import wurde unterbrochen")
+    assert "Watchdog" not in json.dumps(body, ensure_ascii=False)
+    _assert_clean(body)
+
+
+def test_fehlgeschlagener_job_liefert_keinen_traceback(
+    test_db: Session, monkeypatch
+) -> None:
+    """The whole worker path: ``ImportService._fail_job`` stores the traceback
+    in the DB row, the task's terminal write runs after it, and the poll
+    answers without a single traceback fragment — and with one row, not one
+    per layer that saw the exception."""
+    from tasks.import_submissions_task import import_submissions
+
+    client, exam = _job_owner(test_db, "job-traceback")
+    job = ImportJob(
+        institution_id=exam.institution_id,
+        exam_id=exam.id,
+        driver_name="moodle_json",
+        status="queued",
+        rows_processed=0,
+        rows_failed=0,
+        error_log=[],
+        source_metadata={},
+    )
+    test_db.add(job)
+    test_db.commit()
+    _raise_in_pipeline(monkeypatch, RuntimeError("RAW-TB-971"))
+
+    with (
+        patch("tasks.import_submissions_task.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        pytest.raises(RuntimeError),
+    ):
+        import_submissions.run(
+            exam_id=exam.id,
+            driver_name="moodle_json",
+            source_b64=base64.b64encode(_JSON_FIXTURE.encode("utf-8")).decode(),
+            import_job_id=job.id,
+        )
+
+    test_db.expire_all()
+    stored = json.dumps(test_db.get(ImportJob, job.id).error_log)
+    # Precondition: the operator copy is really there, so its absence from the
+    # response below is the filter's doing, not an empty log.
+    assert "Traceback (most recent call last)" in stored
+
+    body = client.get(f"/api/v1/submissions/import-jobs/{job.id}").json()
+    serialised = json.dumps(body, ensure_ascii=False)
+    for fragment in ("Traceback", 'File "', "RuntimeError", "RAW-TB-971", "_boom"):
+        assert fragment not in serialised, f"«{fragment}» in der Antwort: {serialised}"
+    assert [e["error_code"] for e in body["error_log"]] == [
+        "submissions_import_internal_error"
+    ]
+
+
+def test_terminaler_fehler_mit_anderer_ursache_bekommt_eigene_zeile(
+    test_db: Session,
+) -> None:
+    """The task skips its entry only when ``_fail_job`` already recorded the
+    same cause. A service entry left by an earlier Celery attempt must not
+    swallow a later, different failure — e.g. the exam lookup on the retry,
+    which runs before ``commit`` resets ``error_log``."""
+    from tasks.import_submissions_task import _mark_terminal_failure
+
+    client, exam = _job_owner(test_db, "job-stale-entry")
+    job = ImportJob(
+        institution_id=exam.institution_id,
+        exam_id=exam.id,
+        driver_name="moodle_json",
+        status="running",
+        rows_processed=0,
+        rows_failed=0,
+        error_log=[
+            {
+                "row_index": 0,
+                "code": "submissions_import_database_error",
+                "params": {},
+                "reason": "OperationalError: server closed",
+                "step": "pipeline",
+            }
+        ],
+        source_metadata={},
+    )
+    test_db.add(job)
+    test_db.commit()
+
+    _mark_terminal_failure(
+        test_db, job.id, ValueError("Exam RAW-STALE-971 nicht gefunden"), step="lookup"
+    )
+
+    body = client.get(f"/api/v1/submissions/import-jobs/{job.id}").json()
+    assert [e["error_code"] for e in body["error_log"]] == [
+        "submissions_import_database_error",
+        "submissions_import_internal_error",
+    ]
+    assert "RAW-STALE-971" not in json.dumps(body, ensure_ascii=False)
+
+
+def test_preview_uebersetzt_codierte_zeilenfehler() -> None:
+    """A row error with ``code`` carries log text in ``reason`` (the static
+    guard allows exception text there only together with a code). The
+    preview must answer it like the job poll does — translated code, never
+    the ``reason`` — or a driver adopting ``code=`` would leak through it."""
+    from api.submissions import _import_payload_to_preview
+    from services.import_drivers.payloads import ImportPayload, ImportRowError
+
+    payload = ImportPayload(
+        exam_id=1,
+        driver_name="moodle_json",
+        errors=[
+            ImportRowError(
+                row_index=2,
+                reason="IntegrityError: ck_RAW-PREVIEW-971",
+                code="submissions_import_row_persist_failed",
+            ),
+            ImportRowError(row_index=3, reason="Leere external_id"),
+        ],
+    )
+
+    out = _import_payload_to_preview(payload, locale="fr").model_dump()
+    assert out["errors"] == [
+        {
+            "row_index": 2,
+            "reason": ("Cette tentative n'a pas pu être enregistrée et a été ignorée."),
+            "step": None,
+            "error_code": "submissions_import_row_persist_failed",
+            "error_params": None,
+        },
+        {
+            "row_index": 3,
+            "reason": "Leere external_id",
+            "step": None,
+            "error_code": None,
+            "error_params": None,
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    "legacy, code",
+    [
+        (
+            {
+                "row_index": 0,
+                "reason": "OperationalError: RAW-LEGACY-971 password=geheim",
+                "step": "celery_retry",
+                "exception_type": "OperationalError",
+                "traceback": "Traceback (most recent call last):\n  File ...",
+            },
+            "submissions_import_internal_error",
+        ),
+        (
+            {
+                "row_index": 0,
+                "reason": "Worker wahrscheinlich vor Abschluss beendet RAW-LEGACY-971",
+                "step": "watchdog",
+                "exception_type": "WatchdogTimeout",
+            },
+            "submissions_import_interrupted",
+        ),
+        (
+            {
+                "row_index": 3,
+                "reason": (
+                    "DB-Fehler beim Persistieren des Attempts: "
+                    "ck_RAW-LEGACY-971_attempts"
+                ),
+                "exception_type": "IntegrityError",
+            },
+            "submissions_import_row_persist_failed",
+        ),
+    ],
+)
+def test_alte_job_eintraege_ohne_code_bekommen_einen(
+    test_db: Session, legacy, code
+) -> None:
+    """Rows written before TF-971 are still in production DBs; their
+    ``reason`` is log text and must not reach the poll either."""
+    client, exam = _job_owner(
+        test_db, f"job-legacy-{code[len('submissions_import_') :]}"
+    )
+    job = ImportJob(
+        institution_id=exam.institution_id,
+        exam_id=exam.id,
+        driver_name="moodle_json",
+        status="failed",
+        rows_processed=0,
+        rows_failed=0,
+        error_log=[legacy],
+        source_metadata={},
+    )
+    test_db.add(job)
+    test_db.commit()
+
+    body = client.get(f"/api/v1/submissions/import-jobs/{job.id}").json()
+    serialised = json.dumps(body, ensure_ascii=False)
+    assert "RAW-LEGACY-971" not in serialised
+    assert legacy["exception_type"] not in serialised
+    assert [e["error_code"] for e in body["error_log"]] == [code]
+    _assert_clean(body)
+
+
 # Codes whose proof lives in a dedicated test rather than in the matrix.
 _EIGENE_TESTS = {
     "submissions_import_driver_unknown": (
@@ -955,6 +1324,9 @@ _EIGENE_TESTS = {
         "test_absturz_loggt_die_ursache_statt_server_logs_zu_nennen"
     ),
     "submissions_import_job_not_found": "test_unbekannter_import_job_hat_eigenen_code",
+    "submissions_import_interrupted": (
+        "test_unterbrochener_job_nennt_den_watchdog_nicht"
+    ),
     "submissions_import_moodle_connection_invalid": (
         "test_unlesbarer_token_loggt_interna"
     ),
@@ -988,6 +1360,7 @@ def test_jeder_import_code_hat_einen_nachweis() -> None:
 
     belegt = (
         set(_DATEI_FAELLE)
+        | set(_JOB_FAELLE)
         | set(_MOODLE_FAELLE)
         | set(_EIGENE_TESTS)
         | set(HTTP_UNERREICHBAR)

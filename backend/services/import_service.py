@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
@@ -75,6 +76,25 @@ _BENIGN_RACE_CONSTRAINTS = frozenset(
         "uq_attempts_submission_source_attempt_id",
     }
 )
+
+
+def job_failure_code(exc: BaseException) -> tuple[str, dict[str, Any], str]:
+    """``(code, params, diagnostic)`` for an exception that ended an import job.
+
+    Shared by ``ImportService._fail_job`` and the Celery task's terminal
+    failure write, so both record the same code for the same cause. The
+    ``diagnostic`` is the raw text for the log and the DB row; only the code
+    reaches the response (TF-971). A driver error keeps its own code — the
+    async commit re-runs the parse and can fail exactly like the preview.
+    """
+    if isinstance(exc, ImportDriverError):
+        return exc.code, dict(exc.params), exc.log_message
+    diagnostic = f"{type(exc).__name__}: {exc}"
+    if isinstance(exc, SQLAlchemyError):
+        return "submissions_import_database_error", {}, diagnostic
+    if isinstance(exc, SoftTimeLimitExceeded):
+        return "submissions_import_timeout", {}, diagnostic
+    return "submissions_import_internal_error", {}, diagnostic
 
 
 class ImportValidationError(ImportDriverError):
@@ -691,13 +711,14 @@ class ImportService:
                     record_idx,
                     constraint or "?",
                 )
+                # The constraint name is in the log line above; the row entry
+                # carries only the code, because its ``reason`` used to reach
+                # the teacher's screen verbatim (TF-971).
                 payload.errors.append(
                     ImportRowError(
                         row_index=record_idx,
-                        reason=(
-                            f"DB-Fehler beim Persistieren des Attempts: "
-                            f"{constraint or type(exc).__name__}"
-                        ),
+                        reason="DB-Fehler beim Persistieren des Attempts",
+                        code="submissions_import_row_persist_failed",
                     )
                 )
                 continue
@@ -750,8 +771,9 @@ class ImportService:
 
         Returns ``(submission_id, diagnostic, traceback)`` per failure so
         the import-job error_log carries the full stack for operator/DB
-        triage — ``_finalise_job`` turns this into a generic, translated
-        code for the response; ``diagnostic``/``traceback`` never reach
+        triage — ``_finalise_job`` turns this into the translated
+        ``submissions_import_grading_failed`` code for the response;
+        ``diagnostic``/``traceback`` never reach
         the client (see ``_finalise_job``).
         """
         failures: list[tuple[int, str, str]] = []
@@ -970,14 +992,16 @@ class ImportService:
         was imported.
 
         ``grading_failures``: ``(submission_id, diagnostic, traceback)``
-        tuples — same split as ``_fail_job``: a fixed, generic
-        ``submissions_import_internal_error`` code is what
+        tuples — same split as ``_fail_job``: the
+        ``submissions_import_grading_failed`` code is what
         ``_import_job_to_out`` translates into the response, while the raw
         ``diagnostic``/``traceback`` stay under ``details`` for operator/DB
-        triage and are stripped before the response is serialised. Without
-        this, a per-submission grading crash (``AttributeError``,
-        ``TypeError``, …) would put ``str(exc)`` on a teacher's screen the
-        same way an unfixed ``_fail_job`` used to (TF-773 PR 2c review).
+        triage and never reach the response. Without this, a per-submission
+        grading crash (``AttributeError``, ``TypeError``, …) would put
+        ``str(exc)`` on a teacher's screen the same way an unfixed
+        ``_fail_job`` used to (TF-773 PR 2c review). Its own code since
+        TF-971: the import itself went through, only the grading of one
+        submission did not.
         """
         grading_failures = grading_failures or []
         rows_failed = len(payload.errors) + len(grading_failures)
@@ -999,7 +1023,7 @@ class ImportService:
         new_errors.extend(
             {
                 "row_index": 0,
-                "code": "submissions_import_internal_error",
+                "code": "submissions_import_grading_failed",
                 "reason": diagnostic,
                 "step": "grading",
                 "details": {
@@ -1041,22 +1065,22 @@ class ImportService:
         ``driver.parse()``/``_validate_payload`` inside the worker, so a
         transient Moodle error or a validation failure can land here just as
         easily as in the synchronous preview. ``_import_job_to_out``
-        translates ``code``/``params`` into the response and strips
-        ``reason``/``details.diagnostic``/``details.traceback`` — those stay
-        DB/log-only, never reaching the teacher's screen (TF-773 PR 2c
-        review).
+        translates ``code``/``params`` into the response; ``reason`` and
+        ``details`` stay DB/log-only, never reaching the teacher's screen
+        (TF-773 PR 2c review, TF-971). The code comes from
+        ``job_failure_code``, which the Celery task uses too.
         """
         job.status = ImportJobStatus.FAILED.value
         job.finished_at = datetime.now(timezone.utc)
 
-        if isinstance(exc, ImportDriverError):
-            code = exc.code
-            params = dict(exc.params)
-            diagnostic = exc.log_message
-        else:
-            code = "submissions_import_internal_error"
-            params = {}
-            diagnostic = f"{type(exc).__name__}: {exc}"
+        code, params, diagnostic = job_failure_code(exc)
+        logger.warning(
+            "Import-Job %s gescheitert (step=%s, %s): %s",
+            job.id,
+            step,
+            code,
+            diagnostic,
+        )
 
         details: dict[str, Any] = {
             "row_index": 0,  # 0 = job-level failure (not a row)

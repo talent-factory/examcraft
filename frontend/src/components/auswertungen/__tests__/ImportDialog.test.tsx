@@ -8,6 +8,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  within,
 } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -211,7 +212,7 @@ describe('ImportDialog', () => {
       rows_processed: 0,
       rows_failed: 0,
       error_log: [
-        { row_index: -1, reason: 'Grading abgebrochen', step: 'grade', details: null },
+        { row_index: -1, reason: 'Grading abgebrochen', step: 'grade' },
       ],
     });
     const { onImported } = renderDialog({ pollIntervalMs: 5 });
@@ -236,7 +237,64 @@ describe('ImportDialog', () => {
     // 0-row all-duplicates "info" case (which requires status=succeeded).
     expect(result).toHaveTextContent('Import fehlgeschlagen');
     expect(result).not.toHaveTextContent('Keine neuen Resultate importiert');
+    // Only a job-level entry, no row: the list must not announce skipped rows.
+    expect(result).toHaveTextContent('Meldungen zum Import:');
+    expect(result).not.toHaveTextContent('Fehlerhafte Zeilen');
     expect(onImported).not.toHaveBeenCalled();
+  });
+
+  test('rendert den Code eines gescheiterten Jobs übersetzt statt des reason (TF-971)', async () => {
+    mockSubmissionsService.preview.mockResolvedValueOnce(samplePreview);
+    mockSubmissionsService.commit.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'queued',
+      rows_processed: 0,
+    });
+    mockSubmissionsService.getImportJob.mockResolvedValueOnce({
+      ...sampleJob,
+      status: 'failed',
+      rows_processed: 0,
+      rows_failed: 0,
+      error_log: [
+        {
+          row_index: 0,
+          // What a poll in another UI language returns: the backend's own
+          // translation. The dialog must render the code in *its* language.
+          reason: 'The import failed because of a database error.',
+          step: 'pipeline',
+          error_code: 'submissions_import_database_error',
+        },
+        {
+          row_index: 4,
+          reason: 'DB-Fehler beim Persistieren des Attempts',
+          error_code: 'submissions_import_row_persist_failed',
+        },
+      ],
+    });
+    renderDialog({ pollIntervalMs: 5 });
+
+    fireEvent.click(screen.getByTestId('import-next-source'));
+    // The <label> wraps the hidden input, so the label text finds it without
+    // reaching into the DOM.
+    fireEvent.change(screen.getByLabelText('JSON-Datei wählen'), {
+      target: { files: [jsonFile] },
+    });
+    fireEvent.click(screen.getByTestId('import-run-preview'));
+    await screen.findByTestId('preview-student-count');
+    fireEvent.click(screen.getByTestId('import-confirm'));
+
+    const errors = await screen.findByTestId('import-result-errors');
+    const items = within(errors)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(items).toEqual([
+      'Der Import ist an einem Datenbankfehler gescheitert. Bitte versuche es in ein paar Minuten erneut.',
+      'Zeile 4: Dieser Versuch konnte nicht gespeichert werden und wurde übersprungen.',
+    ]);
+    // At least one real row in the list: the row heading stays.
+    expect(errors).toHaveTextContent('Fehlerhafte Zeilen werden übersprungen:');
+    expect(errors).not.toHaveTextContent('database error');
+    expect(errors).not.toHaveTextContent('Persistieren');
   });
 
   test('all-duplicates import shows an info result and does not navigate away (TF-500)', async () => {
@@ -442,7 +500,7 @@ describe('ImportDialog', () => {
       ...sampleJob,
       status: 'partial',
       rows_failed: 1,
-      error_log: [{ row_index: 3, reason: 'Leere external_id', step: null, details: null }],
+      error_log: [{ row_index: 3, reason: 'Leere external_id', step: null }],
     });
     const { onImported } = renderDialog();
 

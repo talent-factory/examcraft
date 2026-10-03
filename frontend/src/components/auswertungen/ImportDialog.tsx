@@ -50,6 +50,7 @@ import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError, SubmissionsService } from '../../services/submissionsService';
 import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
 import { isQuotaError, translateQuotaError } from './QuotaBanner';
+import { importRowErrorMessage } from './importRowErrorMessage';
 import {
   DriverName,
   ImportJob,
@@ -450,15 +451,21 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         {errorRows.length > 0 && (
           <Box sx={{ mt: 1.5 }} data-testid="import-result-errors">
             <Typography variant="subtitle2">
-              {t('auswertungen.importDialog.errorListTitle')}
+              {/* Job-level entries only (row_index <= 0): nothing was skipped */}
+              {errorRows.some((e) => e.row_index > 0)
+                ? t('auswertungen.importDialog.errorListTitle')
+                : t('auswertungen.importDialog.jobErrorListTitle')}
             </Typography>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               {errorRows.slice(0, MAX_VISIBLE_ERRORS).map((e, idx) => (
                 <li key={`${e.row_index}-${idx}`}>
-                  {t('auswertungen.importDialog.rowError', {
-                    row: e.row_index,
-                    reason: e.reason,
-                  })}
+                  {/* row_index 0/-1 marks a job-level entry — no row to name */}
+                  {e.row_index > 0
+                    ? t('auswertungen.importDialog.rowError', {
+                        row: e.row_index,
+                        reason: importRowErrorMessage(e, t),
+                      })
+                    : importRowErrorMessage(e, t)}
                 </li>
               ))}
             </ul>
@@ -658,7 +665,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                     <li key={`${e.row_index}-${e.reason}`}>
                       {t('auswertungen.importDialog.rowError', {
                         row: e.row_index,
-                        reason: e.reason,
+                        reason: importRowErrorMessage(e, t),
                       })}
                     </li>
                   ))}

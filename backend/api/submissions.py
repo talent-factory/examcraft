@@ -90,12 +90,23 @@ _STRICT_OUT = ConfigDict(extra="forbid")
 
 
 class ImportRowErrorOut(BaseModel):
+    """One ``error_log`` row, in the ADR 0005 shape: ``reason`` is the sentence
+    in the caller's language, ``error_code``/``error_params`` sit beside it.
+
+    There used to be a ``details`` dict here. Nothing in any frontend read it,
+    and it was the one field through which operator data (traceback,
+    exception class, diagnostic) could reach the client — a deny-list in
+    ``_import_job_to_out`` was all that kept it out. It is gone (TF-971);
+    those values stay in the DB row and the log.
+    """
+
     model_config = _STRICT_OUT
 
     row_index: int
     reason: str
     step: str | None = None
-    details: dict[str, Any] | None = None
+    error_code: str | None = None
+    error_params: dict[str, str | int] | None = None
 
 
 class ImportPayloadStudentOut(BaseModel):
@@ -373,7 +384,9 @@ def _reject_driver_without_upload_body(driver_name: str, *, locale: str) -> None
         raise api_error(422, "submissions_import_driver_unknown", locale)
 
 
-def _import_payload_to_preview(payload, *, max_rows: int = 50) -> ImportPreviewOut:
+def _import_payload_to_preview(
+    payload, *, locale: str, max_rows: int = 50
+) -> ImportPreviewOut:
     """Map internal ImportPayload → API schema. Truncates large lists for
     preview but flags it via ``truncated`` so the frontend can warn."""
     return ImportPreviewOut(
@@ -398,8 +411,14 @@ def _import_payload_to_preview(payload, *, max_rows: int = 50) -> ImportPreviewO
             for a in payload.attempts[:max_rows]
         ],
         warnings=list(payload.warnings),
+        # A row error with a code carries log text in ``reason`` — answered
+        # with the translation of the code, as in ``_import_job_to_out``.
         errors=[
-            ImportRowErrorOut(row_index=e.row_index, reason=e.reason)
+            ImportRowErrorOut(
+                row_index=e.row_index,
+                reason=translate(e.code, locale) if e.code else e.reason,
+                error_code=e.code,
+            )
             for e in payload.errors
         ],
         source_metadata=payload.source_metadata,
@@ -505,23 +524,34 @@ def _enqueue_import(
     return job
 
 
+# Steps of the job-level entries the worker and the watchdogs wrote without a
+# code before TF-971. Their ``reason`` is log text — an exception class and
+# message, or a German operator sentence — so a row still in the DB from then
+# is answered with the code it would get today, never with its ``reason``.
+_LEGACY_UNCODED_STEPS: dict[str, str] = {
+    "watchdog": "submissions_import_interrupted",
+    "reaper": "submissions_import_interrupted",
+}
+_LEGACY_UNCODED_FALLBACK = "submissions_import_internal_error"
+# The one row-level sentence that was not fixed: ``_persist_attempts`` used to
+# append the violated constraint (or the exception class) after this prefix.
+_LEGACY_PERSIST_ROW_PREFIX = "DB-Fehler beim Persistieren des Attempts"
+
+
 def _import_job_to_out(job: ImportJob, *, locale: str) -> ImportJobOut:
     """Map the persisted ``error_log`` to the response, translating as needed.
 
-    A job-level failure recorded by ``ImportService._fail_job``, and a
-    per-submission grading crash recorded by ``_finalise_job``, both carry a
-    ``code``/``params`` pair (same split as ``_import_error``) because the
-    async commit path can fail with the very same coded exceptions the
-    synchronous preview does — so it is translated here exactly like
-    ``api_error()`` translates them for the synchronous response, instead of
-    ever putting the stored diagnostic sentence on the wire. Entries without
-    a ``code`` are the row-level ``payload.errors`` a driver writes as a
-    fixed, safe German sentence — with one known pre-existing exception,
-    ``_persist_attempts``'s "unexpected IntegrityError" row error, which puts
-    a raw constraint/exception-class name in ``reason`` (tracked separately,
-    out of this review's scope). ``details.diagnostic``/``details.traceback``/
-    ``details.exception_type`` are operator/DB-only and are stripped here
-    regardless of origin (TF-773 PR 2c review).
+    Every job-level entry — ``ImportService._fail_job``, the grading crashes
+    from ``_finalise_job``, the Celery task's terminal write, the two
+    watchdogs — carries a ``code``/``params`` pair (same split as
+    ``_import_error``), and ``reason`` is the translation of that code; the
+    stored diagnostic never goes on the wire (TF-773 PR 2c, TF-971). Entries
+    without a ``code`` and without a ``step`` are the row-level
+    ``payload.errors`` a driver writes as a fixed, safe German sentence; they
+    pass through. An entry with a ``step`` but no ``code`` predates TF-971 and
+    gets a code here (``_LEGACY_UNCODED_STEPS``), and so does the old
+    ``_persist_attempts`` row error that named a constraint
+    (``_LEGACY_PERSIST_ROW_PREFIX``).
     """
     raw_log = job.error_log or []
     structured = []
@@ -529,28 +559,35 @@ def _import_job_to_out(job: ImportJob, *, locale: str) -> ImportJobOut:
         if not isinstance(entry, dict):
             continue
         code = entry.get("code")
-        params = entry.get("params")
-        reason = (
-            translate(code, locale, **(params if isinstance(params, dict) else {}))
-            if code
-            else str(entry.get("reason") or "")
-        )
-        raw_details = entry.get("details")
-        details = (
+        step = entry.get("step")
+        if not code and step:
+            code = _LEGACY_UNCODED_STEPS.get(step, _LEGACY_UNCODED_FALLBACK)
+        elif not code and str(entry.get("reason") or "").startswith(
+            _LEGACY_PERSIST_ROW_PREFIX
+        ):
+            code = "submissions_import_row_persist_failed"
+        raw_params = entry.get("params") if code else None
+        params = (
             {
                 k: v
-                for k, v in raw_details.items()
-                if k not in ("diagnostic", "traceback", "exception_type")
+                for k, v in raw_params.items()
+                if isinstance(v, (str, int)) and not isinstance(v, bool)
             }
-            if isinstance(raw_details, dict)
-            else None
+            if isinstance(raw_params, dict)
+            else {}
+        )
+        reason = (
+            translate(code, locale, **params)
+            if code
+            else str(entry.get("reason") or "")
         )
         structured.append(
             ImportRowErrorOut(
                 row_index=int(entry.get("row_index", 0) or 0),
                 reason=reason,
-                step=entry.get("step"),
-                details=details or None,
+                step=step,
+                error_code=code or None,
+                error_params=params or None,
             )
         )
     return ImportJobOut(
@@ -618,7 +655,7 @@ async def import_preview(
         # says (TF-773 PR 2c).
         raise api_error(500, "submissions_import_internal_error", locale)
 
-    return _import_payload_to_preview(payload)
+    return _import_payload_to_preview(payload, locale=locale)
 
 
 @router.post("/import/commit", response_model=ImportJobOut, status_code=202)
@@ -1032,7 +1069,7 @@ async def import_api_preview(
         )
         raise api_error(500, "submissions_import_internal_error", locale)
 
-    return _import_payload_to_preview(payload)
+    return _import_payload_to_preview(payload, locale=locale)
 
 
 @router.post("/import/api-commit", response_model=ImportJobOut, status_code=202)

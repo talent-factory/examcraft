@@ -976,7 +976,7 @@ def test_enqueue_still_returns_503_when_failure_persist_also_fails() -> None:
 def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     """ImportJob.error_log on the wire must be ``list[ImportRowErrorOut]``
     (frontend type) not ``list[dict]`` — so a row error has typed
-    row_index/reason/step/details fields."""
+    row_index/reason/step/error_code/error_params fields."""
     json_with_bad_row = json.dumps(
         [
             [
@@ -1020,8 +1020,15 @@ def test_error_log_serialises_as_structured_list(test_db: Session) -> None:
     assert body["status"] == "partial"
     assert body["error_log"], "error_log must not be empty"
     entry = body["error_log"][0]
-    # Strict-mode pydantic enforces these keys
-    assert {"row_index", "reason", "step", "details"} <= set(entry.keys())
+    # Strict-mode pydantic enforces these keys. ``details`` is gone (TF-971):
+    # it was the one field operator data could ride out on.
+    assert set(entry.keys()) == {
+        "row_index",
+        "reason",
+        "step",
+        "error_code",
+        "error_params",
+    }
     assert isinstance(entry["row_index"], int)
     assert isinstance(entry["reason"], str)
 
@@ -1036,7 +1043,8 @@ def test_grading_crash_never_reaches_the_polling_response(
     exactly the raw-exception-on-a-teacher's-screen class of bug this PR
     closed for the job-level ``_fail_job`` path. This pins the analogous fix
     for the per-submission grading path: the polling response gets the
-    generic, translated ``submissions_import_internal_error`` sentence, the
+    translated ``submissions_import_grading_failed`` sentence (its own code
+    since TF-971, ``submissions_import_internal_error`` before), the
     exception's own text (``RuntimeError: …``) and its traceback stay in
     ``job.error_log`` for operator/DB triage but never reach
     ``GET /import-jobs/{id}`` (TF-773 PR 2c review).
@@ -1075,12 +1083,12 @@ def test_grading_crash_never_reaches_the_polling_response(
     wire_grading_entries = [e for e in body["error_log"] if e.get("step") == "grading"]
     assert wire_grading_entries
     for entry in wire_grading_entries:
+        assert entry["error_code"] == "submissions_import_grading_failed"
         assert entry["reason"] == (
-            "Der Import ist an einem internen Fehler gescheitert. "
-            "Bitte versuche es erneut oder wende dich an den Support."
+            "Eine Abgabe wurde importiert, konnte aber nicht automatisch "
+            "bewertet werden. Bitte wende dich an den Support."
         )
-        assert entry["details"] is None or "traceback" not in entry["details"]
-        assert entry["details"] is None or "diagnostic" not in entry["details"]
+        assert "details" not in entry
 
 
 def test_job_level_failure_never_reaches_the_polling_response(test_db: Session) -> None:
@@ -1127,12 +1135,12 @@ def test_job_level_failure_never_reaches_the_polling_response(test_db: Session) 
     assert "Expecting value" not in serialised
 
     entry = body["error_log"][0]
+    assert entry["error_code"] == "submissions_import_file_not_json"
     assert entry["reason"] == (
         "Die Datei ist kein gültiges JSON. Bitte prüfe, ob du den "
         "JSON-Export aus Moodle gewählt hast."
     )
-    assert entry["details"] is None or "traceback" not in entry["details"]
-    assert entry["details"] is None or "diagnostic" not in entry["details"]
+    assert "details" not in entry
 
 
 def test_preview_422_renders_the_translated_sentence_not_the_service_text(

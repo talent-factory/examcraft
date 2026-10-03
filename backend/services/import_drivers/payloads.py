@@ -64,6 +64,10 @@ class ImportRowError(BaseModel):
 
     row_index: int
     reason: str
+    # Set where ``reason`` is a log text rather than a sentence for the
+    # teacher; the preview and the import-job response then translate the
+    # code instead (TF-971). Driver row errors leave it unset.
+    code: str | None = None
 
 
 class ImportPayload(BaseModel):
