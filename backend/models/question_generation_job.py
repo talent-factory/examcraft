@@ -28,7 +28,11 @@ class QuestionGenerationJob(Base):
     user_id = Column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    # TF-972: timezone-aware, so the API serializes it with an offset and the
+    # browser shows local time.
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
     topic = Column(String, nullable=True)
     question_count = Column(Integer, nullable=True)
     status = Column(String, default="PENDING", server_default="PENDING", nullable=False)

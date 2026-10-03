@@ -972,7 +972,7 @@ async def get_active_tasks(
 
     from tasks.question_tasks import _try_update_job_status
 
-    # created_at is timezone-aware (UTC) — use aware cutoffs
+    # created_at is timestamptz since TF-972 — use aware cutoffs
     now = datetime.now(timezone.utc)
     cutoff = now - ACTIVE_TASK_MAX_AGE
     completed_cutoff = now - COMPLETED_TASK_MAX_AGE
