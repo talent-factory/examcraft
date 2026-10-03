@@ -34,11 +34,13 @@ from utils.auth_utils import get_current_user, get_current_active_user
 # ---------------------------------------------------------------------------
 
 
-def _make_institution(db: Session, slug: str) -> Institution:
+def _make_institution(
+    db: Session, slug: str, *, tier: str = "professional"
+) -> Institution:
     inst = Institution(
         name=f"RQ-{slug}",
         slug=f"rq-{slug}",
-        subscription_tier="professional",
+        subscription_tier=tier,
         max_users=10,
         max_documents=100,
         max_questions_per_month=1000,
@@ -337,6 +339,41 @@ def test_bulk_approve_by_grade_ids(test_db: Session) -> None:
     )
     assert response.status_code == 200, response.text
     assert response.json()["approved_count"] == 2
+
+
+@pytest.mark.parametrize(
+    ("tier", "allowed"),
+    [
+        ("free", False),
+        ("starter", False),
+        ("professional", True),
+        ("enterprise", True),
+    ],
+)
+def test_bulk_approve_tier_gate(test_db: Session, tier: str, allowed: bool) -> None:
+    """TF-970: bulk-approve is Pro+ (``review_bulk`` in ``_TIER_LIMITS``).
+    Below that the endpoint answers 402 before touching a grade."""
+    inst = _make_institution(test_db, f"bulktier-{tier}", tier=tier)
+    user = _make_user(test_db, inst, email=f"bulktier-{tier}@rq.org")
+    exam, grades = _seed_exam_with_proposed_grades(test_db, inst, count=2)
+    client = _client(test_db, user)
+
+    response = client.post(
+        "/api/v1/grades/bulk-approve",
+        json={"exam_id": exam.id, "grade_ids": [g.id for g in grades]},
+    )
+
+    if allowed:
+        assert response.status_code == 200, response.text
+        assert response.json()["approved_count"] == 2
+        return
+    assert response.status_code == 402, response.text
+    body = response.json()
+    assert body["detail"]["error_code"] == "auswertung_review_bulk_pro_only"
+    assert body["error_code"] == "auswertung_review_bulk_pro_only"
+    for grade in grades:
+        test_db.refresh(grade)
+        assert grade.status == GradeStatus.PROPOSED.value
 
 
 def test_bulk_approve_rejects_both_filters(test_db: Session) -> None:

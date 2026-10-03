@@ -37,11 +37,14 @@ def _clear_overrides_after_each_test():
 # ---------------------------------------------------------------------------
 
 
-def _make_institution(db: Session, slug: str = "tf335") -> Institution:
+def _make_institution(
+    db: Session, slug: str = "tf335", *, tier: str = "enterprise"
+) -> Institution:
     inst = Institution(
         name=f"Inst-{slug}",
         slug=slug,
-        subscription_tier="professional",
+        # Custom grading schemes are Enterprise-only (TF-970).
+        subscription_tier=tier,
         max_users=10,
         max_documents=100,
         max_questions_per_month=1000,
@@ -578,3 +581,123 @@ def test_delete_institution_default_returns_409(test_db: Session) -> None:
     response = client.delete(f"/api/v1/grading-schemes/{scheme.id}")
     assert response.status_code == 409
     assert "default" in response.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Tier gate (TF-970)
+# ---------------------------------------------------------------------------
+
+
+_BELOW_ENTERPRISE = ("free", "starter", "professional")
+
+
+def _own_scheme(db: Session, institution_id: int, name: str) -> GradingScheme:
+    scheme = GradingScheme(
+        institution_id=institution_id,
+        name=name,
+        display_format="numeric",
+        config=_custom_config(),
+    )
+    db.add(scheme)
+    db.flush()
+    return scheme
+
+
+@pytest.mark.parametrize("tier", _BELOW_ENTERPRISE)
+def test_create_below_enterprise_returns_402(test_db: Session, tier: str) -> None:
+    inst = _make_institution(test_db, slug=f"gs-tier-c-{tier}", tier=tier)
+    user = _make_user_with_perms(
+        test_db, inst.id, permissions=["grading_schemes:manage"]
+    )
+    test_db.commit()
+
+    response = _client(test_db, user).post(
+        "/api/v1/grading-schemes",
+        json={
+            "name": "Eigenes",
+            "display_format": "pass_fail",
+            "config": _custom_config(),
+        },
+    )
+    assert response.status_code == 402, response.text
+    assert response.json()["detail"]["error_code"] == (
+        "auswertung_custom_grading_schemes_enterprise_only"
+    )
+    assert (
+        test_db.query(GradingScheme)
+        .filter(GradingScheme.institution_id == inst.id)
+        .count()
+        == 0
+    )
+
+
+def test_create_enterprise_passes_tier_gate(test_db: Session) -> None:
+    inst = _make_institution(test_db, slug="gs-tier-c-ent", tier="enterprise")
+    user = _make_user_with_perms(
+        test_db, inst.id, permissions=["grading_schemes:manage"]
+    )
+    test_db.commit()
+
+    response = _client(test_db, user).post(
+        "/api/v1/grading-schemes",
+        json={
+            "name": "Eigenes",
+            "display_format": "pass_fail",
+            "config": _custom_config(),
+        },
+    )
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.parametrize("tier", _BELOW_ENTERPRISE)
+def test_update_below_enterprise_returns_402(test_db: Session, tier: str) -> None:
+    """An institution that dropped below Enterprise keeps its schemes but
+    can no longer edit them."""
+    inst = _make_institution(test_db, slug=f"gs-tier-u-{tier}", tier=tier)
+    user = _make_user_with_perms(
+        test_db, inst.id, permissions=["grading_schemes:manage"]
+    )
+    own = _own_scheme(test_db, inst.id, "Original")
+    test_db.commit()
+
+    response = _client(test_db, user).patch(
+        f"/api/v1/grading-schemes/{own.id}", json={"name": "Renamed"}
+    )
+    assert response.status_code == 402, response.text
+    assert response.json()["detail"]["error_code"] == (
+        "auswertung_custom_grading_schemes_enterprise_only"
+    )
+    test_db.refresh(own)
+    assert own.name == "Original"
+
+
+def test_update_enterprise_passes_tier_gate(test_db: Session) -> None:
+    inst = _make_institution(test_db, slug="gs-tier-u-ent", tier="enterprise")
+    user = _make_user_with_perms(
+        test_db, inst.id, permissions=["grading_schemes:manage"]
+    )
+    own = _own_scheme(test_db, inst.id, "Original")
+    test_db.commit()
+
+    response = _client(test_db, user).patch(
+        f"/api/v1/grading-schemes/{own.id}", json={"name": "Renamed"}
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_read_and_delete_stay_open_below_enterprise(test_db: Session) -> None:
+    """Deliberately ungated: the exam composer lists schemes in every tier,
+    and a downgraded institution must be able to remove what it can no
+    longer edit."""
+    inst = _make_institution(test_db, slug="gs-tier-rd", tier="professional")
+    user = _make_user_with_perms(
+        test_db, inst.id, permissions=["grading_schemes:manage"]
+    )
+    own = _own_scheme(test_db, inst.id, "Altbestand")
+    test_db.commit()
+    scheme_id = own.id
+    client = _client(test_db, user)
+
+    assert client.get("/api/v1/grading-schemes").status_code == 200
+    assert client.get(f"/api/v1/grading-schemes/{scheme_id}").status_code == 200
+    assert client.delete(f"/api/v1/grading-schemes/{scheme_id}").status_code == 204

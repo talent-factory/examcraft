@@ -40,6 +40,7 @@ from models.exam import Exam
 from models.grading_scheme import GradingScheme, GradingSchemeConfig
 from utils.auth_utils import require_permission, get_current_active_user
 from services.audit_service import AuditService
+from services.auswertung_quotas import assert_custom_grading_schemes_allowed
 from errors import api_error
 from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
@@ -257,6 +258,8 @@ async def create_grading_scheme(
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
     locale = get_request_locale(request, current_user)
+    # Tier gate: custom grading schemes are Enterprise-only (TF-970).
+    assert_custom_grading_schemes_allowed(current_user)
     if current_user.institution_id is None:
         raise api_error(400, "grading_schemes_institution_required", locale)
 
@@ -312,6 +315,9 @@ async def update_grading_scheme(
     db: Session = Depends(get_db),
 ) -> GradingSchemeOut:
     locale = get_request_locale(request, current_user)
+    # Tier gate as on create. Delete stays open so an institution that
+    # dropped below Enterprise can still clean up its own schemes.
+    assert_custom_grading_schemes_allowed(current_user)
     scheme = _load_scheme_for_user(
         db=db, user=current_user, scheme_id=scheme_id, for_write=True, locale=locale
     )

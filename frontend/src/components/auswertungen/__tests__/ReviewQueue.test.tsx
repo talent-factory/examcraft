@@ -16,18 +16,23 @@ import {
 } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router-dom';
 
 import ReviewQueue from '../ReviewQueue';
 import { AppError } from '../../../errors';
 import { GradesService } from '../../../services/gradesService';
+import { ApiError } from '../../../services/submissionsService';
 import { ReviewQueue as ReviewQueueData } from '../../../types/submission';
 
 jest.mock('../../../services/gradesService');
 const mockGradesService = GradesService as jest.Mocked<typeof GradesService>;
 
 const theme = createTheme();
+// MemoryRouter: QuotaBanner (bulk-approve 402) navigates to /billing.
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider theme={theme}>{children}</ThemeProvider>
+  <MemoryRouter>
+    <ThemeProvider theme={theme}>{children}</ThemeProvider>
+  </MemoryRouter>
 );
 
 const baseQueue: ReviewQueueData = {
@@ -227,6 +232,61 @@ describe('ReviewQueue', () => {
       });
     });
     confirmSpy.mockRestore();
+  });
+
+  // TF-970: bulk-approve is Pro+; a 402 shows the upgrade banner instead of
+  // the generic action-failure snackbar.
+  it('shows the tier banner when bulk-approve is rejected with 402', async () => {
+    mockGradesService.bulkApprove.mockRejectedValue(
+      new ApiError({
+        kind: 'permission',
+        status: 402,
+        message: 'Request failed (402)',
+        detail: {
+          error_code: 'auswertung_review_bulk_pro_only',
+          message: 'ROHER BACKEND-TEXT',
+          tier: 'starter',
+          upgrade_to: 'professional',
+        },
+        errorCode: 'auswertung_review_bulk_pro_only',
+      }),
+    );
+    renderQueue();
+    fireEvent.click(await screen.findByTestId('select-11'));
+    fireEvent.click(screen.getByTestId('bulk-apply-selection'));
+
+    const banner = await screen.findByTestId('quota-banner');
+    expect(banner).toHaveTextContent('Bulk-Review-Aktionen sind erst ab Professional verfügbar.');
+    expect(banner).not.toHaveTextContent('ROHER BACKEND-TEXT');
+    expect(screen.getByTestId('quota-banner-upgrade')).toBeInTheDocument();
+    expect(screen.queryByText('Sammelfreigabe fehlgeschlagen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Aktion fehlgeschlagen.')).not.toBeInTheDocument();
+  });
+
+  it('blendet den Tier-Banner beim nächsten Bulk-Versuch aus', async () => {
+    mockGradesService.bulkApprove
+      .mockRejectedValueOnce(
+        new ApiError({
+          kind: 'permission',
+          status: 402,
+          message: 'Request failed (402)',
+          detail: {
+            error_code: 'auswertung_review_bulk_pro_only',
+            tier: 'starter',
+            upgrade_to: 'professional',
+          },
+        }),
+      )
+      .mockResolvedValueOnce({ approved_count: 1, grade_ids: [11] });
+    renderQueue();
+    fireEvent.click(await screen.findByTestId('select-11'));
+    fireEvent.click(screen.getByTestId('bulk-apply-selection'));
+    await screen.findByTestId('quota-banner');
+
+    fireEvent.click(screen.getByTestId('bulk-apply-selection'));
+
+    await waitFor(() => expect(mockGradesService.bulkApprove).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByTestId('quota-banner')).not.toBeInTheDocument());
   });
 
   it('bulk-approve aborts when user cancels the confirm dialog', async () => {

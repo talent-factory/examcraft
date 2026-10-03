@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
@@ -308,6 +309,85 @@ describe('GradingSchemeEditor — edit mode', () => {
     const alert = await screen.findByTestId('gs-editor-error');
     expect(alert).toHaveTextContent('Grading-Scheme-Update verletzt eine Eindeutigkeit');
     expect(alert).not.toHaveTextContent('ROHER BACKEND-TEXT');
+  });
+
+  // TF-970: custom grading schemes are Enterprise-only; the 402 must reach
+  // the upgrade banner, not the generic save-failure sentence.
+  it.each([
+    ['create', null],
+    ['update', makeScheme()],
+  ] as const)('shows the tier banner when %s is rejected with 402', async (op, scheme) => {
+    const { ApiError } = jest.requireActual('../../../services/submissionsService');
+    const quotaError = new ApiError({
+      kind: 'permission',
+      status: 402,
+      message: 'Request failed (402)',
+      detail: {
+        error_code: 'auswertung_custom_grading_schemes_enterprise_only',
+        message: 'ROHER BACKEND-TEXT',
+        tier: 'professional',
+        upgrade_to: 'enterprise',
+      },
+      errorCode: 'auswertung_custom_grading_schemes_enterprise_only',
+    });
+    mocked.create.mockRejectedValue(quotaError);
+    mocked.update.mockRejectedValue(quotaError);
+    const onSaved = jest.fn();
+
+    render(
+      <MemoryRouter>
+        <Wrapper>
+          <GradingSchemeEditor open scheme={scheme} onClose={noop} onSaved={onSaved} />
+        </Wrapper>
+      </MemoryRouter>,
+    );
+    if (op === 'create') {
+      fireEvent.change(screen.getByTestId('gs-field-name'), { target: { value: 'Eigenes' } });
+    }
+    fireEvent.click(screen.getByTestId('gs-editor-save'));
+
+    const banner = await screen.findByTestId('quota-banner');
+    expect(banner).toHaveTextContent('Eigene Notenmodelle sind Teil des Enterprise-Tiers.');
+    expect(banner).not.toHaveTextContent('ROHER BACKEND-TEXT');
+    expect(screen.getByTestId('quota-banner-upgrade')).toBeInTheDocument();
+    expect(screen.queryByTestId('gs-editor-error')).not.toBeInTheDocument();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('replaces the tier banner when the next save fails for another reason', async () => {
+    const { ApiError } = jest.requireActual('../../../services/submissionsService');
+    const scheme = makeScheme();
+    mocked.update
+      .mockRejectedValueOnce(
+        new ApiError({
+          kind: 'permission',
+          status: 402,
+          message: 'Request failed (402)',
+          detail: {
+            error_code: 'auswertung_custom_grading_schemes_enterprise_only',
+            tier: 'professional',
+            upgrade_to: 'enterprise',
+          },
+        }),
+      )
+      .mockRejectedValueOnce(
+        new ApiError({ kind: 'server', status: 500, message: 'x', detail: null, issues: [] }),
+      );
+
+    render(
+      <MemoryRouter>
+        <Wrapper>
+          <GradingSchemeEditor open scheme={scheme} onClose={noop} onSaved={noop} />
+        </Wrapper>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByTestId('gs-editor-save'));
+    await screen.findByTestId('quota-banner');
+
+    fireEvent.click(screen.getByTestId('gs-editor-save'));
+
+    await screen.findByTestId('gs-editor-error');
+    expect(screen.queryByTestId('quota-banner')).not.toBeInTheDocument();
   });
 
   it('renders the update fallback when the error carries no code', async () => {

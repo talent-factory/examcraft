@@ -1,5 +1,6 @@
 import { GradesService } from '../gradesService';
 import { AppError, isAppError } from '../../errors';
+import { isQuotaError } from '../../components/auswertungen/QuotaBanner';
 
 /**
  * Error path of `GradesService` (TF-772 PR 4). The file had no test at all.
@@ -119,5 +120,37 @@ describe('GradesService', () => {
     expect(err.code).toBe('grades_approve_failed');
     expect(err.status).toBeUndefined();
     expect(err.detail).toBe('Failed to fetch');
+  });
+
+  // TF-970: the tier-quota 402 keeps its nested `detail` so the review queue
+  // can render QuotaBanner; as an AppError the unregistered code would be
+  // dropped and the user would see "bulk-approve failed".
+  it('reicht einen Tier-402 als ApiError mit detail an den QuotaBanner weiter', async () => {
+    const detail = {
+      error_code: 'auswertung_review_bulk_pro_only',
+      message: 'Bulk-Aktionen …',
+      tier: 'starter',
+      upgrade_to: 'professional',
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(failing(402, { detail, error_code: 'auswertung_review_bulk_pro_only' }));
+
+    const err = await GradesService.bulkApprove({ examId: 7, gradeIds: [1] }).catch((e) => e);
+
+    expect(isAppError(err)).toBe(false);
+    expect(isQuotaError(err)).toBe(true);
+    expect(err.detail).toEqual(detail);
+    expect(err.errorCode).toBe('auswertung_review_bulk_pro_only');
+  });
+
+  // Only the quota envelope leaves the AppError path: a 402 without a nested
+  // `detail.error_code` (proxy, framework) keeps the operation's own code.
+  it('behandelt einen 402 ohne Quota-detail wie jeden anderen Fehler', async () => {
+    global.fetch = jest.fn().mockResolvedValue(failing(402, { detail: 'Payment Required' }));
+
+    expect((await thrownBy(GradesService.bulkApprove({ examId: 7, gradeIds: [1] }))).code).toBe(
+      'grades_bulk_approve_failed',
+    );
   });
 });

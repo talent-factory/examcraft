@@ -58,6 +58,8 @@ import {
 } from '../../types/gradingScheme';
 import { GradingSchemesService } from '../../services/gradingSchemesService';
 import { appErrorFromApiError, translateError } from '../../errors';
+import { ApiError } from '../../services/submissionsService';
+import QuotaBanner, { isQuotaError } from '../auswertungen/QuotaBanner';
 
 // ---------------------------------------------------------------------------
 // Local grade evaluator (mirrors backend grading_evaluator.py logic)
@@ -461,6 +463,9 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Custom grading schemes are Enterprise-only (TF-970): a 402 on save gets
+  // the upgrade banner instead of the generic save-failure sentence.
+  const [quotaError, setQuotaError] = useState<ApiError | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -479,6 +484,7 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
       setConfig(defaultConfigFor('linear'));
     }
     setError(null);
+    setQuotaError(null);
     setNameError(null);
   }, [open, scheme]);
 
@@ -509,6 +515,7 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
     if (!validate()) return;
     setSaving(true);
     setError(null);
+    setQuotaError(null);
     try {
       if (isEdit && scheme) {
         const payload: GradingSchemeUpdate = {
@@ -530,6 +537,10 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
       onSaved();
       onClose();
     } catch (err) {
+      if (isQuotaError(err)) {
+        setQuotaError(err);
+        return;
+      }
       setError(
         isEdit
           ? translateError(
@@ -564,6 +575,9 @@ const GradingSchemeEditor: React.FC<GradingSchemeEditorProps> = ({
 
       <DialogContent dividers>
         <Stack spacing={3} sx={{ pt: 1 }}>
+          {quotaError && (
+            <QuotaBanner error={quotaError} onDismiss={() => setQuotaError(null)} />
+          )}
           {error && (
             <Alert severity="error" data-testid="gs-editor-error">
               {error}

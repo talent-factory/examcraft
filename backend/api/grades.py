@@ -40,6 +40,7 @@ from models.submission import (
     Grade,
     Submission,
 )
+from services.auswertung_quotas import assert_review_bulk_allowed
 from services.grading_service import (
     GradeNotFoundError,
     GradingService,
@@ -385,8 +386,12 @@ async def bulk_approve(
     Multi-Tenancy: ``institution_id=current_user.institution_id`` ist
     Pflicht-Filter im Service — Tenant A kann selbst mit gefälschten
     Grade-IDs keine Grades von Tenant B approven.
+
+    Tier-Gate: erst ab Professional. 402 mit ``error_code`` für den
+    i18n-Banner, vor dem Exam-Lookup.
     """
     locale = get_request_locale(request, current_user)
+    assert_review_bulk_allowed(current_user)
     _ensure_exam_for_user(
         db=db, user=current_user, exam_id=payload.exam_id, locale=locale
     )

@@ -43,11 +43,13 @@ import {
 
 import { GradesService } from '../../services/gradesService';
 import { translateError } from '../../errors';
+import { ApiError } from '../../services/submissionsService';
 import { ReviewQueueItem } from '../../types/submission';
 import OverrideGradeDialog from './OverrideGradeDialog';
 import MarkdownRenderer from '../MarkdownRenderer';
 import AiNotice from '../common/AiNotice';
 import { reflowMoodleAnswer } from '../../utils/moodleAnswerReflow';
+import QuotaBanner, { isQuotaError } from './QuotaBanner';
 
 // Lower bound for the bulk confidence threshold: 0% would collect
 // all proposed grades, including the fail-soft stubs (confidence=0.0)
@@ -85,6 +87,9 @@ const ReviewQueue: React.FC<Props> = ({
   const [overrideItem, setOverrideItem] = useState<ReviewQueueItem | null>(null);
   const [snack, setSnack] = useState<string | null>(null);
   const [snackErr, setSnackErr] = useState<string | null>(null);
+  // Tier gate on bulk-approve (Pro+, TF-970): a 402 gets the upgrade banner
+  // instead of the generic action-failure snackbar.
+  const [quotaError, setQuotaError] = useState<ApiError | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -194,6 +199,7 @@ const ReviewQueue: React.FC<Props> = ({
       return;
     }
     setBulkBusy(true);
+    setQuotaError(null);
     try {
       const result = await GradesService.bulkApprove({
         examId,
@@ -206,7 +212,11 @@ const ReviewQueue: React.FC<Props> = ({
       );
       await reload();
     } catch (err) {
-      setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
+      if (isQuotaError(err)) {
+        setQuotaError(err);
+      } else {
+        setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
+      }
     } finally {
       setBulkBusy(false);
     }
@@ -215,6 +225,7 @@ const ReviewQueue: React.FC<Props> = ({
   const handleBulkBySelection = async () => {
     if (selected.size === 0) return;
     setBulkBusy(true);
+    setQuotaError(null);
     try {
       const result = await GradesService.bulkApprove({
         examId,
@@ -228,7 +239,11 @@ const ReviewQueue: React.FC<Props> = ({
       );
       await reload();
     } catch (err) {
-      setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
+      if (isQuotaError(err)) {
+        setQuotaError(err);
+      } else {
+        setSnackErr(translateError(err, t, 'auswertungen.exam.review.actionFailure'));
+      }
     } finally {
       setBulkBusy(false);
     }
@@ -331,6 +346,12 @@ const ReviewQueue: React.FC<Props> = ({
           </Stack>
         </CardContent>
       </Card>
+
+      {quotaError && (
+        <Box sx={{ mb: 2 }}>
+          <QuotaBanner error={quotaError} onDismiss={() => setQuotaError(null)} />
+        </Box>
+      )}
 
       {/* Bulk bar */}
       <Card variant="outlined" sx={{ mb: 2 }}>

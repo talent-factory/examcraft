@@ -10,10 +10,15 @@
  * see `errors/codes/grades.ts` for what that costs and why the fix belongs in
  * the backend. The shared helpers stayed behind with the services that still
  * use them: nothing here needs `ApiErrorKind` any more, because the consumers
- * distinguish failures by code, not by kind.
+ * distinguish failures by code, not by kind. The one exception is a tier-quota
+ * 402, which stays an `ApiError` for `QuotaBanner` (TF-970, see
+ * `quotaOrAppError` below).
  */
 
 import { AppError, AppErrorCode, appErrorFromResponse } from '../errors';
+import { ApiError, statusToKind } from './submissionsService';
+import { readErrorEnvelope } from './apiErrorBody';
+import { ErrorBody, readDetail, readParams, selectCode } from '../errors/errorBody';
 import {
   BulkApproveResult,
   GradeAction,
@@ -52,10 +57,64 @@ async function request(
     throw new AppError(code, err instanceof Error ? err.message : undefined);
   }
 
+  if (response.status === 402) {
+    throw await quotaOrAppError(response, code);
+  }
   if (!response.ok) {
     throw await appErrorFromResponse(response, code);
   }
   return response;
+}
+
+/**
+ * A tier-quota 402 (`assert_review_bulk_allowed`, TF-970) stays an `ApiError`.
+ *
+ * Its `error_code` lives nested in `detail` (pre-ADR-0005 quota envelope, see
+ * `QuotaBanner.tsx`) and is not registered as an `AppErrorCode`, so the
+ * `AppError` path would drop it and show the operation's generic failure
+ * sentence. As an `ApiError` carrying `detail`, the consumer can hand it to
+ * `isQuotaError` / `QuotaBanner` — the same contract `StudentClassesService`
+ * keeps for the class-history gate.
+ *
+ * A 402 without that envelope (a proxy, a framework default) is not a tier
+ * gate and ends as the operation's `AppError` like any other failure.
+ */
+async function quotaOrAppError(
+  response: Response,
+  code: AppErrorCode,
+): Promise<ApiError | AppError> {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Non-JSON 402 — falls through to the AppError below.
+  }
+  const envelope: ErrorBody = body && typeof body === 'object' ? (body as ErrorBody) : {};
+  const { detail } = envelope;
+  if (isQuotaDetail(detail)) {
+    return new ApiError({
+      kind: statusToKind(response.status),
+      status: response.status,
+      message: `Request failed (${response.status})`,
+      detail,
+      ...readErrorEnvelope(body),
+    });
+  }
+  return new AppError(
+    selectCode(envelope, code),
+    readDetail(envelope),
+    response.status,
+    readParams(envelope.error_params),
+  );
+}
+
+/** The nested shape `auswertung_quotas._http_402` sends; mirrors `isQuotaError`. */
+function isQuotaDetail(detail: unknown): boolean {
+  return (
+    !!detail &&
+    typeof detail === 'object' &&
+    typeof (detail as { error_code?: unknown }).error_code === 'string'
+  );
 }
 
 function buildQuery(filter: ReviewQueueFilter): string {

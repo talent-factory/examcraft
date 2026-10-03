@@ -83,7 +83,8 @@ export class ApiError extends Error {
  * gradeExportService.ts, moodleFeedbackPushService.ts.
  *
  * `gradesService.ts` dropped off that list in TF-772: it throws `AppError`
- * with a code per operation now and has no use for an `ApiErrorKind`. The
+ * with a code per operation now, and imports this function only for the
+ * tier-quota 402 it hands to `QuotaBanner` as an `ApiError` (TF-970). The
  * paragraph above keeps naming it, because the history of the divergent
  * copies is what explains why this function exists at all.
  */

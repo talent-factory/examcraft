@@ -44,7 +44,8 @@ def _institution(db: Session, slug: str = "tf502") -> Institution:
     inst = Institution(
         name=f"Inst-{slug}",
         slug=slug,
-        subscription_tier="professional",
+        # Custom grading schemes are Enterprise-only (TF-970).
+        subscription_tier="enterprise",
         max_users=10,
         max_documents=100,
         max_questions_per_month=1000,
