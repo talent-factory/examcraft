@@ -23,6 +23,27 @@ from utils.auth_utils import get_current_superuser, get_current_user
 _FAKE_ENDPOINT = "https://otel-collector.example.com"
 _FAKE_TEAM_API_KEY = "fake-team-api-key"  # pragma: allowlist secret
 
+# TF-1061: only for tests that assert real specula_client behaviour (its
+# scrubbing, its SpeculaLogHandler). Wiring tests mock the specula_client calls
+# and use _specula_client_available instead, so they also run in the public
+# core/ mirror, which never has the private package.
+requires_specula_client = pytest.mark.skipif(
+    not observability.SPECULA_CLIENT_AVAILABLE,
+    reason="TF-1061: prüft echtes specula-client-Verhalten, Paket nicht "
+    "installiert (just install-specula)",
+)
+
+
+@pytest.fixture
+def _specula_client_available(monkeypatch):
+    """Pretend specula_client is importable, independent of the venv.
+
+    Without the package _init(), instrument_app() and record_exception()
+    return before reaching the mocked calls: the tests below would then fail
+    or, worse, pass without exercising anything (TF-1061).
+    """
+    monkeypatch.setattr(observability, "SPECULA_CLIENT_AVAILABLE", True)
+
 
 class _FakeSpan:
     """Records set_attribute()/record_exception() calls, mirroring the
@@ -57,6 +78,7 @@ def _app_routers_registered():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_init_worker_observability_enables_celery_instrumentation(monkeypatch):
     """init_worker_observability() must wire Celery instrumentation so worker
     tasks are captured; init_observability() (API process) must not."""
@@ -75,6 +97,7 @@ def test_init_worker_observability_enables_celery_instrumentation(monkeypatch):
     assert captured["service_name"] == observability.SERVICE_NAME_WORKER
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_init_observability_does_not_enable_celery_instrumentation(monkeypatch):
     """The API-process init must not instrument Celery — that would double
     up with the worker's own instrumentation had it shared a process."""
@@ -93,6 +116,7 @@ def test_init_observability_does_not_enable_celery_instrumentation(monkeypatch):
     assert captured["service_name"] == observability.SERVICE_NAME_API
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_init_observability_noop_without_specula_team_api_key(monkeypatch):
     """Without SPECULA_TEAM_API_KEY, tracing must not initialize — this was
     the original bug: OTEL_EXPORTER_ENDPOINT (nee SENTRY_DSN) alone left
@@ -111,6 +135,7 @@ def test_init_observability_noop_without_specula_team_api_key(monkeypatch):
     assert calls["n"] == 0
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_init_observability_noop_without_otel_exporter_endpoint(monkeypatch):
     """Enable-guard other half: a team key alone must still be a no-op, so a
     misconfigured deploy never calls init_tracing() with a None endpoint."""
@@ -128,6 +153,7 @@ def test_init_observability_noop_without_otel_exporter_endpoint(monkeypatch):
     assert calls["n"] == 0
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 @pytest.mark.parametrize("environment", ["staging", "production"])
 def test_disabled_state_logs_warning_in_staging_and_production(
     monkeypatch, caplog, environment
@@ -147,6 +173,7 @@ def test_disabled_state_logs_warning_in_staging_and_production(
     assert matching[0].levelno == logging.WARNING
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 @pytest.mark.parametrize("environment", ["development", "test"])
 def test_disabled_state_logs_info_outside_staging_and_production(
     monkeypatch, caplog, environment
@@ -165,6 +192,7 @@ def test_disabled_state_logs_info_outside_staging_and_production(
     assert matching[0].levelno == logging.INFO
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 @pytest.mark.parametrize(
     "environment,expected_sample_rate",
     [("development", 1.0), ("staging", 0.1), ("production", 0.1)],
@@ -188,6 +216,7 @@ def test_init_tracing_sample_rate_by_environment(
     assert captured["sample_rate"] == expected_sample_rate
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_init_observability_survives_init_tracing_raising(monkeypatch, caplog):
     """Call-fail-open: an exception from specula_client.init_tracing() (bad
     endpoint, DNS failure, ...) must not prevent the process from finishing
@@ -210,6 +239,7 @@ def test_init_observability_survives_init_tracing_raising(monkeypatch, caplog):
     )
 
 
+@requires_specula_client
 def test_attach_log_handler_registers_speculaloghandler_at_error_level(monkeypatch):
     """Exercises _attach_log_handler() for real (not monkeypatched away, see
     the other tests in this module) -- the ERROR-level filter is the only
@@ -249,6 +279,7 @@ def test_attach_log_handler_registers_speculaloghandler_at_error_level(monkeypat
         root_logger.handlers = handlers_before
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_instrument_app_skips_instrumentation_when_disabled(monkeypatch):
     """instrument_app() must not even attempt instrument_fastapi_app() when
     unconfigured, rather than relying solely on that call's own no-op
@@ -267,6 +298,7 @@ def test_instrument_app_skips_instrumentation_when_disabled(monkeypatch):
     assert calls["n"] == 0
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_instrument_app_instruments_when_configured(monkeypatch):
     captured = {}
     monkeypatch.setattr(
@@ -284,6 +316,7 @@ def test_instrument_app_instruments_when_configured(monkeypatch):
     assert captured["specula_team_api_key"] == _FAKE_TEAM_API_KEY
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_instrument_app_survives_instrument_fastapi_app_raising(monkeypatch, caplog):
     def _boom(*a, **k):
         raise RuntimeError("instrumentation failed")
@@ -372,9 +405,15 @@ def test_set_span_tag_falls_back_when_str_raises(monkeypatch):
     assert fake_span.attributes["bad"] == "<unrepresentable value>"
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_record_exception_records_and_tags_span(monkeypatch):
     fake_span = _FakeSpan()
     monkeypatch.setattr(observability.trace, "get_current_span", lambda: fake_span)
+    # Pass-through scrubber: the real scrubbing is covered by
+    # test_record_exception_scrubs_sensitive_tags below.
+    monkeypatch.setattr(
+        observability, "scrub_pii", lambda value, *, extra_denylist=(): value
+    )
     exc = ValueError("boom")
 
     observability.record_exception(
@@ -386,6 +425,7 @@ def test_record_exception_records_and_tags_span(monkeypatch):
     assert fake_span.attributes["extra.topic"] == "Heapsort"
 
 
+@requires_specula_client
 def test_record_exception_scrubs_sensitive_tags(monkeypatch):
     """Unlike the retired global EventScrubber, record_exception() is the
     only line of defence against a caller passing a sensitive field through
@@ -404,6 +444,7 @@ def test_record_exception_scrubs_sensitive_tags(monkeypatch):
     assert fake_span.attributes["extra.api_key"] == "[REDACTED]"
 
 
+@pytest.mark.usefixtures("_specula_client_available")
 def test_record_exception_omits_tags_when_scrubbing_fails(monkeypatch):
     fake_span = _FakeSpan()
     monkeypatch.setattr(observability.trace, "get_current_span", lambda: fake_span)
@@ -674,6 +715,7 @@ def test_after_setup_logger_signal_reattaches_observability(monkeypatch):
     assert calls["n"] >= 1
 
 
+@requires_specula_client
 def test_worker_hijack_root_logger_does_not_lose_speculaloghandler(monkeypatch):
     """End-to-end regression guard for the actual production bug (TF-916):
     simulate Celery's worker_hijack_root_logger=True wipe (root.handlers = [])

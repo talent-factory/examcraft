@@ -50,10 +50,15 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # afterwards, and no risk of it persisting in a shipped image layer (this
 # stage's layers are discarded anyway; the runtime stage below only copies
 # the installed site-packages, not this stage's filesystem history).
+#
+# TF-1061: the version is pinned in specula-client.version (shared with CI and
+# `just install-specula`), copied in on its own so this layer stays cached.
+COPY core/backend/specula-client.version ./
 RUN --mount=type=secret,id=GITHUB_TOKEN \
     if [ -s /run/secrets/GITHUB_TOKEN ]; then \
         GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
-        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@v0.1.4"; \
+        SPECULA_CLIENT_VERSION=$(cat specula-client.version) && \
+        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@${SPECULA_CLIENT_VERSION}"; \
     fi
 
 # =========================

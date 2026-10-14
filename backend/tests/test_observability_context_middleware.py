@@ -10,11 +10,12 @@ scope.
 
 from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import middleware.observability_context as observability_context_module
-from config.observability import EXTRA_PII_DENYLIST
+from config.observability import EXTRA_PII_DENYLIST, SPECULA_CLIENT_AVAILABLE
 from middleware.observability_context import ObservabilityContextMiddleware
 
 
@@ -87,6 +88,11 @@ def test_sets_user_attributes_when_authenticated(monkeypatch):
     assert fake_span.attributes["enduser.username"] == "alice"
 
 
+@pytest.mark.skipif(
+    not SPECULA_CLIENT_AVAILABLE,
+    reason="TF-1061: prüft das echte scrub_pii() aus specula-client, Paket "
+    "nicht installiert (just install-specula)",
+)
 def test_query_params_with_default_denylist_terms_are_scrubbed(monkeypatch):
     """Sensitive query params (matched via specula_client's DEFAULT_DENYLIST,
     e.g. the "password" substring) must never reach the observability backend

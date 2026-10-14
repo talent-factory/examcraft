@@ -64,10 +64,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # The token is embedded directly in the pip install URL argument, not
 # written to disk via `git config --global` -- nothing to clean up
 # afterwards, and no risk of it persisting in a shipped image layer.
+#
+# TF-1061: the version is pinned in specula-client.version (shared with CI and
+# `just install-specula`), copied in on its own so this layer stays cached.
+COPY backend/specula-client.version .
 RUN --mount=type=secret,id=GITHUB_TOKEN \
     if [ -s /run/secrets/GITHUB_TOKEN ]; then \
         GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
-        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@v0.1.4"; \
+        SPECULA_CLIENT_VERSION=$(cat specula-client.version) && \
+        pip install --no-cache-dir "specula-client[fastapi,celery] @ git+https://${GITHUB_TOKEN}@github.com/talent-factory/specula-client-python.git@${SPECULA_CLIENT_VERSION}"; \
     fi
 
 # Install additional dependencies from pyproject.toml (qdrant-client, sentence-transformers, etc.)
