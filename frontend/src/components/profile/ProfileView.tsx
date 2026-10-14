@@ -211,14 +211,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
             </div>
           </div>
 
-          {/* Last Login */}
-          {user.last_login && (
+          {/* Last Login -- the previous one; last_login_at is this session */}
+          {user.previous_login_at && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {t('profile.profileView.lastLogin')}
               </label>
               <p className="text-gray-900">
-                {new Date(user.last_login).toLocaleString(getDateLocale(i18n.language))}
+                {new Date(user.previous_login_at).toLocaleString(getDateLocale(i18n.language))}
               </p>
             </div>
           )}

@@ -304,6 +304,9 @@ class User(Base):
 
     # Security
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+    # The login before last_login_at -- what the profile shows, since
+    # last_login_at is always the current session (TF-1060)
+    previous_login_at = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String(45), nullable=True)  # IPv6 support
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     last_failed_login = Column(DateTime(timezone=True), nullable=True)

@@ -183,6 +183,8 @@ class UserProfileResponse(BaseModel):
     preferred_language: Optional[str] = None
     roles: list[RoleResponse]
     created_at: str
+    # The login before the current one (TF-1060); None on the first login
+    previous_login_at: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -383,6 +385,12 @@ async def register(
         logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
         # Don't fail registration if email fails
 
+    # Registration logs the user in -- track it like any other login;
+    # create_tokens_for_user commits it
+    AuthService.record_login(
+        user, http_request.client.host if http_request.client else None
+    )
+
     # Create tokens (user can login but features limited until verified)
     tokens = AuthService.create_tokens_for_user(
         user,
@@ -503,8 +511,9 @@ async def login(
     user.failed_login_attempts = 0
     user.last_failed_login = None
     # Track login
-    user.last_login_at = func.now()
-    user.last_login_ip = http_request.client.host if http_request.client else None
+    AuthService.record_login(
+        user, http_request.client.host if http_request.client else None
+    )
 
     # Sync tier_quotas → Institution.max_* fields on every login
     from utils.tenant_utils import sync_institution_quotas
@@ -706,6 +715,9 @@ async def get_current_user_profile(
         preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
+        previous_login_at=current_user.previous_login_at.isoformat()
+        if current_user.previous_login_at
+        else None,
     )
 
 
@@ -792,6 +804,9 @@ async def update_current_user_profile(
         preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
+        previous_login_at=current_user.previous_login_at.isoformat()
+        if current_user.previous_login_at
+        else None,
     )
 
 
@@ -1421,8 +1436,9 @@ async def oauth_callback(
 
         # Track OAuth login (separate commit — find_or_create already committed internally)
         try:
-            user.last_login_at = func.now()
-            user.last_login_ip = request.client.host if request.client else None
+            AuthService.record_login(
+                user, request.client.host if request.client else None
+            )
             db.commit()
         except Exception as e:
             logger.error(

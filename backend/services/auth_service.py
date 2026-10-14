@@ -186,6 +186,24 @@ class AuthService:
             return None
 
     @staticmethod
+    def record_login(user: User, ip_address: Optional[str]) -> None:
+        """
+        Stamp a successful login on the user (caller commits)
+
+        Shifts the current last_login_at to previous_login_at first: by the
+        time the frontend loads /auth/me, last_login_at is already this very
+        login, so the profile shows previous_login_at (TF-1060). Every path
+        that issues tokens for a login must call this.
+
+        Args:
+            user: User who just logged in
+            ip_address: Client IP address
+        """
+        user.previous_login_at = user.last_login_at
+        user.last_login_at = datetime.now(timezone.utc)
+        user.last_login_ip = ip_address
+
+    @staticmethod
     def create_tokens_for_user(
         user: User,
         db: Session,

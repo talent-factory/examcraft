@@ -93,12 +93,8 @@ def active_user(test_db, test_institution, test_role):
 class TestLoginTracking:
     def test_login_sets_last_login_at(self, test_db, active_user):
         """After successful login, last_login_at must be set."""
-        from sqlalchemy import func
-
         assert active_user.last_login_at is None
-        active_user.failed_login_attempts = 0
-        active_user.last_login_at = func.now()
-        active_user.last_login_ip = "127.0.0.1"
+        AuthService.record_login(active_user, "127.0.0.1")
         test_db.commit()
         test_db.refresh(active_user)
         assert active_user.last_login_at is not None
@@ -108,8 +104,6 @@ class TestLoginTracking:
 class TestOAuthLoginTracking:
     def test_oauth_login_sets_last_login_at(self, test_db, test_institution, test_role):
         """After OAuth login, last_login_at and last_login_ip must be set."""
-        from sqlalchemy import func
-
         user = User(
             email="oauth-track@test.ch",
             first_name="OAuth",
@@ -123,8 +117,7 @@ class TestOAuthLoginTracking:
         test_db.commit()
         test_db.refresh(user)
         assert user.last_login_at is None
-        user.last_login_at = func.now()
-        user.last_login_ip = "10.0.0.1"
+        AuthService.record_login(user, "10.0.0.1")
         test_db.commit()
         test_db.refresh(user)
         assert user.last_login_at is not None

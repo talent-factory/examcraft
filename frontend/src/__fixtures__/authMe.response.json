@@ -1,0 +1,32 @@
+{
+  "id": 1,
+  "email": "test@example.com",
+  "first_name": "Test",
+  "last_name": "User",
+  "status": "active",
+  "is_superuser": false,
+  "is_email_verified": true,
+  "institution_id": 1,
+  "institution_name": "Test University",
+  "institution": {
+    "id": 1,
+    "name": "Test University",
+    "subscription_tier": "free"
+  },
+  "oauth_provider": null,
+  "avatar_url": null,
+  "preferred_language": "de",
+  "roles": [
+    {
+      "id": 2,
+      "name": "dozent",
+      "display_name": "Dozent",
+      "description": "Can create and manage questions",
+      "permissions": ["create_questions", "view_questions"],
+      "is_system_role": true,
+      "created_at": "2026-01-01T00:00:00+00:00"
+    }
+  ],
+  "created_at": "2026-01-15T09:00:00+00:00",
+  "previous_login_at": "2026-09-30T14:05:00+00:00"
+}

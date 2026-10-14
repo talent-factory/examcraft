@@ -87,7 +87,7 @@ export interface User {
   is_email_verified: boolean;  // Email verification status
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
-  last_login?: string;
+  previous_login_at?: string | null;  // Login before the current one (TF-1060)
   created_at: string;
   updated_at?: string;
   preferred_language?: SupportedLanguage;
@@ -193,7 +193,7 @@ export interface UserResponse {
   is_email_verified: boolean;  // Email verification status
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
-  last_login?: string;
+  previous_login_at?: string | null;  // Login before the current one (TF-1060)
   created_at: string;
   preferred_language?: SupportedLanguage;
 }
@@ -259,19 +259,6 @@ export interface OAuthCallbackParams {
 // ============================================================================
 // Admin Types
 // ============================================================================
-
-export interface UserListItem {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  institution_id: number;
-  institution_name: string;
-  roles: string[];
-  status: UserStatus;
-  last_login?: string;
-  created_at: string;
-}
 
 export interface CreateUserRequest {
   email: string;
