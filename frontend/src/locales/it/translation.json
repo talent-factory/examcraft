@@ -1006,9 +1006,7 @@
         "columnLastJob": "Ultima attività",
         "noJob": "Non ancora caricato",
         "delete": "Elimina",
-        "deleteBlocked": "L'eliminazione sarà possibile al termine dell'attività in corso.",
-        "rowsPerPage": "Righe per pagina",
-        "displayedRows": "{{from}}–{{to}} di {{count}}"
+        "deleteBlocked": "L'eliminazione sarà possibile al termine dell'attività in corso."
       },
       "templates": {
         "title": "Modelli di portfolio",

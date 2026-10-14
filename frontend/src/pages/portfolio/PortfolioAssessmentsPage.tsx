@@ -416,10 +416,6 @@ const PortfolioAssessmentsPage: React.FC = () => {
               setRowsPerPage(Number(e.target.value));
               setPage(0);
             }}
-            labelRowsPerPage={t('pages.portfolio.list.rowsPerPage')}
-            labelDisplayedRows={({ from, to, count }) =>
-              t('pages.portfolio.list.displayedRows', { from, to, count })
-            }
           />
         </>
       )}

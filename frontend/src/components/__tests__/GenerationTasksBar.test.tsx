@@ -201,7 +201,7 @@ describe('GenerationTasksBar', () => {
 
     render(<GenerationTasksBar />, { wrapper: Wrapper });
 
-    fireEvent.click(screen.getByLabelText('Schließen'));
+    fireEvent.click(screen.getByLabelText('Schliessen'));
     expect(mockDismissTask).toHaveBeenCalledWith('task-dismiss');
   });
 
@@ -485,7 +485,7 @@ describe('GenerationTasksBar', () => {
       mockTasks([makeLimitedTask()]);
       const { rerender } = render(<GenerationTasksBar />, { wrapper: Wrapper });
 
-      fireEvent.click(screen.getByLabelText('Schließen'));
+      fireEvent.click(screen.getByLabelText('Schliessen'));
       expect(mockDismissTask).toHaveBeenCalledWith('task-limited');
 
       // The context drops the dismissed task; the bar then renders nothing.

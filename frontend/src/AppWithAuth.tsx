@@ -42,6 +42,7 @@ import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { SubscriptionManagementPage } from './pages/SubscriptionManagementPage';
 import { UserRole } from './types/auth';
 import { AppErrorBoundary } from './components/ErrorBoundary';
+import { MuiLocaleThemeProvider } from './components/MuiLocaleThemeProvider';
 import QuestionReviewDetail from './components/QuestionReviewDetail';
 import GenerationTasksBar from './components/GenerationTasksBar';
 import TagSettingsPage from './pages/TagSettingsPage';
@@ -69,6 +70,7 @@ export const queryClient = new QueryClient({
 
 export const AppWithAuth: React.FC = () => {
   return (
+    <MuiLocaleThemeProvider>
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
@@ -437,5 +439,6 @@ export const AppWithAuth: React.FC = () => {
         </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
+    </MuiLocaleThemeProvider>
   );
 };

@@ -1006,9 +1006,7 @@
         "columnLastJob": "Dernière tâche",
         "noJob": "Pas encore téléversé",
         "delete": "Supprimer",
-        "deleteBlocked": "La suppression sera possible une fois la tâche en cours terminée.",
-        "rowsPerPage": "Lignes par page",
-        "displayedRows": "{{from}}–{{to}} sur {{count}}"
+        "deleteBlocked": "La suppression sera possible une fois la tâche en cours terminée."
       },
       "templates": {
         "title": "Modèles de portfolio",

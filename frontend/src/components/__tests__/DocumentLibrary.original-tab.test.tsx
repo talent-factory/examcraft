@@ -299,7 +299,7 @@ describe('OriginalDocumentContent (TF-332)', () => {
 
     // Close the dialog → unmounts OriginalDocumentContent → cleanup runs
     const closeBtn = await screen.findByRole('button', {
-      name: /Schließen|Close|Fermer|Chiudi/i,
+      name: /Schliessen|Close|Fermer|Chiudi/i,
     });
     await act(async () => {
       closeBtn.click();

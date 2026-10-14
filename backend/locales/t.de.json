@@ -79,7 +79,7 @@
     "documents_content_load_failed": "Dokumentinhalt konnte nicht geladen werden",
     "documents_not_processed": "Dokument wurde noch nicht verarbeitet",
     "documents_chunks_load_failed": "Dokumentabschnitte konnten nicht geladen werden",
-    "documents_page_out_of_range": "Seitenzahl außerhalb des gültigen Bereichs",
+    "documents_page_out_of_range": "Seitenzahl ausserhalb des gültigen Bereichs",
     "documents_tag_not_found": "Tag nicht gefunden.",
     "documents_tag_institution_requires_shared": "Ein Institutions-Tag kann nur an institutionsweit geteilte Dokumente angehängt werden.",
     "documents_tag_institution_admin_only": "Nur Administratoren dürfen Institutions-Tags erstellen.",

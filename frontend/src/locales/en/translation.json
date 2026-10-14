@@ -1006,9 +1006,7 @@
         "columnLastJob": "Last job",
         "noJob": "Not uploaded yet",
         "delete": "Delete",
-        "deleteBlocked": "Deleting is possible once the running job has finished.",
-        "rowsPerPage": "Rows per page",
-        "displayedRows": "{{from}}–{{to}} of {{count}}"
+        "deleteBlocked": "Deleting is possible once the running job has finished."
       },
       "templates": {
         "title": "Portfolio templates",
