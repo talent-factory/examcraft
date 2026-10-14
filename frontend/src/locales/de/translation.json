@@ -366,6 +366,14 @@
       "auswertung_exam_monthly_quota_exceeded": "Monatslimit erreicht: {{used}} von {{limit}} Auswertungen genutzt. Upgrade auf Starter oder höher.",
       "auswertung_submission_quota_exceeded": "Submission-Limit pro Prüfung erreicht ({{limit}}). Upgrade auf Professional."
     },
+    "tierLock": {
+      "reviewBulk": "Bulk-Übernehmen ist ab dem Tarif {{tier}} verfügbar. Einzelne Bewertungen kannst du weiterhin freigeben und überschreiben.",
+      "customGradingSchemes": "Eigene Bewertungsschemata anlegen und bearbeiten ist ab dem Tarif {{tier}} möglich. Bestehende Schemata kannst du weiterhin verwenden und löschen.",
+      "customGradingSchemesShort": "Bearbeiten ab Tarif {{tier}}",
+      "classHistoryName": "Klassen- und Studi-Verlauf",
+      "classHistoryDescription": "Verlaufsstatistiken über mehrere Prüfungen hinweg, für ganze Klassen und einzelne Studierende.",
+      "moodleApiTag": "ab Tarif {{tier}}"
+    },
     "moodleSync": {
       "actionLabel": "Moodle-IDs erfassen",
       "dialogTitle": "Moodle-Quiz-IDs synchronisieren",

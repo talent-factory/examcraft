@@ -20,6 +20,12 @@ import { useActivityHeartbeat } from '../../../hooks/useActivityHeartbeat';
 jest.mock('../../../api/apiClient');
 
 jest.mock('../../../services/submissionsService');
+// Tier limits unknown (TF-1055): nothing is locked up front, so these
+// tests keep covering the ungated behaviour; tierLocks.test.tsx covers
+// the locks.
+jest.mock('../../../hooks/useFeatures', () => ({
+  useFeatures: () => ({ evaluationLimits: null, isLoading: false }),
+}));
 const mockSubmissionsService = SubmissionsService as jest.Mocked<
   typeof SubmissionsService
 >;

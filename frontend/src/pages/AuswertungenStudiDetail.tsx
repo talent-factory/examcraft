@@ -6,6 +6,10 @@
  *  - Submissions chronologically (LineChart % over time + table)
  *  - Bloom mix (BarChart)
  *  - Topic heatmap (BarChart)
+ *
+ * The whole page is ``/api/v1/students/{id}/stats`` (Enterprise-only). Since
+ * TF-1055 a tier without class history gets the upgrade prompt without the
+ * request; unknown limits request it and fall back to the 402 QuotaBanner.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -47,6 +51,12 @@ import type { StudentHistoryStats } from '../types/student';
 import QuotaBanner, {
   isQuotaError,
 } from '../components/auswertungen/QuotaBanner';
+import { UpgradePrompt } from '../components/common/UpgradePrompt';
+import {
+  EVALUATION_UPGRADE_TIER,
+  knownTier,
+} from '../components/auswertungen/TierLockedHint';
+import { useFeatures } from '../hooks/useFeatures';
 
 const AuswertungenStudiDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -59,8 +69,13 @@ const AuswertungenStudiDetail: React.FC = () => {
   const [error, setError] = useState<ApiError | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
 
+  const { evaluationLimits, isLoading: featuresLoading } = useFeatures();
+  const historyLocked =
+    evaluationLimits !== null && !evaluationLimits.class_history_stats;
+
   useEffect(() => {
-    if (!Number.isFinite(studentId)) return;
+    // Wait for the limits so a locked tier never hits the stats route.
+    if (!Number.isFinite(studentId) || featuresLoading || historyLocked) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -86,7 +101,32 @@ const AuswertungenStudiDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [studentId, t]);
+  }, [studentId, t, featuresLoading, historyLocked]);
+
+  const header = (
+    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <IconButton onClick={() => navigate('/auswertungen/studierende')}>
+        <ArrowBackIcon />
+      </IconButton>
+      <Typography variant="h4" component="h1">
+        {t('auswertungen.studierende.title')}
+      </Typography>
+    </Box>
+  );
+
+  if (historyLocked) {
+    return (
+      <Box sx={{ p: 3 }}>
+        {header}
+        <UpgradePrompt
+          featureNameKey="auswertungen.tierLock.classHistoryName"
+          featureDescriptionKey="auswertungen.tierLock.classHistoryDescription"
+          requiredTier={EVALUATION_UPGRADE_TIER.class_history_stats}
+          currentTier={knownTier(evaluationLimits?.tier)}
+        />
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
@@ -99,14 +139,7 @@ const AuswertungenStudiDetail: React.FC = () => {
   if (error && isQuotaError(error)) {
     return (
       <Box sx={{ p: 3 }}>
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton onClick={() => navigate('/auswertungen/studierende')}>
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" component="h1">
-            {t('auswertungen.studierende.title')}
-          </Typography>
-        </Box>
+        {header}
         <QuotaBanner error={error} />
       </Box>
     );

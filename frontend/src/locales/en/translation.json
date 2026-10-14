@@ -366,6 +366,14 @@
       "auswertung_exam_monthly_quota_exceeded": "Monthly limit reached: {{used}} of {{limit}} evaluations used. Upgrade to Starter or higher.",
       "auswertung_submission_quota_exceeded": "Per-exam submission limit reached ({{limit}}). Upgrade to Professional."
     },
+    "tierLock": {
+      "reviewBulk": "Bulk approve is available from the {{tier}} plan. You can still approve and override individual grades.",
+      "customGradingSchemes": "Creating and editing your own grading schemes is available from the {{tier}} plan. You can still use and delete existing schemes.",
+      "customGradingSchemesShort": "Editing from the {{tier}} plan",
+      "classHistoryName": "Class and student history",
+      "classHistoryDescription": "History statistics across several exams, for whole classes and individual students.",
+      "moodleApiTag": "from the {{tier}} plan"
+    },
     "moodleSync": {
       "actionLabel": "Capture Moodle IDs",
       "dialogTitle": "Sync Moodle quiz IDs",

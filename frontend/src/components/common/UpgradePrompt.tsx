@@ -52,7 +52,7 @@ export interface UpgradePromptProps {
 // Tier Configuration
 // ============================================================================
 
-const TIER_CONFIG = {
+export const TIER_CONFIG = {
   free: {
     label: 'Free',
     color: '#9e9e9e' as const,

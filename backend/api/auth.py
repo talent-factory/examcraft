@@ -1602,12 +1602,35 @@ async def get_user_avatar(
 # ============================================================================
 
 
+class EvaluationLimitsResponse(BaseModel):
+    """Evaluation tier limits, mirrored from ``auswertung_quotas.TierLimits``.
+
+    ``-1`` = unlimited. The values come from ``get_limits_for_user`` so the
+    frontend can disable gated actions up front; the 402 checks stay the gate.
+    """
+
+    tier: str
+    label: str
+    exams_per_month: int
+    submissions_per_exam: int
+    drivers: List[str]
+    llm_grading: bool
+    class_history_stats: bool
+    review_bulk: bool
+    custom_grading_schemes: bool
+    custom_llm_model: bool
+
+    class Config:
+        from_attributes = True
+
+
 class UserFeaturesResponse(BaseModel):
     """User features and subscription tier response"""
 
     subscription_tier: str
     features: List[str]
     quotas: dict
+    evaluation_limits: EvaluationLimitsResponse
 
 
 @router.get("/features", response_model=UserFeaturesResponse)
@@ -1622,39 +1645,63 @@ async def get_user_features(
     - subscription_tier: User's institution subscription tier
     - features: List of enabled features for this tier
     - quotas: Current quota limits and usage
+    - evaluation_limits: Evaluation tier limits (``auswertung_quotas``)
 
     Used by frontend to determine which components to load and display
     """
-    from config.features import TIER_FEATURES, SubscriptionTier
+    from config.features import TIER_FEATURES, TIER_QUOTAS, SubscriptionTier
+    from services.auswertung_quotas import (
+        UnknownTierError,
+        get_limits,
+        get_tier_for_institution,
+    )
 
-    # Get user's institution
     institution = current_user.institution
 
-    # Get subscription tier
+    # Same tier resolution as the 402 gates: unknown → free (outside
+    # production), no institution → free instead of an AttributeError/500.
+    # In production the 402 gates raise for a misconfigured tier, but this
+    # read-only endpoint must not take down every feature gate in the app:
+    # fall back to the most restrictive tier and log at error level.
     try:
-        tier = SubscriptionTier(institution.subscription_tier)
-    except ValueError:
-        # Fallback to FREE if invalid tier
-        logger.warning(
-            f"Invalid subscription tier '{institution.subscription_tier}' for institution {institution.id}, defaulting to FREE"
+        tier_value = get_tier_for_institution(institution)
+    except UnknownTierError:
+        logger.error(
+            "Features-Endpunkt: unbekannter Tier für Benutzer %s, Fallback auf 'free'",
+            current_user.id,
+            exc_info=True,
         )
-        tier = SubscriptionTier.FREE
+        tier_value = "free"
+    tier = SubscriptionTier(tier_value)
 
     # Get features for this tier
     features = TIER_FEATURES.get(tier, [])
     feature_names = [f.value for f in features]
 
     # Build quota response with current usage
-    quotas = {
-        "max_documents": institution.max_documents,
-        "max_questions_per_month": institution.max_questions_per_month,
-        "max_users": institution.max_users,
-        # TODO: Add current usage counts when usage tracking is implemented
-        # "documents_used": 0,
-        # "questions_used_this_month": 0,
-        # "users_count": 0,
-    }
+    if institution is None:
+        free_quotas = TIER_QUOTAS[SubscriptionTier.FREE]
+        quotas = {
+            "max_documents": free_quotas["max_documents"],
+            "max_questions_per_month": free_quotas["max_questions_per_month"],
+            "max_users": free_quotas["max_users"],
+        }
+    else:
+        quotas = {
+            "max_documents": institution.max_documents,
+            "max_questions_per_month": institution.max_questions_per_month,
+            "max_users": institution.max_users,
+            # TODO: Add current usage counts when usage tracking is implemented
+            # "documents_used": 0,
+            # "questions_used_this_month": 0,
+            # "users_count": 0,
+        }
 
     return UserFeaturesResponse(
-        subscription_tier=tier.value, features=feature_names, quotas=quotas
+        subscription_tier=tier.value,
+        features=feature_names,
+        quotas=quotas,
+        evaluation_limits=EvaluationLimitsResponse.model_validate(
+            get_limits(tier_value)
+        ),
     )

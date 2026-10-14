@@ -10,6 +10,10 @@
  * Recharts renders the charts; data comes from
  * ``/api/v1/student-classes/{id}/stats`` (Enterprise-only — a 402 is
  * surfaced to the user via the QuotaBanner).
+ *
+ * TF-1055: when `evaluation_limits` says the tier lacks class history, the
+ * stats route is not requested at all and the history tab shows the upgrade
+ * prompt; the members tab keeps working. Unknown limits request it as before.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -62,6 +66,12 @@ import AssignStudentDialog from '../components/auswertungen/AssignStudentDialog'
 import QuotaBanner, {
   isQuotaError,
 } from '../components/auswertungen/QuotaBanner';
+import { UpgradePrompt } from '../components/common/UpgradePrompt';
+import {
+  EVALUATION_UPGRADE_TIER,
+  knownTier,
+} from '../components/auswertungen/TierLockedHint';
+import { useFeatures } from '../hooks/useFeatures';
 
 const AuswertungenKlassenDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -80,15 +90,20 @@ const AuswertungenKlassenDetail: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey((k) => k + 1);
 
+  const { evaluationLimits, isLoading: featuresLoading } = useFeatures();
+  const historyLocked =
+    evaluationLimits !== null && !evaluationLimits.class_history_stats;
+
   useEffect(() => {
-    if (!Number.isFinite(classId)) return;
+    // Wait for the limits so a locked tier never hits the stats route.
+    if (!Number.isFinite(classId) || featuresLoading) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setErrorText(null);
     Promise.allSettled([
       StudentClassesService.get(classId),
-      StudentClassesService.getHistory(classId),
+      historyLocked ? Promise.resolve(null) : StudentClassesService.getHistory(classId),
     ])
       .then(([detailRes, historyRes]) => {
         if (cancelled) return;
@@ -131,7 +146,7 @@ const AuswertungenKlassenDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [classId, reloadKey, t]);
+  }, [classId, reloadKey, t, featuresLoading, historyLocked]);
 
   const handleRemoveMember = async (studentId: number) => {
     try {
@@ -225,7 +240,16 @@ const AuswertungenKlassenDetail: React.FC = () => {
         />
       </Tabs>
 
-      {tab === 'history' && (
+      {tab === 'history' && historyLocked && (
+        <UpgradePrompt
+          featureNameKey="auswertungen.tierLock.classHistoryName"
+          featureDescriptionKey="auswertungen.tierLock.classHistoryDescription"
+          requiredTier={EVALUATION_UPGRADE_TIER.class_history_stats}
+          currentTier={knownTier(evaluationLimits?.tier)}
+        />
+      )}
+
+      {tab === 'history' && !historyLocked && (
         <Box>
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" sx={{ mb: 1 }}>

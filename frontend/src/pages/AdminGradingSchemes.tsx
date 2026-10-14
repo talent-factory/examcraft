@@ -8,6 +8,10 @@
  *
  * Requires the `grading_schemes:manage` permission on the writable actions.
  * The page itself is already protected at the route level.
+ *
+ * Creating and editing custom schemes is Enterprise-only (TF-970); since
+ * TF-1055 both buttons are disabled up front with an upgrade hint. Listing
+ * and deleting stay available in every tier.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -41,6 +45,11 @@ import { appErrorFromApiError, isAppErrorCode, translateError } from '../errors'
 import { ApiError } from '../services/submissionsService';
 import GradingSchemeEditor from '../components/admin/GradingSchemeEditor';
 import { useActivityHeartbeat } from '../hooks/useActivityHeartbeat';
+import { useFeatures } from '../hooks/useFeatures';
+import TierLockedHint, {
+  EVALUATION_UPGRADE_TIER,
+  tierLabel,
+} from '../components/auswertungen/TierLockedHint';
 
 const AdminGradingSchemes: React.FC = () => {
   const { t } = useTranslation();
@@ -55,6 +64,14 @@ const AdminGradingSchemes: React.FC = () => {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<GradingSchemeOut | null>(null);
+
+  // Unknown limits leave both enabled; the editor's QuotaBanner catches the 402.
+  const { evaluationLimits } = useFeatures();
+  const writeLocked =
+    evaluationLimits !== null && !evaluationLimits.custom_grading_schemes;
+  const lockedTitle = t('auswertungen.tierLock.customGradingSchemesShort', {
+    tier: tierLabel(EVALUATION_UPGRADE_TIER.custom_grading_schemes),
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,11 +171,22 @@ const AdminGradingSchemes: React.FC = () => {
         <Button
           variant="contained"
           onClick={handleCreate}
+          disabled={writeLocked}
           data-testid="gs-page-create"
         >
           {t('admin.gradingSchemes.btnCreate')}
         </Button>
       </Box>
+
+      {writeLocked && (
+        <Box sx={{ mb: 2 }}>
+          <TierLockedHint
+            messageKey="auswertungen.tierLock.customGradingSchemes"
+            requiredTier={EVALUATION_UPGRADE_TIER.custom_grading_schemes}
+            testId="gs-tier-lock"
+          />
+        </Box>
+      )}
 
       {loadError && (
         <Alert severity="error" sx={{ mb: 2 }} data-testid="gs-page-load-error">
@@ -235,14 +263,16 @@ const AdminGradingSchemes: React.FC = () => {
                       title={
                         scheme.is_system_scheme
                           ? t('admin.gradingSchemes.systemReadOnly')
-                          : t('admin.gradingSchemes.btnEdit')
+                          : writeLocked
+                            ? lockedTitle
+                            : t('admin.gradingSchemes.btnEdit')
                       }
                     >
                       <span>
                         <IconButton
                           size="small"
                           onClick={() => handleEdit(scheme)}
-                          disabled={scheme.is_system_scheme}
+                          disabled={scheme.is_system_scheme || writeLocked}
                           data-testid={`gs-btn-edit-${scheme.id}`}
                         >
                           <EditIcon fontSize="small" />

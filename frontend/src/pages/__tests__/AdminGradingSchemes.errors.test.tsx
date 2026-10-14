@@ -17,6 +17,12 @@ import { ApiError } from '../../services/submissionsService';
 import { GradingSchemeOut } from '../../types/gradingScheme';
 
 jest.mock('../../services/gradingSchemesService');
+// Tier limits unknown (TF-1055): nothing is locked up front, so these
+// tests keep covering the ungated behaviour; tierLocks.test.tsx covers
+// the locks.
+jest.mock('../../hooks/useFeatures', () => ({
+  useFeatures: () => ({ evaluationLimits: null, isLoading: false }),
+}));
 const mocked = GradingSchemesService as jest.Mocked<typeof GradingSchemesService>;
 
 // TF-838 (PR #286 review): mocked so this suite doesn't fire real, unmocked

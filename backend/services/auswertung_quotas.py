@@ -48,7 +48,7 @@ def _is_production() -> bool:
     Tests and local dev (where ``ENV`` is unset or ``test``/``development``)
     keep the soft-fallback so a single typo doesn't break the whole suite.
     """
-    return (os.getenv("ENV") or "").strip().lower() == "production"
+    return (os.getenv("ENVIRONMENT") or "").strip().lower() == "production"
 
 
 @dataclass(frozen=True)

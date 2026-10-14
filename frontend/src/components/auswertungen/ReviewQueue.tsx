@@ -50,6 +50,8 @@ import MarkdownRenderer from '../MarkdownRenderer';
 import AiNotice from '../common/AiNotice';
 import { reflowMoodleAnswer } from '../../utils/moodleAnswerReflow';
 import QuotaBanner, { isQuotaError } from './QuotaBanner';
+import TierLockedHint, { EVALUATION_UPGRADE_TIER } from './TierLockedHint';
+import { useFeatures } from '../../hooks/useFeatures';
 
 // Lower bound for the bulk confidence threshold: 0% would collect
 // all proposed grades, including the fail-soft stubs (confidence=0.0)
@@ -90,6 +92,10 @@ const ReviewQueue: React.FC<Props> = ({
   // Tier gate on bulk-approve (Pro+, TF-970): a 402 gets the upgrade banner
   // instead of the generic action-failure snackbar.
   const [quotaError, setQuotaError] = useState<ApiError | null>(null);
+  // Known up front since TF-1055; unknown limits leave the bar enabled and
+  // the 402 above as the fallback.
+  const { evaluationLimits } = useFeatures();
+  const bulkLocked = evaluationLimits !== null && !evaluationLimits.review_bulk;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -377,6 +383,7 @@ const ReviewQueue: React.FC<Props> = ({
                 min={MIN_BULK_THRESHOLD}
                 max={100}
                 valueLabelDisplay="auto"
+                disabled={bulkLocked}
                 aria-label={t('auswertungen.exam.review.bulk.thresholdAria')}
                 data-testid="bulk-threshold"
               />
@@ -384,7 +391,7 @@ const ReviewQueue: React.FC<Props> = ({
             <Button
               variant="outlined"
               onClick={handleBulkByThreshold}
-              disabled={bulkBusy}
+              disabled={bulkBusy || bulkLocked}
               data-testid="bulk-apply-threshold"
             >
               {t('auswertungen.exam.review.bulk.applyByThreshold')}
@@ -392,7 +399,7 @@ const ReviewQueue: React.FC<Props> = ({
             <Button
               variant="contained"
               onClick={handleBulkBySelection}
-              disabled={bulkBusy || selected.size === 0}
+              disabled={bulkBusy || bulkLocked || selected.size === 0}
               data-testid="bulk-apply-selection"
             >
               {t('auswertungen.exam.review.bulk.applyBySelection', {
@@ -400,6 +407,15 @@ const ReviewQueue: React.FC<Props> = ({
               })}
             </Button>
           </Stack>
+          {bulkLocked && (
+            <Box sx={{ mt: 2 }}>
+              <TierLockedHint
+                messageKey="auswertungen.tierLock.reviewBulk"
+                requiredTier={EVALUATION_UPGRADE_TIER.review_bulk}
+                testId="bulk-tier-lock"
+              />
+            </Box>
+          )}
         </CardContent>
       </Card>
 

@@ -24,6 +24,12 @@ import '@testing-library/jest-dom';
 import ImportDialog from '../ImportDialog';
 
 jest.mock('../../../api/apiClient');
+// Tier limits unknown (TF-1055): nothing is locked up front, so these
+// tests keep covering the ungated behaviour; tierLocks.test.tsx covers
+// the locks.
+jest.mock('../../../hooks/useFeatures', () => ({
+  useFeatures: () => ({ evaluationLimits: null, isLoading: false }),
+}));
 
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;

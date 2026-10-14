@@ -25,6 +25,12 @@ import { ApiError } from '../../../services/submissionsService';
 import { ReviewQueue as ReviewQueueData } from '../../../types/submission';
 
 jest.mock('../../../services/gradesService');
+// Tier limits unknown (TF-1055): nothing is locked up front, so these
+// tests keep covering the ungated behaviour; tierLocks.test.tsx covers
+// the locks.
+jest.mock('../../../hooks/useFeatures', () => ({
+  useFeatures: () => ({ evaluationLimits: null, isLoading: false }),
+}));
 const mockGradesService = GradesService as jest.Mocked<typeof GradesService>;
 
 const theme = createTheme();

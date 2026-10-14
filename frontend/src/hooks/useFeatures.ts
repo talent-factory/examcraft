@@ -7,7 +7,7 @@
  * context to automatically refetch when the user changes.
  *
  * @example
- * const { features, tier, quotas, hasFeature, isLoading, error } = useFeatures();
+ * const { features, tier, quotas, evaluationLimits, hasFeature, isLoading, error } = useFeatures();
  *
  * if (hasFeature('document_chatbot')) {
  *   // Show premium feature
@@ -23,6 +23,24 @@ import { AppError, translateError } from '../errors';
 // Types
 // ============================================================================
 
+/**
+ * Evaluation tier limits from `services/auswertung_quotas.py::TierLimits`
+ * (TF-1055). `-1` = unlimited. Used to disable gated actions up front; the
+ * backend's 402 stays the actual gate.
+ */
+export interface EvaluationLimits {
+  tier: string;
+  label: string;
+  exams_per_month: number;
+  submissions_per_exam: number;
+  drivers: string[];
+  llm_grading: boolean;
+  class_history_stats: boolean;
+  review_bulk: boolean;
+  custom_grading_schemes: boolean;
+  custom_llm_model: boolean;
+}
+
 export interface UserFeatures {
   subscription_tier: string;
   features: string[];
@@ -31,6 +49,7 @@ export interface UserFeatures {
     max_questions_per_month: number;
     max_users: number;
   };
+  evaluation_limits: EvaluationLimits;
 }
 
 export interface UseFeaturesReturn {
@@ -40,6 +59,8 @@ export interface UseFeaturesReturn {
   features: string[];
   /** Quota limits for the user's institution */
   quotas: UserFeatures['quotas'] | null;
+  /** Evaluation tier limits; null while loading or when the request failed */
+  evaluationLimits: EvaluationLimits | null;
   /** Check if a specific feature is enabled */
   hasFeature: (featureName: string) => boolean;
   /** Loading state */
@@ -100,6 +121,7 @@ export const useFeatures = (): UseFeaturesReturn => {
       // Cache the result
       localStorage.setItem(CACHE_KEY, JSON.stringify({
         data: featuresData,
+        userId: user?.id,
         timestamp: Date.now(),
       }));
 
@@ -110,7 +132,7 @@ export const useFeatures = (): UseFeaturesReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, accessToken, t]);
+  }, [isAuthenticated, accessToken, user?.id, t]);
 
   /**
    * Load features from cache or fetch from API
@@ -126,10 +148,17 @@ export const useFeatures = (): UseFeaturesReturn => {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       try {
-        const { data: cachedData, timestamp } = JSON.parse(cached);
+        const { data: cachedData, userId: cachedUserId, timestamp } = JSON.parse(cached);
         const age = Date.now() - timestamp;
 
-        if (age < CACHE_DURATION) {
+        // Entries cached before TF-1055 lack `evaluation_limits`; refetch
+        // instead of treating every gated action as unknown for 5 minutes.
+        // The cache is shared across logins, so only reuse it for the same user.
+        if (
+          age < CACHE_DURATION &&
+          cachedData?.evaluation_limits &&
+          cachedUserId === user?.id
+        ) {
           // Cache is still valid
           setData(cachedData);
           setIsLoading(false);
@@ -156,6 +185,7 @@ export const useFeatures = (): UseFeaturesReturn => {
     tier: data?.subscription_tier || null,
     features: data?.features || [],
     quotas: data?.quotas || null,
+    evaluationLimits: data?.evaluation_limits || null,
     hasFeature,
     isLoading,
     error,

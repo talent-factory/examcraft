@@ -6,7 +6,9 @@
  *   - ``moodle_api``: only visible when the institution has a
  *     ``moodle_connections`` entry. Instead of a file upload, the
  *     Moodle quiz ID is captured; preview/commit go to
- *     `/import/api-preview` resp. `/import/api-commit`. A tier-quota
+ *     `/import/api-preview` resp. `/import/api-commit`. Tiers without the
+ *     driver (`evaluation_limits.drivers`, TF-1055) see the radio disabled
+ *     with the target tier instead of a 402 after the quiz ID. A tier-quota
  *     402 renders the `auswertungen.tierBanner.*` sentence (see
  *     `translateQuotaError`), every other failure its `error_code` or the
  *     operation fallback — never `ApiError.message` (TF-772 PR 7).
@@ -50,6 +52,8 @@ import { appErrorFromApiError, translateError } from '../../errors';
 import { ApiError, SubmissionsService } from '../../services/submissionsService';
 import { MoodleConnectionsService } from '../../services/moodleConnectionsService';
 import { isQuotaError, translateQuotaError } from './QuotaBanner';
+import { EVALUATION_UPGRADE_TIER, TierChip, tierLabel } from './TierLockedHint';
+import { useFeatures } from '../../hooks/useFeatures';
 import { importRowErrorMessage } from './importRowErrorMessage';
 import {
   DriverName,
@@ -156,6 +160,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [moodleProbeError, setMoodleProbeError] = useState<string | null>(
     null,
   );
+  // Unknown limits keep the radio up to the connection probe; the backend's
+  // 402 stays the fallback.
+  const { evaluationLimits } = useFeatures();
+  const moodleApiLocked =
+    evaluationLimits !== null && !evaluationLimits.drivers.includes('moodle_api');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -535,11 +544,27 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               />
               <FormControlLabel
                 value="moodle_api"
-                control={<Radio disabled={!hasMoodleConnection} />}
+                control={
+                  <Radio
+                    disabled={moodleApiLocked || !hasMoodleConnection}
+                    inputProps={{ 'data-testid': 'import-driver-moodle-api' } as React.InputHTMLAttributes<HTMLInputElement>}
+                  />
+                }
                 label={
                   <span>
                     {t('auswertungen.importDialog.sourceMoodleApi')}
-                    {!hasMoodleConnection && (
+                    {moodleApiLocked ? (
+                      <Box component="span" sx={{ ml: 1 }}>
+                        <TierChip
+                          tier={EVALUATION_UPGRADE_TIER.moodle_api}
+                          locked
+                          label={t('auswertungen.tierLock.moodleApiTag', {
+                            tier: tierLabel(EVALUATION_UPGRADE_TIER.moodle_api),
+                          })}
+                          testId="import-driver-moodle-api-tier-lock"
+                        />
+                      </Box>
+                    ) : !hasMoodleConnection && (
                       <Chip
                         label={t('auswertungen.importDialog.unavailableTag')}
                         size="small"

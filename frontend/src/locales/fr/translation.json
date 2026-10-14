@@ -366,6 +366,14 @@
       "auswertung_exam_monthly_quota_exceeded": "Limite mensuelle atteinte : {{used}} évaluations sur {{limit}} utilisées. Passe à Starter ou supérieur.",
       "auswertung_submission_quota_exceeded": "Limite de soumissions par examen atteinte ({{limit}}). Passe à Professional."
     },
+    "tierLock": {
+      "reviewBulk": "La validation groupée est disponible à partir de l'offre {{tier}}. Tu peux toujours valider et modifier les notes une par une.",
+      "customGradingSchemes": "Créer et modifier tes propres schèmes de notation est possible à partir de l'offre {{tier}}. Tu peux toujours utiliser et supprimer les schèmes existants.",
+      "customGradingSchemesShort": "Modification à partir de l'offre {{tier}}",
+      "classHistoryName": "Historique des classes et des étudiant·e·s",
+      "classHistoryDescription": "Statistiques d'évolution sur plusieurs examens, pour des classes entières et pour chaque étudiant·e.",
+      "moodleApiTag": "à partir de l'offre {{tier}}"
+    },
     "moodleSync": {
       "actionLabel": "Saisir les ID Moodle",
       "dialogTitle": "Synchroniser les ID de quiz Moodle",
