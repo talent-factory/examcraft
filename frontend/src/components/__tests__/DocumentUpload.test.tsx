@@ -1,625 +1,256 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import DocumentUpload from '../DocumentUpload';
 import { DocumentService } from '../../services/DocumentService';
-
+import { OrgUnitsService } from '../../services/orgUnitsService';
+import { DocumentVisibility } from '../../types/document';
 import { useDropzone } from 'react-dropzone';
-jest.mock('../../api/apiClient');
 
-// Mock DocumentService
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, email: 'test@example.com', role: 'institution_user' } }),
+}));
+
 jest.mock('../../services/DocumentService');
 const mockDocumentService = DocumentService as jest.Mocked<typeof DocumentService>;
 
-// Mock react-dropzone
-jest.mock('react-dropzone', () => ({
-  useDropzone: jest.fn()
-}));
+jest.mock('../../services/orgUnitsService');
+const mockOrgUnitsService = OrgUnitsService as jest.Mocked<typeof OrgUnitsService>;
+
+jest.mock('react-dropzone', () => ({ useDropzone: jest.fn() }));
 const mockUseDropzone = useDropzone as jest.MockedFunction<typeof useDropzone>;
 
-// Mock theme
 const theme = createTheme();
+const wrap = (ui: React.ReactElement) => <ThemeProvider theme={theme}>{ui}</ThemeProvider>;
 
-// Test wrapper with theme
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider theme={theme}>
-    {children}
-  </ThemeProvider>
-);
+/**
+ * DocumentUpload tests: queue, upload flow, callbacks and statistics. The
+ * suite sat on `describe.skip` until TF-1057. Two neighbours cover the rest
+ * and are not repeated here: DocumentUpload.cancellation.test.tsx (cancel and
+ * the UploadCancelled sentinel, including AppError translation) and
+ * DocumentUpload.visibility.test.tsx (the visibility selector).
+ *
+ * react-dropzone is mocked; files enter the queue through the `onDrop`
+ * callback the component hands to `useDropzone`.
+ */
 
-// Mock file
+function dropzoneState(isDragActive = false): ReturnType<typeof useDropzone> {
+  return {
+    getRootProps: jest.fn().mockReturnValue({}),
+    getInputProps: jest.fn().mockReturnValue({}),
+    isDragActive,
+    acceptedFiles: [],
+    fileRejections: [],
+    isFocused: false,
+    isDragAccept: false,
+    isDragReject: false,
+    open: jest.fn(),
+  } as unknown as ReturnType<typeof useDropzone>;
+}
+
 const createMockFile = (name: string, size: number, type: string): File => {
-  const file = new File(['test content'], name, { type });
+  const file = new File(['content'], name, { type });
   Object.defineProperty(file, 'size', { value: size });
   return file;
 };
 
-/**
- * DocumentUpload Tests - PARTIALLY DISABLED
- *
- * Many tests are currently disabled due to:
- * 1. Component UI changes (Upload button, file queue rendering)
- * 2. Complex react-dropzone mocking requirements
- * 3. State management changes in the component
- *
- * TODO: Re-enable and update tests when:
- * - Component API is stable
- * - UI structure is finalized
- * - Better test utilities for dropzone are available
- */
-describe.skip('DocumentUpload', () => {
-  const mockGetRootProps = jest.fn();
-  const mockGetInputProps = jest.fn();
+function dropFiles(...files: File[]): void {
+  const onDrop = mockUseDropzone.mock.calls[0][0]!.onDrop!;
+  act(() => {
+    onDrop(files, [], {} as never);
+  });
+}
 
+const uploadOk = (documentId = 1, filename = 'test.pdf') => ({
+  document_id: documentId,
+  filename,
+  message: 'Upload successful',
+});
+
+const startUpload = () => fireEvent.click(screen.getByRole('button', { name: 'Upload starten' }));
+
+/** The queue row (list item) that shows `filename`. */
+const rowOf = (filename: string) =>
+  // eslint-disable-next-line testing-library/no-node-access
+  screen.getByText(filename).closest('li') as HTMLElement;
+
+describe('DocumentUpload', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    mockUseDropzone.mockReturnValue({
-      getRootProps: mockGetRootProps,
-      getInputProps: mockGetInputProps,
-      isDragActive: false,
-      acceptedFiles: [],
-      fileRejections: [],
-      isFocused: false,
-      isDragAccept: false,
-      isDragReject: false,
-      open: jest.fn()
+    mockOrgUnitsService.mine.mockResolvedValue({ items: [] });
+    mockUseDropzone.mockReturnValue(dropzoneState());
+    mockDocumentService.processDocument.mockResolvedValue({
+      message: 'Processing started',
+      document_id: 1,
     });
-
-    mockGetRootProps.mockReturnValue({});
-    mockGetInputProps.mockReturnValue({});
   });
 
-  describe('Rendering', () => {
-    it('renders upload area with correct text', () => {
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
+  describe('Drop zone', () => {
+    it('renders title, hint and the configured formats and file limit', () => {
+      render(wrap(<DocumentUpload maxFiles={5} acceptedFileTypes={['.pdf', '.txt']} />));
 
       expect(screen.getByText('Dokumente hochladen')).toBeInTheDocument();
       expect(screen.getByText('Zieh Dateien hierher oder klicke zum Auswählen')).toBeInTheDocument();
-      expect(screen.getByText(/Unterstützte Formate:/)).toBeInTheDocument();
+      expect(screen.getByText('Unterstützte Formate: .pdf, .txt • Max. 5 Dateien')).toBeInTheDocument();
+      expect(mockUseDropzone).toHaveBeenCalledWith(expect.objectContaining({ maxFiles: 5, multiple: true }));
     });
 
-    it('shows drag active state', () => {
-      mockUseDropzone.mockReturnValue({
-        getRootProps: mockGetRootProps,
-        getInputProps: mockGetInputProps,
-        isDragActive: true,
-        acceptedFiles: [],
-        fileRejections: [],
-        isFocused: false,
-        isDragAccept: false,
-        isDragReject: false,
-        open: jest.fn()
-      });
+    it('switches the title while files are dragged over it', () => {
+      mockUseDropzone.mockReturnValue(dropzoneState(true));
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
+      render(wrap(<DocumentUpload />));
 
       expect(screen.getByText('Dateien hier ablegen...')).toBeInTheDocument();
-    });
-
-    it('renders with custom props', () => {
-      render(
-        <TestWrapper>
-          <DocumentUpload
-            maxFiles={5}
-            acceptedFileTypes={['.pdf', '.txt']}
-          />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText(/Max\. 5 Dateien/)).toBeInTheDocument();
+      expect(screen.queryByText('Dokumente hochladen')).not.toBeInTheDocument();
     });
   });
 
-  describe('File Upload Queue', () => {
-    it('shows upload queue when files are added', () => {
-      const { rerender } = render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
+  describe('Upload queue', () => {
+    it('lists dropped files with type icon and size', () => {
+      render(wrap(<DocumentUpload />));
+
+      dropFiles(
+        createMockFile('large.pdf', 1024 * 1024, 'application/pdf'),
+        createMockFile('notes.txt', 1536, 'text/plain'),
+        createMockFile('word.docx', 2048, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
       );
 
-      // Simulate files being added
-      const mockFiles = [
-        createMockFile('test1.pdf', 1024, 'application/pdf'),
-        createMockFile('test2.txt', 512, 'text/plain')
-      ];
+      expect(screen.getByText('Upload-Warteschlange (3)')).toBeInTheDocument();
+      expect(within(rowOf('large.pdf')).getByTestId('PictureAsPdfIcon')).toBeInTheDocument();
+      expect(within(rowOf('large.pdf')).getByText('1 MB')).toBeInTheDocument();
+      expect(within(rowOf('notes.txt')).getByTestId('TextSnippetIcon')).toBeInTheDocument();
+      expect(within(rowOf('notes.txt')).getByText('1.5 KB')).toBeInTheDocument();
+      expect(within(rowOf('word.docx')).getByTestId('DescriptionIcon')).toBeInTheDocument();
+      expect(within(rowOf('word.docx')).getByText('Wartend')).toBeInTheDocument();
+    });
 
-      mockUseDropzone.mockReturnValue({
-        getRootProps: mockGetRootProps,
-        getInputProps: mockGetInputProps,
-        isDragActive: false,
-        acceptedFiles: mockFiles,
-        fileRejections: [],
-        isFocused: false,
-        isDragAccept: false,
-        isDragReject: false,
-        open: jest.fn()
-      });
+    it('caps the queue at maxFiles', () => {
+      render(wrap(<DocumentUpload maxFiles={2} />));
 
-      // Trigger the onDrop callback manually
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      rerender(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
+      dropFiles(
+        createMockFile('a.pdf', 10, 'application/pdf'),
+        createMockFile('b.pdf', 10, 'application/pdf'),
+        createMockFile('c.pdf', 10, 'application/pdf'),
       );
 
       expect(screen.getByText('Upload-Warteschlange (2)')).toBeInTheDocument();
-      expect(screen.getByText('test1.pdf')).toBeInTheDocument();
-      expect(screen.getByText('test2.txt')).toBeInTheDocument();
+      expect(screen.queryByText('c.pdf')).not.toBeInTheDocument();
     });
 
-    it('shows correct file icons for different file types', () => {
-      const mockFiles = [
-        createMockFile('document.pdf', 1024, 'application/pdf'),
-        createMockFile('text.txt', 512, 'text/plain'),
-        createMockFile('word.docx', 2048, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-      ];
+    it('removes a single file from the queue', () => {
+      render(wrap(<DocumentUpload />));
+      dropFiles(createMockFile('keep.pdf', 10, 'application/pdf'), createMockFile('drop.pdf', 10, 'application/pdf'));
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
+      fireEvent.click(within(rowOf('drop.pdf')).getByTitle('Entfernen'));
 
-      // Simulate adding files
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      expect(screen.getByTestId('PictureAsPdfIcon')).toBeInTheDocument();
-      expect(screen.getByTestId('TextSnippetIcon')).toBeInTheDocument();
-      expect(screen.getByTestId('DescriptionIcon')).toBeInTheDocument();
+      expect(screen.queryByText('drop.pdf')).not.toBeInTheDocument();
+      expect(screen.getByText('keep.pdf')).toBeInTheDocument();
+      expect(screen.getByText('Upload-Warteschlange (1)')).toBeInTheDocument();
     });
 
-    it('displays file sizes correctly', () => {
-      const mockFiles = [
-        createMockFile('large.pdf', 1024000, 'application/pdf'), // 1 MB
-        createMockFile('small.txt', 1024, 'text/plain') // 1 KB
-      ];
+    it('clears the whole queue', () => {
+      render(wrap(<DocumentUpload />));
+      dropFiles(createMockFile('a.pdf', 10, 'application/pdf'), createMockFile('b.txt', 10, 'text/plain'));
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
+      fireEvent.click(screen.getByRole('button', { name: 'Alle entfernen' }));
 
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      expect(screen.getByText('1 MB')).toBeInTheDocument();
-      expect(screen.getByText('1 KB')).toBeInTheDocument();
+      expect(screen.queryByText('a.pdf')).not.toBeInTheDocument();
+      expect(screen.queryByText('b.txt')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Upload-Warteschlange/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Upload Process', () => {
-    it('starts upload process when button is clicked', async () => {
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
+  describe('Upload flow', () => {
+    it('uploads, starts processing and reports completion', async () => {
+      mockDocumentService.uploadDocument.mockResolvedValue(uploadOk(7, 'test.pdf'));
+      const onUploadComplete = jest.fn();
+      const onAllUploadsComplete = jest.fn();
+      const file = createMockFile('test.pdf', 1024, 'application/pdf');
 
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1,
-        processing_stats: {
-          total_chunks: 5,
-          embedding_dimension: 384,
-          model_name: 'test-model',
-          processing_time: 1.5
-        }
-      });
+      render(wrap(
+        <DocumentUpload onUploadComplete={onUploadComplete} onAllUploadsComplete={onAllUploadsComplete} />
+      ));
+      dropFiles(file);
+      startUpload();
 
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      // Add files
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      // Start upload
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(mockDocumentService.uploadDocument).toHaveBeenCalledWith(mockFiles[0]);
-      });
-
-      await waitFor(() => {
-        expect(mockDocumentService.processDocument).toHaveBeenCalledWith(1, true);
-      });
+      expect(await within(rowOf('test.pdf')).findByText('Abgeschlossen')).toBeInTheDocument();
+      expect(mockDocumentService.uploadDocument).toHaveBeenCalledWith(file, DocumentVisibility.PRIVATE, null);
+      expect(mockDocumentService.processDocument).toHaveBeenCalledWith(7, true);
+      expect(onUploadComplete).toHaveBeenCalledWith(7, 'test.pdf');
+      await waitFor(() => expect(onAllUploadsComplete).toHaveBeenCalledTimes(1));
+      expect(screen.getByText('Upload abgeschlossen')).toBeInTheDocument();
+      expect(screen.getByText('1 von 1 Dateien erfolgreich hochgeladen und verarbeitet')).toBeInTheDocument();
+      // Nothing left to upload: the start button is disabled.
+      expect(screen.getByRole('button', { name: 'Upload starten' })).toBeDisabled();
     });
 
-    it('shows upload progress', async () => {
-      mockDocumentService.uploadDocument.mockImplementation(
-        () => new Promise(resolve =>
-          setTimeout(() => resolve({
-            document_id: 1,
-            filename: 'test.pdf',
-            message: 'Upload successful'
-          }), 100)
-        )
-      );
-
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
+    it('uploads several files one after another', async () => {
+      const order: string[] = [];
+      mockDocumentService.uploadDocument.mockImplementation(async (file: File) => {
+        order.push(`start ${file.name}`);
+        await Promise.resolve();
+        order.push(`end ${file.name}`);
+        return uploadOk(1, file.name);
       });
 
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
+      render(wrap(<DocumentUpload />));
+      dropFiles(createMockFile('one.pdf', 10, 'application/pdf'), createMockFile('two.pdf', 10, 'application/pdf'));
+      startUpload();
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      // Should show uploading state
-      await waitFor(() => {
-        expect(screen.getByText('Upload...')).toBeInTheDocument();
-      });
+      await screen.findByText('Upload abgeschlossen');
+      expect(order).toEqual(['start one.pdf', 'end one.pdf', 'start two.pdf', 'end two.pdf']);
+      expect(screen.getByText('2 von 2 Dateien erfolgreich hochgeladen und verarbeitet')).toBeInTheDocument();
     });
 
-    it('shows completed status after successful upload', async () => {
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
+    it('shows the processing hint while the backend call is still running', async () => {
+      mockDocumentService.uploadDocument.mockResolvedValue(uploadOk());
+      mockDocumentService.processDocument.mockImplementation(() => new Promise(() => {}));
 
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
-      });
+      render(wrap(<DocumentUpload />));
+      dropFiles(createMockFile('test.pdf', 10, 'application/pdf'));
+      startUpload();
 
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Abgeschlossen')).toBeInTheDocument();
-      });
-    });
-
-    // NOTE: this whole suite is `describe.skip` (see the top of the file) and
-    // was not run when TF-772 migrated `DocumentUpload` to `translateError`.
-    // Updated anyway so that whoever un-skips it does not first have to work
-    // out why an assertion on a raw error message fails: a plain `Error`
-    // (no `AppError`) now renders the translated fallback key, not
-    // `err.message` verbatim.
-    it('handles upload errors', async () => {
-      mockDocumentService.uploadDocument.mockRejectedValue(new Error('Upload failed'));
-
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Fehler')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Upload fehlgeschlagen')).toBeInTheDocument();
+      expect(await screen.findByText(/Dokumente werden verarbeitet/)).toBeInTheDocument();
+      expect(within(rowOf('test.pdf')).getByText('Verarbeitung...')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Uploading...' })).toBeDisabled();
     });
   });
 
-  describe('File Management', () => {
-    it('allows removing files from queue', () => {
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
+  describe('Errors and retry', () => {
+    it('marks a failed file, reports the translated fallback and counts it', async () => {
+      mockDocumentService.uploadDocument.mockRejectedValue(new Error('socket hang up'));
+      const onUploadError = jest.fn();
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
+      render(wrap(<DocumentUpload onUploadError={onUploadError} />));
+      dropFiles(createMockFile('test.pdf', 10, 'application/pdf'));
+      startUpload();
 
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      expect(screen.getByText('test.pdf')).toBeInTheDocument();
-
-      // Remove file
-      const deleteButton = screen.getByLabelText('delete');
-      fireEvent.click(deleteButton);
-
-      expect(screen.queryByText('test.pdf')).not.toBeInTheDocument();
+      const row = rowOf('test.pdf');
+      expect(await within(row).findByText('Upload fehlgeschlagen')).toBeInTheDocument();
+      expect(within(row).getByText('Fehler')).toBeInTheDocument();
+      expect(screen.queryByText(/socket hang up/)).not.toBeInTheDocument();
+      expect(onUploadError).toHaveBeenCalledWith('test.pdf', 'Upload fehlgeschlagen');
+      expect(mockDocumentService.processDocument).not.toHaveBeenCalled();
+      expect(await screen.findByText(/0 von 1 Dateien .* • 1 Fehler/)).toBeInTheDocument();
     });
 
-    it('allows retrying failed uploads', async () => {
+    it('retries a failed file', async () => {
       mockDocumentService.uploadDocument
         .mockRejectedValueOnce(new Error('Upload failed'))
-        .mockResolvedValueOnce({
-          document_id: 1,
-          filename: 'test.pdf',
-          message: 'Upload successful'
-        });
+        .mockResolvedValueOnce(uploadOk());
 
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
-      });
+      render(wrap(<DocumentUpload />));
+      dropFiles(createMockFile('test.pdf', 10, 'application/pdf'));
+      startUpload();
 
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
+      const retry = await within(rowOf('test.pdf')).findByTitle('Erneut versuchen');
+      await waitFor(() => expect(retry).toBeEnabled());
+      fireEvent.click(retry);
 
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      // Start upload (will fail)
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Fehler')).toBeInTheDocument();
-      });
-
-      // Retry upload
-      const retryButton = screen.getByLabelText('refresh');
-      fireEvent.click(retryButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Abgeschlossen')).toBeInTheDocument();
-      });
-    });
-
-    it('clears all files when clear button is clicked', () => {
-      const mockFiles = [
-        createMockFile('test1.pdf', 1024, 'application/pdf'),
-        createMockFile('test2.txt', 512, 'text/plain')
-      ];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      expect(screen.getByText('test1.pdf')).toBeInTheDocument();
-      expect(screen.getByText('test2.txt')).toBeInTheDocument();
-
-      // Clear all files
-      const clearButton = screen.getByText('Alle entfernen');
-      fireEvent.click(clearButton);
-
-      expect(screen.queryByText('test1.pdf')).not.toBeInTheDocument();
-      expect(screen.queryByText('test2.txt')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Upload Statistics', () => {
-    it('displays upload statistics', async () => {
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
-
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
-      });
-
-      const mockFiles = [
-        createMockFile('test1.pdf', 1024, 'application/pdf'),
-        createMockFile('test2.txt', 512, 'text/plain')
-      ];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Upload-Statistiken')).toBeInTheDocument();
-      });
-      expect(screen.getByText('2')).toBeInTheDocument(); // Total
-      expect(screen.getByText('Gesamt')).toBeInTheDocument();
-    });
-
-    it('shows success summary after upload completion', async () => {
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
-
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
-      });
-
-      const mockOnAllUploadsComplete = jest.fn();
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload onAllUploadsComplete={mockOnAllUploadsComplete} />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('Upload abgeschlossen')).toBeInTheDocument();
-      });
-      await waitFor(() => {
-        expect(mockOnAllUploadsComplete).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Callbacks', () => {
-    it('calls onUploadComplete callback', async () => {
-      const mockOnUploadComplete = jest.fn();
-
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
-
-      mockDocumentService.processDocument.mockResolvedValue({
-        message: 'Processing successful',
-        document_id: 1
-      });
-
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload onUploadComplete={mockOnUploadComplete} />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(mockOnUploadComplete).toHaveBeenCalledWith(1, 'test.pdf');
-      });
-    });
-
-    // NOTE: same TF-772 caveat as 'handles upload errors' above —
-    // `onUploadError` now receives the translated fallback text for a plain
-    // `Error`, not `err.message` verbatim.
-    it('calls onUploadError callback', async () => {
-      const mockOnUploadError = jest.fn();
-
-      mockDocumentService.uploadDocument.mockRejectedValue(new Error('Upload failed'));
-
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload onUploadError={mockOnUploadError} />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(mockOnUploadError).toHaveBeenCalledWith('test.pdf', 'Upload fehlgeschlagen');
-      });
-    });
-  });
-
-  describe('Processing Info', () => {
-    it('shows processing info when documents are being processed', async () => {
-      mockDocumentService.uploadDocument.mockResolvedValue({
-        document_id: 1,
-        filename: 'test.pdf',
-        message: 'Upload successful'
-      });
-
-      mockDocumentService.processDocument.mockImplementation(
-        () => new Promise(resolve =>
-          setTimeout(() => resolve({
-            message: 'Processing successful',
-            document_id: 1
-          }), 100)
-        )
-      );
-
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      const uploadButton = screen.getByText('Upload starten');
-      fireEvent.click(uploadButton);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Dokumente werden verarbeitet/)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('has proper ARIA labels', () => {
-      render(
-        <TestWrapper>
-          <DocumentUpload />
-        </TestWrapper>
-      );
-
-      const mockFiles = [createMockFile('test.pdf', 1024, 'application/pdf')];
-      const onDropCallback = mockUseDropzone.mock.calls[0][0].onDrop;
-      onDropCallback(mockFiles);
-
-      expect(screen.getByLabelText('delete')).toBeInTheDocument();
+      expect(await within(rowOf('test.pdf')).findByText('Abgeschlossen')).toBeInTheDocument();
+      expect(mockDocumentService.uploadDocument).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('Upload fehlgeschlagen')).not.toBeInTheDocument();
     });
   });
 });

@@ -510,10 +510,9 @@ describe('DocumentService', () => {
   });
 
   describe('downloadDocument', () => {
-    // TODO: This test is skipped because mocking DOM elements (createElement, appendChild, etc.)
-    // in Jest is complex and fragile. The download functionality works correctly in the browser.
-    // Consider using E2E tests (Playwright) to test this functionality instead.
-    it.skip('downloads document successfully', async () => {
+    // Relies on the module-level DOM stubs at the top of this file:
+    // createElement('a') returns `mockLink`, append/removeChild are no-ops.
+    it('downloads document successfully', async () => {
       const mockBlob = new Blob(['file content'], { type: 'application/pdf' });
 
       mockFetch.mockResolvedValueOnce({
@@ -532,7 +531,11 @@ describe('DocumentService', () => {
       );
 
       expect(global.URL.createObjectURL).toHaveBeenCalledWith(mockBlob);
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(mockLink.getAttribute('href')).toBe('mock-url');
+      expect(mockLink.download).toBe('test.pdf');
+      expect(mockLink.click).toHaveBeenCalledTimes(1);
+      expect(document.body.removeChild).toHaveBeenCalledWith(mockLink);
+      expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('mock-url');
     });
 
     it('handles download errors', async () => {
@@ -757,39 +760,47 @@ describe('DocumentService', () => {
     });
   });
 
-  // TODO: These tests are skipped because API_BASE_URL is a module-level constant
-  // that is set at import time and cannot be changed dynamically in tests.
-  // To properly test this, we would need to use jest.resetModules() and re-import
-  // the module for each test, which is complex and fragile.
-  describe.skip('API URL Configuration', () => {
-    it('uses default API URL when env var not set', async () => {
-      delete process.env.REACT_APP_API_URL;
+  // API_BASE_URL is read from the environment once, at import time. Each case
+  // therefore loads its own copy of the module after setting the variable.
+  describe('API URL Configuration', () => {
+    const originalApiUrl = process.env.REACT_APP_API_URL;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ documents: [] })
-      } as Response);
-
-      await DocumentService.getDocuments();
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/api/v1/documents/',
-        expect.any(Object)
-      );
+    afterEach(() => {
+      if (originalApiUrl === undefined) {
+        delete process.env.REACT_APP_API_URL;
+      } else {
+        process.env.REACT_APP_API_URL = originalApiUrl;
+      }
     });
 
-    it('uses custom API URL from env var', async () => {
-      process.env.REACT_APP_API_URL = 'https://api.example.com';
+    const loadFreshService = (): typeof DocumentService => {
+      let fresh!: typeof DocumentService;
+      jest.isolateModules(() => {
+        fresh = require('../DocumentService').DocumentService;
+      });
+      return fresh;
+    };
+
+    it.each([
+      ['falls back to localhost when the env var is not set', undefined, 'http://localhost:8000'],
+      ['uses the API URL from the env var', 'https://api.example.com', 'https://api.example.com'],
+    ])('%s', async (_name, envValue, expectedBase) => {
+      if (envValue === undefined) {
+        delete process.env.REACT_APP_API_URL;
+      } else {
+        process.env.REACT_APP_API_URL = envValue;
+      }
+      const FreshDocumentService = loadFreshService();
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ documents: [] })
       } as Response);
 
-      await DocumentService.getDocuments();
+      await FreshDocumentService.getDocuments();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/api/v1/documents/',
+        `${expectedBase}/api/v1/documents/`,
         expect.any(Object)
       );
     });

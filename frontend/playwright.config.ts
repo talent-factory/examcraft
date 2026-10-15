@@ -3,10 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright E2E Test Configuration
  *
- * Tests critical user flows including:
- * - Chat Export (Markdown & JSON)
- * - File Downloads with correct filenames
- * - Cross-browser compatibility
+ * Tests critical user flows (auth, document library, visibility, token
+ * refresh) against a running dev stack; see e2e/README.md.
  */
 export default defineConfig({
   testDir: './e2e',

@@ -3,11 +3,10 @@
  * PR 2), which replaced `error.message.includes('cancel')` in
  * `DocumentUpload.tsx`'s catch block.
  *
- * Deliberately a separate, un-skipped file rather than an addition to
- * `DocumentUpload.test.tsx` — that whole suite is `describe.skip` for
- * pre-existing reasons (dropzone-mocking complexity, UI churn) unrelated to
- * error handling; see its own header comment. Reuses the same
- * `useDropzone`/`DocumentService` mocking pattern as that file.
+ * Written as a separate file while `DocumentUpload.test.tsx` was still
+ * `describe.skip` (re-enabled in TF-1057). That suite covers the general
+ * upload flow and does not repeat the cancellation cases here. Both use the
+ * same `useDropzone`/`DocumentService` mocking pattern.
  */
 import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';

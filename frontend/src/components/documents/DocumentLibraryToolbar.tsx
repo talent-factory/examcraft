@@ -48,6 +48,9 @@ export default function DocumentLibraryToolbar({
   const debouncedQ = useDebounce(localQ, 300);
 
   useEffect(() => {
+    // 'q' resets the page. Reporting the unchanged value on mount would send
+    // every deep link or reload of `?page=2` back to page 1 (TF-1057).
+    if ((debouncedQ || undefined) === (params.q || undefined)) return;
     onChange('q', debouncedQ || undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ]);

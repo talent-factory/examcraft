@@ -137,8 +137,7 @@ describe('QuestionReviewCard', () => {
   });
 
   describe('Action Buttons', () => {
-    // TODO: Fix test - multiple buttons with same name cause query issues
-    it.skip('renders all action buttons', () => {
+    it('renders all action buttons', () => {
       render(
         <TestWrapper>
           <QuestionReviewCard
@@ -154,7 +153,7 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByRole('button', { name: /Genehmigen/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Ablehnen/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Frage bearbeiten/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /comment/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Kommentar hinzufügen' })).toBeInTheDocument();
     });
 
     it('calls onApprove when approve button is clicked', () => {
@@ -205,8 +204,7 @@ describe('QuestionReviewCard', () => {
       expect(mockOnEdit).toHaveBeenCalledWith(1);
     });
 
-    // TODO: Fix test - multiple buttons with same name cause query issues
-    it.skip('calls onComment when comment button is clicked', () => {
+    it('calls onComment when comment button is clicked', () => {
       render(
         <TestWrapper>
           <QuestionReviewCard
@@ -216,14 +214,13 @@ describe('QuestionReviewCard', () => {
         </TestWrapper>
       );
 
-      const commentButton = screen.getByRole('button', { name: /comment/i });
+      const commentButton = screen.getByRole('button', { name: 'Kommentar hinzufügen' });
       fireEvent.click(commentButton);
 
       expect(mockOnComment).toHaveBeenCalledWith(1);
     });
 
-    // TODO: Fix test - multiple buttons with same name cause query issues
-    it.skip('disables buttons when loading', () => {
+    it('disables buttons when loading', () => {
       render(
         <TestWrapper>
           <QuestionReviewCard
@@ -240,7 +237,7 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByRole('button', { name: /Genehmigen/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Ablehnen/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Frage bearbeiten/i })).toBeDisabled();
-      expect(screen.getByRole('button', { name: /comment/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Kommentar hinzufügen' })).toBeDisabled();
     });
   });
 
@@ -256,25 +253,21 @@ describe('QuestionReviewCard', () => {
       expect(screen.getByText(/data_structures_guide.pdf/i)).toBeInTheDocument();
     });
 
-    // TODO: Fix test - UI structure changed
-    it.skip('expands/collapses source citations', () => {
+    it('expands/collapses source citations', () => {
       render(
         <TestWrapper>
           <QuestionReviewCard question={mockQuestion} />
         </TestWrapper>
       );
 
-      // Button text is "Show Sources (2)"
-      const expandButton = screen.getByRole('button', { name: /Show Sources \(2\)/i });
+      // The document list sits in a MUI Collapse: mounted but hidden until expanded.
+      expect(screen.getByText('algorithms_textbook.pdf')).not.toBeVisible();
 
-      // Initially collapsed - source chunks should not be in document
-      expect(screen.queryByText('Heap is a tree-based structure...')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Quellen anzeigen (2)' }));
+      expect(screen.getByText('algorithms_textbook.pdf')).toBeVisible();
 
-      // Click to expand
-      fireEvent.click(expandButton);
-
-      // Now visible
-      expect(screen.getByText('Heap is a tree-based structure...')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Quellen ausblenden (2)' }));
+      expect(screen.getByRole('button', { name: 'Quellen anzeigen (2)' })).toBeInTheDocument();
     });
   });
 

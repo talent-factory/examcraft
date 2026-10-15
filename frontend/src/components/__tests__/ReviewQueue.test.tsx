@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { MemoryRouter } from 'react-router-dom';
 import ReviewQueue from '../ReviewQueue';
 import { ReviewService } from '../../services/ReviewService';
 import { QuestionReview, ReviewStatus } from '../../types/review';
@@ -12,32 +13,53 @@ jest.mock('../../hooks/useActivityHeartbeat', () => ({
   useActivityHeartbeat: jest.fn(),
 }));
 
-// Mock ReviewService
+const mockHasPermission = jest.fn();
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: mockHasPermission }),
+}));
+
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
+// The editor dialog pulls in tagsApi (ESM axios) — same stubs as QuestionEditor.test.tsx.
+jest.mock('../../api/tagsApi', () => ({
+  tagsApi: {
+    listTags: jest.fn().mockResolvedValue([]),
+    createTag: jest.fn(),
+    setQuestionTags: jest.fn().mockResolvedValue({ tags: [] }),
+    removeQuestionTag: jest.fn(),
+  },
+}));
+jest.mock('../shared/TagAutocomplete', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 jest.mock('../../services/ReviewService');
 const mockReviewService = ReviewService as jest.Mocked<typeof ReviewService>;
 
-// Mock theme
 const theme = createTheme();
 
-// Test wrapper with theme
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider theme={theme}>
-    {children}
-  </ThemeProvider>
-);
+const renderQueue = () =>
+  render(
+    <MemoryRouter>
+      <ThemeProvider theme={theme}>
+        <ReviewQueue />
+      </ThemeProvider>
+    </MemoryRouter>
+  );
 
 /**
- * ReviewQueue Tests - TEMPORARILY DISABLED
- *
- * These tests are currently disabled due to:
- * 1. Component UI changes
- * 2. Service mocking complexity
- * 3. State management changes
- *
- * TODO: Re-enable and update tests when component is stable
+ * ReviewQueue tests. The suite sat on `describe.skip` with English labels
+ * until TF-1057; it now asserts the German copy the global i18n mock in
+ * setupTests.ts renders from de/translation.json. Which fallback code each
+ * service call maps to is pinned in services/__tests__/ReviewService.errors.test.ts
+ * and not repeated here — this suite covers the component's wiring.
  */
 
-// Sample test data
 const mockQuestions: QuestionReview[] = [
   {
     id: 1,
@@ -78,405 +100,50 @@ const mockQuestions: QuestionReview[] = [
 ];
 
 const mockReviewQueueResponse = {
-  total: 2,
-  pending: 2,
-  approved: 0,
-  rejected: 0,
-  in_review: 0,
+  total: 7,
+  pending: 3,
+  approved: 2,
+  rejected: 1,
+  in_review: 1,
   questions: mockQuestions
 };
 
-describe.skip('ReviewQueue', () => {
+/** The question cards render once the first queue response has arrived. */
+const waitForQuestions = () => screen.findByText('What is a heap data structure?');
+
+/** Card actions exist once per card; the first one belongs to question 1. */
+const firstCardButton = (name: string) => screen.getAllByRole('button', { name })[0];
+
+describe('ReviewQueue', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasPermission.mockReturnValue(false);
     mockReviewService.getReviewQueue.mockResolvedValue(mockReviewQueueResponse);
   });
 
   describe('Rendering', () => {
-    it('renders component title', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
+    it('renders title, statistics and the loaded questions', async () => {
+      renderQueue();
 
-      expect(screen.getByText(/Question Review Queue/i)).toBeInTheDocument();
-    });
-
-    it('displays statistics cards', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Total')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Pending')).toBeInTheDocument();
-      expect(screen.getByText('Approved')).toBeInTheDocument();
-      expect(screen.getByText('Rejected')).toBeInTheDocument();
-      expect(screen.getByText('In Review')).toBeInTheDocument();
-    });
-
-    it('displays correct statistics values', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        const stats = screen.getAllByText('2');
-        expect(stats.length).toBeGreaterThan(0); // Total and Pending both show 2
-      });
-    });
-
-    it('loads and displays questions', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Fragen-Review Queue')).toBeInTheDocument();
+      await waitForQuestions();
       expect(screen.getByText('Explain the concept of polymorphism.')).toBeInTheDocument();
-    });
-  });
 
-  describe('Filters', () => {
-    it('renders all filter controls', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      // Wait for component to load
-      await waitFor(() => {
-        expect(screen.getByText('Question Review Queue')).toBeInTheDocument();
-      });
-
-      // Check for filter labels (they exist as InputLabel components)
-      expect(screen.getByText('Status')).toBeInTheDocument();
-      expect(screen.getByText('Difficulty')).toBeInTheDocument();
-      expect(screen.getByText('Question Type')).toBeInTheDocument();
+      // Each statistic card pairs the count from the response with its label.
+      const stats: Array<[string, string]> = [
+        ['Gesamt', '7'],
+        ['Ausstehend', '3'],
+        ['Genehmigt', '2'],
+        ['Abgelehnt', '1'],
+      ];
+      for (const [label, value] of stats) {
+        // eslint-disable-next-line testing-library/no-node-access
+        const card = screen.getAllByText(label)[0].closest('.MuiCardContent-root') as HTMLElement;
+        expect(within(card).getByText(value)).toBeInTheDocument();
+      }
     });
 
-    it('applies status filter', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('Question Review Queue')).toBeInTheDocument();
-      });
-
-      // Find all comboboxes (MUI Select components)
-      const selects = screen.getAllByRole('combobox');
-      const statusFilter = selects[0]; // First select is Status
-
-      fireEvent.mouseDown(statusFilter);
-
-      const pendingOption = await screen.findByRole('option', { name: /Pending/i });
-      fireEvent.click(pendingOption);
-
-      await waitFor(() => {
-        expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
-          expect.objectContaining({
-            status: 'pending'
-          })
-        );
-      });
-    });
-
-    it('applies difficulty filter', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('Question Review Queue')).toBeInTheDocument();
-      });
-
-      // Find all comboboxes (MUI Select components)
-      const selects = screen.getAllByRole('combobox');
-      const difficultyFilter = selects[1]; // Second select is Difficulty
-
-      fireEvent.mouseDown(difficultyFilter);
-
-      const mediumOption = await screen.findByRole('option', { name: /Medium/i });
-      fireEvent.click(mediumOption);
-
-      await waitFor(() => {
-        expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
-          expect.objectContaining({
-            difficulty: 'medium'
-          })
-        );
-      });
-    });
-
-    it('applies question type filter', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      // Find all comboboxes (MUI Select components)
-      const selects = screen.getAllByRole('combobox');
-      const typeFilter = selects[2]; // Third select is Question Type
-
-      fireEvent.mouseDown(typeFilter);
-
-      const mcOption = await screen.findByRole('option', { name: /Multiple Choice/i });
-      fireEvent.click(mcOption);
-
-      await waitFor(() => {
-        expect(mockReviewService.getReviewQueue).toHaveBeenCalledWith(
-          expect.objectContaining({
-            question_type: 'single_choice'
-          })
-        );
-      });
-    });
-  });
-
-  describe('Question Actions', () => {
-    it('opens approve dialog when approve is clicked', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      const approveButtons = screen.getAllByRole('button', { name: /Approve/i });
-      fireEvent.click(approveButtons[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Approve Question/i)).toBeInTheDocument();
-      });
-    });
-
-    it('opens reject dialog when reject is clicked', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      const rejectButtons = screen.getAllByRole('button', { name: /Reject/i });
-      fireEvent.click(rejectButtons[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Reject Question/i)).toBeInTheDocument();
-      });
-    });
-
-    it('opens editor when edit is clicked', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      const editButtons = screen.getAllByRole('button', { name: /Edit/i });
-      fireEvent.click(editButtons[0]);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Edit Question #1/i)).toBeInTheDocument();
-      });
-    });
-
-    it('opens comment dialog when comment is clicked', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      // Find comment button by aria-label instead of text
-      const commentButtons = screen.getAllByLabelText(/Add Comment/i);
-      fireEvent.click(commentButtons[0]);
-
-      await waitFor(() => {
-        // Dialog title should be visible
-        expect(screen.getByRole('heading', { name: /Add Comment/i })).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Approve/Reject Workflow', () => {
-    it('approves question successfully', async () => {
-      mockReviewService.approveQuestion.mockResolvedValue({
-        ...mockQuestions[0],
-        review_status: ReviewStatus.APPROVED
-      });
-
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      // Click approve button
-      const approveButtons = screen.getAllByRole('button', { name: /Approve/i });
-      fireEvent.click(approveButtons[0]);
-
-      // Wait for dialog
-      await waitFor(() => {
-        expect(screen.getByText(/Approve Question/i)).toBeInTheDocument();
-      });
-
-      // Click confirm in dialog
-      const confirmButton = screen.getByRole('button', { name: /Approve/i });
-      fireEvent.click(confirmButton);
-
-      await waitFor(() => {
-        expect(mockReviewService.approveQuestion).toHaveBeenCalledWith(
-          1,
-          expect.objectContaining({
-            reviewer_id: 'current_user'
-          })
-        );
-      });
-    });
-
-    it('rejects question with reason', async () => {
-      mockReviewService.rejectQuestion.mockResolvedValue({
-        ...mockQuestions[0],
-        review_status: ReviewStatus.REJECTED
-      });
-
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      // Click reject button
-      const rejectButtons = screen.getAllByRole('button', { name: /Reject/i });
-      fireEvent.click(rejectButtons[0]);
-
-      // Wait for dialog
-      await waitFor(() => {
-        expect(screen.getByText(/Reject Question/i)).toBeInTheDocument();
-      });
-
-      // Enter reason
-      const reasonInput = screen.getByLabelText(/Reason/i);
-      fireEvent.change(reasonInput, { target: { value: 'Question is ambiguous' } });
-
-      // Click confirm
-      const confirmButton = screen.getByRole('button', { name: /Reject/i });
-      fireEvent.click(confirmButton);
-
-      await waitFor(() => {
-        expect(mockReviewService.rejectQuestion).toHaveBeenCalledWith(
-          1,
-          expect.objectContaining({
-            reviewer_id: 'current_user',
-            reason: 'Question is ambiguous'
-          })
-        );
-      });
-    });
-  });
-
-  describe('Refresh Functionality', () => {
-    it('refreshes questions when refresh button is clicked', async () => {
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('What is a heap data structure?')).toBeInTheDocument();
-      });
-
-      // Clear mock to reset call count
-      mockReviewService.getReviewQueue.mockClear();
-
-      // Find refresh button by aria-label (it's an IconButton with Tooltip)
-      const refreshButton = screen.getByLabelText(/Refresh/i);
-      fireEvent.click(refreshButton);
-
-      await waitFor(() => {
-        expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
-      });
-    });
-  });
-
-  describe('Error Handling', () => {
-    // NOTE: this whole suite is `describe.skip` (see the top of the file) and
-    // was not run when TF-772 changed the component. Updated anyway so that
-    // whoever un-skips it does not first have to work out why an assertion on
-    // a raw error message fails: the queue no longer renders `err.message`,
-    // it renders `translateError()`'s resolved `components.reviewQueue.errorLoad`
-    // text for an untyped error — the setupTests `t` mock resolves real keys
-    // to their real translation (see `mockResolveKey`), so asserting on the
-    // literal key string here would itself fail once un-skipped.
-    it('displays error message when loading fails', async () => {
-      mockReviewService.getReviewQueue.mockRejectedValue(new Error('Failed to load'));
-
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        const alerts = screen.getAllByRole('alert');
-        const errorAlert = alerts.find(alert =>
-          alert.textContent?.includes('Fragen konnten nicht geladen werden'),
-        );
-        expect(errorAlert).toBeInTheDocument();
-      }, { timeout: 3000 });
-    });
-  });
-
-  describe('Empty State', () => {
-    it('displays message when no questions found', async () => {
+    it('shows the empty-state message when no question matches', async () => {
       mockReviewService.getReviewQueue.mockResolvedValue({
         total: 0,
         pending: 0,
@@ -486,15 +153,232 @@ describe.skip('ReviewQueue', () => {
         questions: []
       });
 
-      render(
-        <TestWrapper>
-          <ReviewQueue />
-        </TestWrapper>
-      );
+      renderQueue();
+
+      expect(
+        await screen.findByText('Keine Fragen gefunden, die deinen Filtern entsprechen.')
+      ).toBeInTheDocument();
+    });
+
+    it('shows the translated load error, not the raw message', async () => {
+      mockReviewService.getReviewQueue.mockRejectedValue(new Error('Failed to load'));
+
+      renderQueue();
+
+      expect(await screen.findByText('Fragen konnten nicht geladen werden')).toBeInTheDocument();
+      expect(screen.queryByText(/Failed to load/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Filters', () => {
+    // The three MUI Selects carry no accessible name (InputLabel is not wired
+    // via labelId), so they are addressed by position: status, difficulty, type.
+    const pickFilter = async (index: number, option: string) => {
+      fireEvent.mouseDown(screen.getAllByRole('combobox')[index]);
+      fireEvent.click(within(await screen.findByRole('listbox')).getByText(option));
+    };
+
+    it.each([
+      [0, 'Ausstehend', { status: ReviewStatus.PENDING }],
+      [1, 'Mittel', { difficulty: 'medium' }],
+      [2, 'Einfachauswahl', { question_type: 'single_choice' }],
+    ])('reloads the queue with the chosen filter (select %i: %s)', async (index, option, expected) => {
+      renderQueue();
+      await waitForQuestions();
+
+      await pickFilter(index, option);
 
       await waitFor(() => {
-        expect(screen.getByText(/No questions found matching your filters/i)).toBeInTheDocument();
+        expect(mockReviewService.getReviewQueue).toHaveBeenLastCalledWith(
+          expect.objectContaining({ ...expected, offset: 0 })
+        );
       });
+    });
+
+    it('switches to the archive view', async () => {
+      renderQueue();
+      await waitForQuestions();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Archiv anzeigen' }));
+
+      await waitFor(() => {
+        expect(mockReviewService.getReviewQueue).toHaveBeenLastCalledWith(
+          expect.objectContaining({ archived_only: true })
+        );
+      });
+      expect(screen.getByRole('button', { name: 'Aktive anzeigen' })).toBeInTheDocument();
+    });
+
+    it('reloads the queue when refresh is clicked', async () => {
+      renderQueue();
+      await waitForQuestions();
+      mockReviewService.getReviewQueue.mockClear();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+
+      await waitFor(() => {
+        expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Approve/Reject Workflow', () => {
+    it('approves a question through the confirmation dialog and reloads', async () => {
+      mockReviewService.approveQuestion.mockResolvedValue({
+        ...mockQuestions[0],
+        review_status: ReviewStatus.APPROVED
+      });
+
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(firstCardButton('Genehmigen'));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Frage genehmigen')).toBeInTheDocument();
+      mockReviewService.getReviewQueue.mockClear();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
+
+      await waitFor(() => {
+        expect(mockReviewService.approveQuestion).toHaveBeenCalledWith(1, { reason: undefined });
+      });
+      await waitFor(() => {
+        expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
+      });
+      expect(mockReviewService.rejectQuestion).not.toHaveBeenCalled();
+    });
+
+    it('rejects a question and passes the entered reason', async () => {
+      mockReviewService.rejectQuestion.mockResolvedValue({
+        ...mockQuestions[0],
+        review_status: ReviewStatus.REJECTED
+      });
+
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(firstCardButton('Ablehnen'));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Frage ablehnen')).toBeInTheDocument();
+      fireEvent.change(within(dialog).getByLabelText('Begründung (optional)'), {
+        target: { value: 'Question is ambiguous' }
+      });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
+
+      await waitFor(() => {
+        expect(mockReviewService.rejectQuestion).toHaveBeenCalledWith(1, {
+          reason: 'Question is ambiguous'
+        });
+      });
+      expect(mockReviewService.approveQuestion).not.toHaveBeenCalled();
+    });
+
+    it('keeps the dialog open and shows the error when the action fails', async () => {
+      mockReviewService.approveQuestion.mockRejectedValue(new Error('boom'));
+
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(firstCardButton('Genehmigen'));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
+
+      expect(await screen.findByText('Aktion fehlgeschlagen')).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  describe('Other Card Actions', () => {
+    it('starts a review and navigates to the review page', async () => {
+      mockReviewService.startReview.mockResolvedValue(mockQuestions[0]);
+
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(firstCardButton('Review starten'));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/questions/review/1');
+      });
+      expect(mockReviewService.startReview).toHaveBeenCalledWith(1);
+    });
+
+    it('opens the editor for the clicked question', async () => {
+      renderQueue();
+      await waitForQuestions();
+
+      fireEvent.click(firstCardButton('Frage bearbeiten'));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByDisplayValue('What is a heap data structure?')).toBeInTheDocument();
+    });
+
+    it('adds a comment through the comment dialog', async () => {
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(firstCardButton('Kommentar hinzufügen'));
+
+      const dialog = await screen.findByRole('dialog');
+      const submit = within(dialog).getByRole('button', { name: 'Kommentar hinzufügen' });
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(within(dialog).getByLabelText('Kommentar'), {
+        target: { value: 'Distractor B is too obvious' }
+      });
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(mockReviewService.addComment).toHaveBeenCalledWith(1, {
+          comment_text: 'Distractor B is too obvious',
+          comment_type: 'general'
+        });
+      });
+    });
+
+    it('archives a question and reloads', async () => {
+      renderQueue();
+      await waitForQuestions();
+      mockReviewService.getReviewQueue.mockClear();
+      fireEvent.click(firstCardButton('Archivieren'));
+
+      await waitFor(() => {
+        expect(mockReviewService.archiveQuestion).toHaveBeenCalledWith(1);
+      });
+      await waitFor(() => {
+        expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Hard Delete (TF-396/TF-408)', () => {
+    const archivedResponse = {
+      ...mockReviewQueueResponse,
+      questions: [{ ...mockQuestions[0], archived_at: '2025-10-20T10:00:00Z' }],
+    };
+
+    it('hides the delete action without the delete_questions permission', async () => {
+      mockReviewService.getReviewQueue.mockResolvedValue(archivedResponse);
+
+      renderQueue();
+      await waitForQuestions();
+
+      expect(screen.getByRole('button', { name: 'Wiederherstellen' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Endgültig löschen' })).not.toBeInTheDocument();
+      expect(mockHasPermission).toHaveBeenCalledWith('delete_questions');
+    });
+
+    it('shows a failed delete inline in the still-open dialog', async () => {
+      mockHasPermission.mockReturnValue(true);
+      mockReviewService.getReviewQueue.mockResolvedValue(archivedResponse);
+      mockReviewService.deleteQuestion.mockRejectedValue(new Error('in use'));
+
+      renderQueue();
+      await waitForQuestions();
+      fireEvent.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
+
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
+
+      expect(await within(dialog).findByText('Löschen fehlgeschlagen')).toBeInTheDocument();
+      expect(mockReviewService.deleteQuestion).toHaveBeenCalledWith(1);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
   });
 });

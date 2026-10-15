@@ -2,9 +2,10 @@ import { ReviewService } from '../ReviewService';
 
 /**
  * ReviewService had no test file at all before TF-772, and the component suite
- * that exercised it (`components/__tests__/ReviewQueue.test.tsx`) is
- * `describe.skip`. So the error path this ticket rewrote had no live coverage
- * whatsoever — this closes that, scoped to the part TF-772 changed.
+ * that exercised it (`components/__tests__/ReviewQueue.test.tsx`) was
+ * `describe.skip` until TF-1057. So the error path TF-772 rewrote had no live
+ * coverage whatsoever — this closed that, scoped to the part TF-772 changed.
+ * The component suite mocks ReviewService and does not repeat these cases.
  *
  * The mechanics of reading `error_code` live in
  * `errors/__tests__/appErrorFromResponse.test.ts`. What is worth pinning HERE

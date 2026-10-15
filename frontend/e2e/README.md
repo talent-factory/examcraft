@@ -21,10 +21,8 @@ frontend/e2e/
 ├── smoke.spec.ts            # Smoke tests (no auth required, fast)
 ├── auth.spec.ts             # Authentication E2E tests (Login, Logout, OAuth)
 ├── api-connectivity.spec.ts # API connectivity tests (URL fix verification)
-├── chat-export.spec.ts      # Chat Export Tests (Markdown & JSON)
 ├── README.md                # Diese Datei
-├── .auth/                   # Stored auth state (gitignored)
-└── test-downloads/          # Temporäre Downloads (wird automatisch bereinigt)
+└── .auth/                   # Stored auth state (gitignored)
 ```
 
 ## Tests ausführen
@@ -56,7 +54,7 @@ bun run test:e2e:debug
 ### Spezifischer Test
 
 ```bash
-npx playwright test chat-export.spec.ts
+npx playwright test auth.spec.ts
 ```
 
 ### Nur ein Browser
@@ -126,16 +124,6 @@ npx playwright install
 - **Health Check** - Backend reachability
 - **Protected Endpoints** - 401 without auth
 - **URL Configuration** - No hardcoded localhost in production
-- **Chat Download** - ChatInterface download API calls
-- **Prompts API** - promptsApi service calls
-
-### ✅ Chat Export (`chat-export.spec.ts`)
-
-- **Markdown Export** - Korrekte Dateinamen, Inhalt validieren
-- **JSON Export** - Struktur validieren, Dateinamen prüfen
-- **Sonderzeichen** - Umlaute, Leerzeichen in Dateinamen
-- **Auto-Extension** - `.md` / `.json` automatisch hinzufügen
-- **Cross-Browser** - Chromium, Firefox, WebKit
 
 ### 🔜 Geplante Tests
 
@@ -239,13 +227,6 @@ bun start
 Erhöhe Timeout in `playwright.config.ts`:
 ```typescript
 timeout: 60 * 1000, // 60 Sekunden
-```
-
-### Problem: "Download failed"
-
-Überprüfe Download-Ordner Permissions:
-```bash
-chmod 755 frontend/e2e/test-downloads
 ```
 
 ## Weitere Ressourcen

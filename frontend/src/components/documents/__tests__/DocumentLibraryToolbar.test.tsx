@@ -48,3 +48,17 @@ test('reset-all appears with >=2 active filters and calls onReset', () => {
   fireEvent.click(screen.getByText(/zur(ü|u)cksetzen|reset all/i));
   expect(onReset).toHaveBeenCalled();
 });
+
+// TF-1057: 'q' is a page-resetting key. Echoing the unchanged query back on
+// mount sent every deep link or reload of `?page=2` back to page 1.
+test.each([
+  ['without a query', {}],
+  ['with a query from the URL', { q: 'mathe' }],
+])('does not report an unchanged query on mount (%s)', async (_label, params) => {
+  const onChange = jest.fn();
+  renderIt({ onChange, params });
+  // Longer than the 300 ms debounce.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  expect(onChange).not.toHaveBeenCalledWith('q', expect.anything());
+  expect(onChange).not.toHaveBeenCalledWith('q', undefined);
+});
