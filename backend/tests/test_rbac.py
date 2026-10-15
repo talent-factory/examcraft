@@ -8,14 +8,21 @@ from fastapi.testclient import TestClient
 
 from main import app
 from database import get_db
-from models.auth import User, Role, Institution, UserStatus, UserRole
+from models.auth import User, Role, Institution, UserStatus
 from services.auth_service import AuthService
+from tests.conftest import login_headers
+
+# Own role names instead of the seeded admin/dozent/viewer: a get-or-create on
+# the real names would silently test whatever permissions an earlier test or
+# seed left behind.
+DOZENT_ROLE = "test_rbac_dozent"
+ASSISTANT_ROLE = "test_rbac_assistant"
+VIEWER_ROLE = "test_rbac_viewer"
 
 
 @pytest.fixture(scope="function")
 def db(test_db):
     """Use PostgreSQL test database from conftest.py"""
-    # Create test institution
     institution = Institution(
         name="Test University",
         slug="test-university",
@@ -28,49 +35,35 @@ def db(test_db):
     test_db.add(institution)
     test_db.flush()
 
-    # Create roles with different permissions (get_or_create to avoid duplicate key errors)
-    role_defs = [
-        {
-            "name": UserRole.ADMIN.value,
-            "display_name": "Admin",
-            "description": "Full system access",
-            "permissions": ["*"],
-            "is_system_role": True,
-        },
-        {
-            "name": UserRole.DOZENT.value,
-            "display_name": "Dozent",
-            "description": "Can create and manage questions",
-            "permissions": [
-                "create_questions",
-                "approve_questions",
-                "edit_questions",
-                "create_documents",
-                "delete_documents",
-                "view_questions",
-            ],
-            "is_system_role": True,
-        },
-        {
-            "name": UserRole.ASSISTANT.value,
-            "display_name": "Assistant",
-            "description": "Can create questions",
-            "permissions": ["create_questions", "create_documents", "view_questions"],
-            "is_system_role": True,
-        },
-        {
-            "name": UserRole.VIEWER.value,
-            "display_name": "Viewer",
-            "description": "Can view questions",
-            "permissions": ["view_questions"],
-            "is_system_role": True,
-        },
-    ]
-    for role_def in role_defs:
-        existing = test_db.query(Role).filter(Role.name == role_def["name"]).first()
-        if not existing:
-            test_db.add(Role(**role_def))
-
+    test_db.add_all(
+        [
+            Role(
+                name=DOZENT_ROLE,
+                display_name="Dozent",
+                description="Can create and review questions",
+                permissions=[
+                    "create_questions",
+                    "review_questions",
+                    "edit_questions",
+                    "create_documents",
+                    "delete_documents",
+                    "view_questions",
+                ],
+            ),
+            Role(
+                name=ASSISTANT_ROLE,
+                display_name="Assistant",
+                description="Can create questions",
+                permissions=["create_questions", "create_documents", "view_questions"],
+            ),
+            Role(
+                name=VIEWER_ROLE,
+                display_name="Viewer",
+                description="Can view questions",
+                permissions=["view_questions"],
+            ),
+        ]
+    )
     test_db.commit()
 
     yield test_db
@@ -78,24 +71,24 @@ def db(test_db):
 
 @pytest.fixture(scope="function")
 def test_client(db):
-    """Create test client with database override"""
+    """Create test client with database override.
+
+    ``with`` runs the app lifespan, which registers the routers; a bare
+    ``TestClient(app)`` answers every API route with 404.
+    """
 
     def override_get_db():
-        try:
-            yield db
-        finally:
-            pass
+        yield db
 
     app.dependency_overrides[get_db] = override_get_db
-    client = TestClient(app)
-    yield client
-    app.dependency_overrides.clear()
+    with TestClient(app) as client:
+        yield client
 
 
 def create_user_with_role(db, email: str, role_name: str):
     """Helper to create user with specific role"""
-    institution = db.query(Institution).first()
-    role = db.query(Role).filter(Role.name == role_name).first()
+    institution = db.query(Institution).filter_by(slug="test-university").one()
+    role = db.query(Role).filter(Role.name == role_name).one()
 
     user = User(
         email=email,
@@ -116,37 +109,18 @@ def create_user_with_role(db, email: str, role_name: str):
     return user
 
 
-def get_auth_token(test_client, email: str):
-    """Helper to get auth token for user"""
-    response = test_client.post(
-        "/api/auth/login", json={"email": email, "password": "testpassword123"}
-    )
-    return response.json()["access_token"]
-
-
 # ============================================================================
 # Permission Tests
 # ============================================================================
 
 
-def test_admin_has_all_permissions(db):
-    """Test that admin role has wildcard permission"""
-    db.query(Role).filter(Role.name == UserRole.ADMIN.value).first()
-    user = create_user_with_role(db, "admin@test.com", UserRole.ADMIN.value)
-
-    # Admin should have any permission
-    assert user.has_permission("create_questions")
-    assert user.has_permission("delete_documents")
-    assert user.has_permission("any_permission")
-
-
 def test_dozent_has_specific_permissions(db):
     """Test that dozent role has specific permissions"""
-    user = create_user_with_role(db, "dozent@test.com", UserRole.DOZENT.value)
+    user = create_user_with_role(db, "dozent@test.com", DOZENT_ROLE)
 
     # Dozent should have these permissions
     assert user.has_permission("create_questions")
-    assert user.has_permission("approve_questions")
+    assert user.has_permission("review_questions")
     assert user.has_permission("create_documents")
 
     # Dozent should NOT have admin permissions
@@ -155,14 +129,14 @@ def test_dozent_has_specific_permissions(db):
 
 def test_viewer_has_limited_permissions(db):
     """Test that viewer role has limited permissions"""
-    user = create_user_with_role(db, "viewer@test.com", UserRole.VIEWER.value)
+    user = create_user_with_role(db, "viewer@test.com", VIEWER_ROLE)
 
     # Viewer should only have view permission
     assert user.has_permission("view_questions")
 
     # Viewer should NOT have create/edit permissions
     assert not user.has_permission("create_questions")
-    assert not user.has_permission("approve_questions")
+    assert not user.has_permission("review_questions")
     assert not user.has_permission("create_documents")
 
 
@@ -173,66 +147,65 @@ def test_viewer_has_limited_permissions(db):
 
 def test_viewer_cannot_create_document(test_client, db):
     """Test that viewer cannot upload documents"""
-    create_user_with_role(db, "viewer@test.com", UserRole.VIEWER.value)
-    token = get_auth_token(test_client, "viewer@test.com")
+    create_user_with_role(db, "viewer@test.com", VIEWER_ROLE)
+    headers = login_headers(test_client, "viewer@test.com", "testpassword123")
 
-    # Try to upload document
     response = test_client.post(
         "/api/v1/documents/upload",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         files={"file": ("test.txt", b"test content", "text/plain")},
     )
 
     assert response.status_code == 403
-    assert "permission" in response.json()["detail"].lower()
+    assert response.json()["error_code"] == "auth_permission_required"
 
 
 def test_dozent_can_create_document(test_client, db):
-    """Test that dozent can upload documents"""
-    create_user_with_role(db, "dozent@test.com", UserRole.DOZENT.value)
-    token = get_auth_token(test_client, "dozent@test.com")
+    """Test that dozent passes the permission check of the upload endpoint"""
+    create_user_with_role(db, "dozent@test.com", DOZENT_ROLE)
+    headers = login_headers(test_client, "dozent@test.com", "testpassword123")
 
-    # Upload document
+    # visibility=team without org_unit_id is rejected right after the
+    # permission check, before the file system or Celery get involved.
     response = test_client.post(
         "/api/v1/documents/upload",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         files={"file": ("test.txt", b"test content", "text/plain")},
+        data={"visibility": "team"},
     )
 
-    # Should succeed (201) or fail for other reasons, but NOT 403
-    assert response.status_code != 403
+    assert response.status_code == 400, response.text
+    assert response.json()["error_code"] == "documents_visibility_invalid_org_unit"
 
 
 def test_viewer_cannot_approve_question(test_client, db):
     """Test that viewer cannot approve questions"""
-    create_user_with_role(db, "viewer@test.com", UserRole.VIEWER.value)
-    token = get_auth_token(test_client, "viewer@test.com")
+    create_user_with_role(db, "viewer@test.com", VIEWER_ROLE)
+    headers = login_headers(test_client, "viewer@test.com", "testpassword123")
 
-    # Try to approve question
     response = test_client.post(
         "/api/v1/questions/1/approve",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=headers,
         json={"reason": "Looks good"},
     )
 
     assert response.status_code == 403
-    assert "permission" in response.json()["detail"].lower()
+    assert response.json()["error_code"] == "auth_permission_required"
 
 
 def test_dozent_can_approve_question(test_client, db):
-    """Test that dozent can approve questions"""
-    create_user_with_role(db, "dozent@test.com", UserRole.DOZENT.value)
-    token = get_auth_token(test_client, "dozent@test.com")
+    """Test that dozent passes the permission check of the approve endpoint"""
+    create_user_with_role(db, "dozent@test.com", DOZENT_ROLE)
+    headers = login_headers(test_client, "dozent@test.com", "testpassword123")
 
-    # Try to approve question (will fail with 404 since question doesn't exist, but NOT 403)
     response = test_client.post(
-        "/api/v1/questions/1/approve",
-        headers={"Authorization": f"Bearer {token}"},
+        "/api/v1/questions/999999999/approve",
+        headers=headers,
         json={"reason": "Looks good"},
     )
 
-    # Should fail with 404 (not found), NOT 403 (forbidden)
-    assert response.status_code != 403
+    # The question does not exist: past the permission check, the lookup fails
+    assert response.status_code == 404, response.text
 
 
 # ============================================================================
@@ -242,27 +215,8 @@ def test_dozent_can_approve_question(test_client, db):
 
 def test_user_with_multiple_roles(db):
     """Test user with multiple roles has combined permissions"""
-    institution = db.query(Institution).first()
-    viewer_role = db.query(Role).filter(Role.name == UserRole.VIEWER.value).first()
-    assistant_role = (
-        db.query(Role).filter(Role.name == UserRole.ASSISTANT.value).first()
-    )
-
-    user = User(
-        email="multi@test.com",
-        password_hash=AuthService.get_password_hash("testpassword123"),
-        first_name="Multi",
-        last_name="Role",
-        institution_id=institution.id,
-        status=UserStatus.ACTIVE.value,
-        is_superuser=False,
-    )
-    db.add(user)
-    db.flush()
-
-    # Assign multiple roles
-    user.roles.append(viewer_role)
-    user.roles.append(assistant_role)
+    user = create_user_with_role(db, "multi@test.com", VIEWER_ROLE)
+    user.roles.append(db.query(Role).filter(Role.name == ASSISTANT_ROLE).one())
     db.commit()
     db.refresh(user)
 
@@ -270,6 +224,7 @@ def test_user_with_multiple_roles(db):
     assert user.has_permission("view_questions")  # From viewer
     assert user.has_permission("create_questions")  # From assistant
     assert user.has_permission("create_documents")  # From assistant
+    assert not user.has_permission("review_questions")  # From neither
 
 
 # ============================================================================
@@ -279,7 +234,7 @@ def test_user_with_multiple_roles(db):
 
 def test_superuser_has_all_permissions(db):
     """Test that superuser has all permissions regardless of roles"""
-    institution = db.query(Institution).first()
+    institution = db.query(Institution).filter_by(slug="test-university").one()
 
     user = User(
         email="superuser@test.com",

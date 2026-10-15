@@ -63,13 +63,6 @@ import models.tag_merge_log  # noqa: F401
 import models.competency  # noqa: F401
 import models.org_unit  # noqa: F401
 
-# Skip test files that need major fixture updates for current DB schema
-collect_ignore_glob = [
-    "test_rbac.py",
-    "test_multi_tenancy.py",
-    "test_document_model.py",
-]
-
 # Test Database Configuration
 # CI sets DATABASE_URL with localhost; Docker uses 'postgres' as host
 POSTGRES_HOST = os.getenv(
@@ -195,6 +188,26 @@ def test_db(test_engine):
     if transaction.is_active:
         transaction.rollback()
     connection.close()
+
+
+_ORIGINAL_LIFESPAN_CONTEXT = app.router.lifespan_context
+
+
+@pytest.fixture(autouse=True)
+def _reset_lifespan_context():
+    """Undo the lifespan wrapping that every ``with TestClient(app)`` leaves.
+
+    ``main.lifespan`` calls ``app.include_router`` for ~44 routers on every
+    startup, and FastAPI's ``include_router`` wraps ``app.router.
+    lifespan_context`` in one more ``merged_lifespan`` layer each time. In a
+    long session the nesting grows by ~44 per TestClient entry until the
+    next entry dies with RecursionError (TF-1056: ~4997 layers deep in
+    test_task_result.py) — the actual mechanism behind the TF-902 bumps of
+    the recursion limit above. No included router defines its own lifespan,
+    so restoring the original context loses nothing.
+    """
+    yield
+    app.router.lifespan_context = _ORIGINAL_LIFESPAN_CONTEXT
 
 
 @pytest.fixture(autouse=True)

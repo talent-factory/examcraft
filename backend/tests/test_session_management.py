@@ -3,6 +3,9 @@ Tests for Session Management
 Tests Redis session store, token blacklist, and session cleanup
 """
 
+import time
+import uuid
+
 import pytest
 from datetime import datetime, timezone, timedelta
 
@@ -43,18 +46,48 @@ def db(test_db):
     yield test_db
 
 
+class _OwnRedisKeys:
+    """Hands out collision-free IDs and remembers the Redis keys they map to.
+
+    Since TF-816 sessions, blacklist, rate limiting, MCP OAuth, ops alerts and
+    activity presence all share Redis DB 0, and a local run may point at the
+    dev Redis. The tests therefore never flush: every ID is unique per test
+    and the teardown deletes exactly the keys handed out here.
+    """
+
+    def __init__(self):
+        self.keys: list[str] = []
+
+    def session_id(self) -> str:
+        session_id = f"test-session-{uuid.uuid4().hex}"
+        self.keys.append(f"session:{session_id}")
+        return session_id
+
+    def user_id(self) -> int:
+        # Far above any real users.id, so user_sessions:{id} never hits dev data.
+        user_id = 10**12 + uuid.uuid4().int % 10**9
+        self.keys.append(f"user_sessions:{user_id}")
+        return user_id
+
+    def token_jti(self) -> str:
+        token_jti = f"test-jti-{uuid.uuid4().hex}"
+        self.keys.append(f"blacklist:{token_jti}")
+        return token_jti
+
+
 @pytest.fixture
-def redis_service():
-    """Create Redis service instance"""
-    try:
-        service = RedisService()
-        # Clear test data
-        service.session_db.flushdb()
-        service.blacklist_db.flushdb()
-        service.rate_limit_db.flushdb()
-        yield service
-    except Exception as e:
-        pytest.skip(f"Redis not available: {e}")
+def own_keys():
+    """Real Redis (CI provides a service container), cleaned up key by key.
+
+    No skip when Redis is unreachable: ``ping()`` raises and the test errors.
+    A skip used to hide that these tests had not run since TF-816.
+    """
+    client = RedisService.get_session_client()
+    client.ping()
+    keys = _OwnRedisKeys()
+    yield keys
+    if keys.keys:
+        client.delete(*keys.keys)
 
 
 def create_test_user(db):
@@ -86,100 +119,96 @@ def create_test_user(db):
 # ============================================================================
 
 
-def test_create_session(redis_service):
+def test_create_session(own_keys):
     """Test creating a session in Redis"""
-    session_store = SessionStore(redis_service.session_db)
+    session_store = SessionStore()
+    client = RedisService.get_session_client()
+    session_id = own_keys.session_id()
+    user_id = own_keys.user_id()
 
-    session_data = {
-        "user_id": 123,
-        "email": "test@example.com",
-        "ip_address": "192.168.1.1",
-    }
-
-    session_id = session_store.create_session(
-        user_id=123, session_data=session_data, ttl_seconds=3600
+    result = session_store.create_session(
+        session_id=session_id,
+        user_id=user_id,
+        data={"email": "test@example.com", "ip_address": "192.168.1.1"},
+        ttl_seconds=3600,
     )
 
-    assert session_id is not None
-    assert len(session_id) > 0
-
-
-def test_get_session(redis_service):
-    """Test retrieving a session from Redis"""
-    session_store = SessionStore(redis_service.session_db)
-
-    session_data = {"user_id": 123, "email": "test@example.com"}
-
-    session_id = session_store.create_session(123, session_data, 3600)
-    retrieved_data = session_store.get_session(session_id)
-
-    assert retrieved_data is not None
-    assert retrieved_data["user_id"] == 123
-    assert retrieved_data["email"] == "test@example.com"
-
-
-def test_delete_session(redis_service):
-    """Test deleting a session from Redis"""
-    session_store = SessionStore(redis_service.session_db)
-
-    session_data = {"user_id": 123}
-    session_id = session_store.create_session(123, session_data, 3600)
-
-    # Delete session
-    result = session_store.delete_session(session_id)
     assert result is True
+    assert 0 < client.ttl(f"session:{session_id}") <= 3600
+    assert session_id in client.smembers(f"user_sessions:{user_id}")
 
-    # Session should no longer exist
+
+def test_get_session(own_keys):
+    """Test retrieving a session from Redis"""
+    session_store = SessionStore()
+    session_id = own_keys.session_id()
+    user_id = own_keys.user_id()
+
+    session_store.create_session(session_id, user_id, {"email": "test@example.com"})
     retrieved_data = session_store.get_session(session_id)
-    assert retrieved_data is None
+
+    assert retrieved_data == {"user_id": user_id, "email": "test@example.com"}
 
 
-def test_delete_user_sessions(redis_service):
+def test_delete_session(own_keys):
+    """Test deleting a session from Redis"""
+    session_store = SessionStore()
+    client = RedisService.get_session_client()
+    session_id = own_keys.session_id()
+    user_id = own_keys.user_id()
+    session_store.create_session(session_id, user_id, {})
+
+    result = session_store.delete_session(session_id)
+
+    assert result is True
+    assert session_store.get_session(session_id) is None
+    assert session_id not in client.smembers(f"user_sessions:{user_id}")
+
+
+def test_delete_user_sessions(own_keys):
     """Test deleting all sessions for a user"""
-    session_store = SessionStore(redis_service.session_db)
+    session_store = SessionStore()
+    client = RedisService.get_session_client()
+    user_id = own_keys.user_id()
+    session_id1 = own_keys.session_id()
+    session_id2 = own_keys.session_id()
+    session_store.create_session(session_id1, user_id, {})
+    session_store.create_session(session_id2, user_id, {})
 
-    # Create multiple sessions for same user
-    session_data = {"user_id": 123}
-    session_id1 = session_store.create_session(123, session_data, 3600)
-    session_id2 = session_store.create_session(123, session_data, 3600)
+    count = session_store.delete_user_sessions(user_id)
 
-    # Delete all sessions for user
-    count = session_store.delete_user_sessions(123)
     assert count == 2
-
-    # Sessions should no longer exist
     assert session_store.get_session(session_id1) is None
     assert session_store.get_session(session_id2) is None
+    assert client.exists(f"user_sessions:{user_id}") == 0
 
 
-def test_extend_session(redis_service):
+def test_extend_session(own_keys):
     """Test extending session TTL"""
-    session_store = SessionStore(redis_service.session_db)
+    session_store = SessionStore()
+    client = RedisService.get_session_client()
+    session_id = own_keys.session_id()
+    session_store.create_session(session_id, own_keys.user_id(), {}, ttl_seconds=60)
 
-    session_data = {"user_id": 123}
-    session_id = session_store.create_session(123, session_data, 60)  # 1 minute
+    result = session_store.extend_session(session_id, 3600)
 
-    # Extend session
-    result = session_store.extend_session(session_id, 3600)  # Extend to 1 hour
     assert result is True
+    assert client.ttl(f"session:{session_id}") > 60
+    # A session that does not exist cannot be extended
+    assert session_store.extend_session(own_keys.session_id(), 3600) is False
 
 
-def test_session_expiration(redis_service):
+def test_session_expiration(own_keys):
     """Test that sessions expire after TTL"""
-    import time
-
-    session_store = SessionStore(redis_service.session_db)
-
-    session_data = {"user_id": 123}
-    session_id = session_store.create_session(123, session_data, 1)  # 1 second TTL
+    session_store = SessionStore()
+    session_id = own_keys.session_id()
+    session_store.create_session(session_id, own_keys.user_id(), {}, ttl_seconds=1)
 
     # Session should exist immediately
     assert session_store.get_session(session_id) is not None
 
-    # Wait for expiration
-    time.sleep(2)
+    time.sleep(1.5)
 
-    # Session should be expired
     assert session_store.get_session(session_id) is None
 
 
@@ -188,49 +217,43 @@ def test_session_expiration(redis_service):
 # ============================================================================
 
 
-def test_add_token_to_blacklist(redis_service):
+def test_add_token_to_blacklist(own_keys):
     """Test adding a token to the blacklist"""
-    blacklist = TokenBlacklist(redis_service.blacklist_db)
+    blacklist = TokenBlacklist()
+    client = RedisService.get_blacklist_client()
+    token_jti = own_keys.token_jti()
 
-    token = "test.jwt.token"
-    result = blacklist.add_token(token, ttl_seconds=3600)
+    result = blacklist.add_token(token_jti, ttl_seconds=3600)
 
     assert result is True
+    assert 0 < client.ttl(f"blacklist:{token_jti}") <= 3600
 
 
-def test_is_token_blacklisted(redis_service):
+def test_is_token_blacklisted(own_keys):
     """Test checking if a token is blacklisted"""
-    blacklist = TokenBlacklist(redis_service.blacklist_db)
-
-    token = "test.jwt.token"
+    blacklist = TokenBlacklist()
+    token_jti = own_keys.token_jti()
 
     # Token should not be blacklisted initially
-    assert blacklist.is_blacklisted(token) is False
+    assert blacklist.is_token_blacklisted(token_jti) is False
 
-    # Add to blacklist
-    blacklist.add_token(token, 3600)
+    blacklist.add_token(token_jti, 3600)
 
-    # Token should now be blacklisted
-    assert blacklist.is_blacklisted(token) is True
+    assert blacklist.is_token_blacklisted(token_jti) is True
 
 
-def test_blacklist_expiration(redis_service):
+def test_blacklist_expiration(own_keys):
     """Test that blacklisted tokens expire after TTL"""
-    import time
-
-    blacklist = TokenBlacklist(redis_service.blacklist_db)
-
-    token = "test.jwt.token"
-    blacklist.add_token(token, 1)  # 1 second TTL
+    blacklist = TokenBlacklist()
+    token_jti = own_keys.token_jti()
+    blacklist.add_token(token_jti, 1)
 
     # Token should be blacklisted immediately
-    assert blacklist.is_blacklisted(token) is True
+    assert blacklist.is_token_blacklisted(token_jti) is True
 
-    # Wait for expiration
-    time.sleep(2)
+    time.sleep(1.5)
 
-    # Token should no longer be blacklisted
-    assert blacklist.is_blacklisted(token) is False
+    assert blacklist.is_token_blacklisted(token_jti) is False
 
 
 # ============================================================================

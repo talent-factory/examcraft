@@ -194,7 +194,7 @@ def test_prompts_use_case_and_tags_renamed_when_table_present(test_db):
     present, use_case and the legacy tags array flip; in core deployments the
     table is absent and this is a clean skip (mirrors the migration's guard)."""
     if "prompts" not in set(sa_inspect(test_db.get_bind()).get_table_names()):
-        pytest.skip("prompts is premium-only; absent in the core schema")
+        pytest.skip("TF-403: prompts is premium-only; absent in the core schema")
 
     pid = str(uuid.uuid4())
     test_db.execute(

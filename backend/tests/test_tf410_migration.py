@@ -183,7 +183,7 @@ def _has_admin(test_db, user_id):
     return row is not None
 
 
-_PROMPTS_REQUIRED = "prompts is premium-only; absent in the core schema"
+_PROMPTS_REQUIRED = "TF-410: prompts is premium-only; absent in the core schema"
 
 
 def _skip_without_prompts(test_db):

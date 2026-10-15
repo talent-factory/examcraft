@@ -1,290 +1,157 @@
 """
-Tests for Claude API endpoints - health check and usage statistics
+Tests for the development-only Claude endpoints in main.py:
+GET /api/v1/claude/health, GET /api/v1/claude/usage, POST /api/v1/generate-exam
 
-SKIPPED: These endpoints do not exist in Core package.
-Claude API endpoints were moved to Premium package or removed.
+All three answer 404 outside ENVIRONMENT=development. The Claude service is
+mocked via main.get_claude_service, so no gateway call is made.
 """
+
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, Mock
+
 from main import app
 
-# Skip all tests in this file - Claude API endpoints do not exist in Core package
-pytestmark = pytest.mark.skip(
-    reason="Claude API endpoints do not exist in Core package. Moved to Premium or removed."
-)
+USAGE_STATS = {
+    "total_cost": 0.0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "requests_last_minute": 0,
+    "demo_mode": False,
+}
 
 
-class TestClaudeAPIEndpoints:
-    """Test suite for Claude API endpoints"""
+@pytest.fixture
+def client():
+    return TestClient(app)
 
-    @pytest.fixture
-    def client(self):
-        """Test Client Fixture"""
-        return TestClient(app)
 
-    @pytest.fixture
-    def mock_claude_service(self):
-        """Mock Claude Service Fixture"""
-        mock_service = Mock()
-        mock_service.api_key = "test-api-key"
-        mock_service.model = "claude-3-sonnet-20240229"
-        mock_service.get_usage_stats.return_value = {
-            "total_cost": 0.0456,
-            "total_input_tokens": 1500,
-            "total_output_tokens": 800,
-            "requests_last_minute": 3,
-            "demo_mode": False,
+@pytest.fixture
+def development(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+
+
+def _mock_service(demo_mode=False):
+    service = Mock()
+    service.demo_mode = demo_mode
+    service.model = "test-model"
+    service.get_usage_stats.return_value = {**USAGE_STATS, "demo_mode": demo_mode}
+    service.generate_questions = AsyncMock()
+    return service
+
+
+def test_claude_health_endpoint_healthy(client, development, monkeypatch):
+    monkeypatch.setenv("LLM_GATEWAY_URL", "http://gateway.test")
+    with patch("main.get_claude_service", return_value=_mock_service()):
+        response = client.get("/api/v1/claude/health")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["service"] == "Claude API"
+    assert data["demo_mode"] is False
+    assert data["gateway_configured"] is True
+    assert data["model"] == "test-model"
+    assert data["usage"] == USAGE_STATS
+
+
+def test_claude_health_endpoint_demo_mode(client, development, monkeypatch):
+    monkeypatch.delenv("LLM_GATEWAY_URL", raising=False)
+    with patch("main.get_claude_service", return_value=_mock_service(demo_mode=True)):
+        response = client.get("/api/v1/claude/health")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "demo_mode"
+    assert data["demo_mode"] is True
+    assert data["gateway_configured"] is False
+
+
+def test_claude_usage_endpoint(client, development):
+    with patch("main.get_claude_service", return_value=_mock_service()):
+        response = client.get("/api/v1/claude/usage")
+
+    assert response.status_code == 200
+    assert response.json() == USAGE_STATS
+
+
+def test_generate_exam_endpoint_success(client, development):
+    service = _mock_service()
+    service.generate_questions.return_value = [
+        {
+            "id": "1",
+            "type": "single_choice",
+            "question": "Was ist Python?",
+            "options": ["Sprache", "Schlange", "Framework", "Datenbank"],
+            "correct_answer": "Sprache",
+            "explanation": "Python ist eine Programmiersprache",
+            "difficulty": "medium",
+            "topic": "Python Grundlagen",
         }
-        return mock_service
+    ]
 
-    def test_claude_health_endpoint_healthy(self, client, mock_claude_service):
-        """Test Claude Health Endpoint - Healthy Status"""
-        with patch("main.claude_service", mock_claude_service):
-            response = client.get("/api/v1/claude/health")
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["status"] == "healthy"
-            assert data["service"] == "Claude API"
-            assert not data["demo_mode"]
-            assert data["api_key_configured"]
-            assert data["model"] == "claude-3-sonnet-20240229"
-            assert "usage" in data
-
-    def test_claude_health_endpoint_demo_mode(self, client):
-        """Test Claude Health Endpoint - Demo Mode"""
-        mock_service = Mock()
-        mock_service.api_key = None
-        mock_service.model = "claude-3-sonnet-20240229"
-        mock_service.get_usage_stats.return_value = {
-            "total_cost": 0.0,
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-            "requests_last_minute": 0,
-            "demo_mode": True,
-        }
-
-        with patch("main.claude_service", mock_service):
-            response = client.get("/api/v1/claude/health")
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["status"] == "demo_mode"
-            assert data["demo_mode"]
-            assert not data["api_key_configured"]
-
-    def test_claude_usage_endpoint(self, client, mock_claude_service):
-        """Test Claude Usage Statistics Endpoint"""
-        with patch("main.claude_service", mock_claude_service):
-            response = client.get("/api/v1/claude/usage")
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["total_cost"] == 0.0456
-            assert data["total_input_tokens"] == 1500
-            assert data["total_output_tokens"] == 800
-            assert data["requests_last_minute"] == 3
-            assert not data["demo_mode"]
-
-    def test_claude_usage_endpoint_demo_mode(self, client):
-        """Test Claude Usage Endpoint in Demo Mode"""
-        mock_service = Mock()
-        mock_service.get_usage_stats.return_value = {
-            "total_cost": 0.0,
-            "total_input_tokens": 0,
-            "total_output_tokens": 0,
-            "requests_last_minute": 0,
-            "demo_mode": True,
-        }
-
-        with patch("main.claude_service", mock_service):
-            response = client.get("/api/v1/claude/usage")
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["total_cost"] == 0.0
-            assert data["demo_mode"]
-
-    def test_generate_exam_endpoint_with_claude_success(
-        self, client, mock_claude_service
-    ):
-        """Test Exam Generation with successful Claude API call"""
-        # Mock successful question generation
-        mock_claude_service.generate_questions.return_value = [
-            {
-                "id": "1",
-                "type": "single_choice",
-                "question": "Was ist Python?",
-                "options": ["Sprache", "Schlange", "Framework", "Datenbank"],
-                "correct_answer": "Sprache",
-                "explanation": "Python ist eine Programmiersprache",
-                "difficulty": "medium",
+    with patch("main.get_claude_service", return_value=service):
+        response = client.post(
+            "/api/v1/generate-exam",
+            json={
                 "topic": "Python Grundlagen",
-            }
-        ]
-
-        with patch("main.claude_service", mock_claude_service):
-            response = client.post(
-                "/api/v1/generate-exam",
-                json={
-                    "topic": "Python Grundlagen",
-                    "difficulty": "medium",
-                    "question_count": 1,
-                    "question_types": ["single_choice"],
-                    "language": "de",
-                },
-            )
-
-            assert response.status_code == 200
-            data = response.json()
-
-            assert data["topic"] == "Python Grundlagen"
-            assert len(data["questions"]) == 1
-            assert data["questions"][0]["question"] == "Was ist Python?"
-            assert "metadata" in data
-
-    def test_generate_exam_endpoint_fallback_to_demo(self, client):
-        """Test Exam Generation with fallback to Demo Mode"""
-        mock_service = Mock()
-        mock_service.generate_questions.side_effect = Exception("API Error")
-
-        with patch("main.claude_service", mock_service):
-            response = client.post(
-                "/api/v1/generate-exam",
-                json={"topic": "Python", "difficulty": "medium", "question_count": 1},
-            )
-
-            # Should still return 200 with demo questions
-            assert response.status_code == 200
-
-    def test_generate_exam_endpoint_invalid_request(self, client):
-        """Test Exam Generation with invalid data"""
-        response = client.post(
-            "/api/v1/generate-exam",
-            json={
-                "topic": "",  # Empty topic
-                "difficulty": "invalid",  # Invalid difficulty
-                "question_count": -1,  # Negative count
-            },
-        )
-
-        assert response.status_code == 422  # Validation Error
-
-    def test_generate_exam_endpoint_missing_fields(self, client):
-        """Test Exam Generation with missing fields"""
-        response = client.post(
-            "/api/v1/generate-exam",
-            json={
-                # Missing topic
-                "difficulty": "medium"
-            },
-        )
-
-        assert response.status_code == 422  # Validation Error
-
-
-class TestClaudeServiceEndToEnd:
-    """End-to-end tests for Claude Service integration"""
-
-    @pytest.fixture
-    def client(self):
-        return TestClient(app)
-
-    @pytest.mark.asyncio
-    async def test_full_exam_generation_workflow(self, client):
-        """Test complete Exam Generation workflow"""
-        # Test 1: Health Check
-        health_response = client.get("/api/v1/claude/health")
-        assert health_response.status_code == 200
-
-        # Test 2: Usage stats (should initially be 0)
-        usage_response = client.get("/api/v1/claude/usage")
-        assert usage_response.status_code == 200
-        usage_response.json()
-
-        # Test 3: Exam Generation
-        exam_response = client.post(
-            "/api/v1/generate-exam",
-            json={
-                "topic": "Software Testing",
                 "difficulty": "medium",
-                "question_count": 2,
-                "question_types": ["single_choice", "open_ended"],
+                "question_count": 1,
+                "question_types": ["single_choice"],
                 "language": "de",
             },
         )
 
-        assert exam_response.status_code == 200
-        exam_data = exam_response.json()
-
-        assert exam_data["topic"] == "Software Testing"
-        assert len(exam_data["questions"]) == 2
-        assert "exam_id" in exam_data
-        assert "created_at" in exam_data
-
-        # Test 4: Usage stats after exam generation
-        final_usage_response = client.get("/api/v1/claude/usage")
-        assert final_usage_response.status_code == 200
-        final_usage_response.json()
-
-        # In demo mode the stats should not change
-        # In real API mode, token counts would increase
-
-    def test_concurrent_requests_rate_limiting(self, client):
-        """Test rate limiting under concurrent requests"""
-        import concurrent.futures
-
-        def make_request():
-            return client.post(
-                "/api/v1/generate-exam",
-                json={
-                    "topic": "Concurrent Testing",
-                    "difficulty": "easy",
-                    "question_count": 1,
-                },
-            )
-
-        # Send multiple concurrent requests
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(make_request) for _ in range(5)]
-            responses = [future.result() for future in futures]
-
-        # All requests should succeed (demo mode or rate limiting)
-        for response in responses:
-            assert response.status_code in [200, 429]  # 429 = Rate Limited
-
-    def test_error_handling_and_recovery(self, client):
-        """Test error handling and recovery"""
-        # Test with various invalid inputs
-        test_cases = [
-            {
-                "topic": "A" * 1000,
-                "difficulty": "medium",
-                "question_count": 1,
-            },  # Very long topic
-            {
-                "topic": "Test",
-                "difficulty": "medium",
-                "question_count": 100,
-            },  # Too many questions
-            {
-                "topic": "Test",
-                "difficulty": "impossible",
-                "question_count": 1,
-            },  # Invalid difficulty
-        ]
-
-        for test_case in test_cases:
-            response = client.post("/api/v1/generate-exam", json=test_case)
-            # Should either be validated (422) or succeed (200)
-            assert response.status_code in [200, 422]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["topic"] == "Python Grundlagen"
+    assert len(data["questions"]) == 1
+    assert data["questions"][0]["question"] == "Was ist Python?"
+    assert data["metadata"]["generated_by"] == "ExamCraft AI with Claude"
+    service.generate_questions.assert_awaited_once_with(
+        topic="Python Grundlagen",
+        difficulty="medium",
+        question_count=1,
+        question_types=["single_choice"],
+        language="de",
+    )
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+def test_generate_exam_endpoint_service_error_returns_500(client, development):
+    service = _mock_service()
+    service.generate_questions.side_effect = RuntimeError("gateway down")
+
+    with patch("main.get_claude_service", return_value=service):
+        response = client.post(
+            "/api/v1/generate-exam",
+            json={"topic": "Python", "question_count": 1},
+        )
+
+    assert response.status_code == 500
+
+
+def test_generate_exam_endpoint_missing_topic(client, development):
+    response = client.post("/api/v1/generate-exam", json={"difficulty": "medium"})
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "method, path",
+    [
+        ("GET", "/api/v1/claude/health"),
+        ("GET", "/api/v1/claude/usage"),
+        ("POST", "/api/v1/generate-exam"),
+    ],
+)
+def test_endpoints_are_hidden_outside_development(client, monkeypatch, method, path):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    service = _mock_service()
+
+    with patch("main.get_claude_service", return_value=service):
+        response = client.request(method, path, json={"topic": "Python"})
+
+    assert response.status_code == 404
+    service.get_usage_stats.assert_not_called()
+    service.generate_questions.assert_not_called()

@@ -1,6 +1,10 @@
 """
 Tests for Multi-Tenancy
-Tests institution isolation, subscription limits, and tenant-aware queries
+Tests institution isolation and tenant-aware queries
+
+Subscription limits (SubscriptionLimits) are covered by
+test_subscription_limits.py, test_subscription_limits_superuser.py and
+test_quota_enforcement_integration.py.
 """
 
 import pytest
@@ -9,7 +13,7 @@ from models.auth import User, Role, Institution, UserStatus, UserRole
 from models.document import Document, DocumentStatus
 from models.question_review import QuestionReview, ReviewStatus
 from services.auth_service import AuthService
-from utils.tenant_utils import TenantFilter, SubscriptionLimits, get_tenant_context
+from utils.tenant_utils import TenantFilter, get_tenant_context
 
 
 @pytest.fixture(scope="function")
@@ -115,6 +119,7 @@ def test_document_tenant_isolation(db):
     # Create documents for each institution
     doc1 = Document(
         filename="doc1.pdf",
+        original_filename="doc1.pdf",
         file_path="/uploads/doc1.pdf",
         file_size=1000,
         mime_type="application/pdf",
@@ -124,6 +129,7 @@ def test_document_tenant_isolation(db):
     )
     doc2 = Document(
         filename="doc2.pdf",
+        original_filename="doc2.pdf",
         file_path="/uploads/doc2.pdf",
         file_size=2000,
         mime_type="application/pdf",
@@ -229,6 +235,7 @@ def test_superuser_can_see_all_data(db):
     # Create documents for both institutions
     doc1 = Document(
         filename="doc1.pdf",
+        original_filename="doc1.pdf",
         file_path="/uploads/doc1.pdf",
         file_size=1000,
         mime_type="application/pdf",
@@ -238,6 +245,7 @@ def test_superuser_can_see_all_data(db):
     )
     doc2 = Document(
         filename="doc2.pdf",
+        original_filename="doc2.pdf",
         file_path="/uploads/doc2.pdf",
         file_size=2000,
         mime_type="application/pdf",
@@ -251,110 +259,12 @@ def test_superuser_can_see_all_data(db):
 
     # Superuser should see all documents
     tenant_context = get_tenant_context(superuser)
-    query = db.query(Document)
+    query = db.query(Document).filter(
+        Document.institution_id.in_([institution1.id, institution2.id])
+    )
     filtered_query = TenantFilter.filter_by_tenant(
         query, Document, tenant_context, allow_superuser_access=True
     )
     docs = filtered_query.all()
 
     assert len(docs) == 2  # Superuser sees both
-
-
-# ============================================================================
-# Subscription Limit Tests
-# ============================================================================
-
-
-def test_user_limit_enforcement(db):
-    """Test that user limit is enforced"""
-    institution = (
-        db.query(Institution).filter(Institution.slug == "university-a").first()
-    )
-
-    # Create max_users (5) active users
-    for i in range(5):
-        create_user(db, f"user{i}@university-a.edu", institution.id)
-
-    # Try to add one more user should fail
-    with pytest.raises(Exception) as exc_info:
-        SubscriptionLimits.check_user_limit(institution, db)
-
-    assert "user limit" in str(exc_info.value).lower()
-
-
-def test_document_limit_enforcement(db):
-    """Test that document limit is enforced"""
-    institution = (
-        db.query(Institution).filter(Institution.slug == "university-a").first()
-    )
-    user = create_user(db, "user@university-a.edu", institution.id)
-
-    # Create max_documents (10) documents
-    for i in range(10):
-        doc = Document(
-            filename=f"doc{i}.pdf",
-            file_path=f"/uploads/doc{i}.pdf",
-            file_size=1000,
-            mime_type="application/pdf",
-            status=DocumentStatus.UPLOADED,
-            user_id=user.id,
-            institution_id=institution.id,
-        )
-        db.add(doc)
-    db.commit()
-
-    # Try to add one more document should fail
-    with pytest.raises(Exception) as exc_info:
-        SubscriptionLimits.check_document_limit(institution, db)
-
-    assert "document limit" in str(exc_info.value).lower()
-
-
-def test_question_limit_enforcement(db):
-    """Test that monthly question limit is enforced"""
-    institution = (
-        db.query(Institution).filter(Institution.slug == "university-a").first()
-    )
-    user = create_user(db, "user@university-a.edu", institution.id)
-
-    # Create max_questions_per_month (50) questions
-    for i in range(50):
-        q = QuestionReview(
-            question_text=f"Question {i}?",
-            question_type="single_choice",
-            difficulty="medium",
-            topic="Test",
-            language="en",
-            review_status=ReviewStatus.PENDING.value,
-            institution_id=institution.id,
-            created_by=user.id,
-        )
-        db.add(q)
-    db.commit()
-
-    # Try to add one more question should fail
-    with pytest.raises(Exception) as exc_info:
-        SubscriptionLimits.check_question_limit(institution, db)
-
-    assert "question limit" in str(exc_info.value).lower()
-
-
-def test_professional_tier_has_higher_limits(db):
-    """Test that professional tier has higher limits than free tier"""
-    free_institution = (
-        db.query(Institution).filter(Institution.slug == "university-a").first()
-    )
-    pro_institution = (
-        db.query(Institution).filter(Institution.slug == "university-b").first()
-    )
-
-    assert free_institution.subscription_tier == "free"
-    assert pro_institution.subscription_tier == "professional"
-
-    # Professional should have higher limits
-    assert pro_institution.max_users > free_institution.max_users
-    assert pro_institution.max_documents > free_institution.max_documents
-    assert (
-        pro_institution.max_questions_per_month
-        > free_institution.max_questions_per_month
-    )

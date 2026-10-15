@@ -152,7 +152,7 @@ def test_ops_alert_task_is_registered_and_routed_in_running_app():
 
     task_name = "premium.tasks.ops_alert_tasks.check_ops_alert_thresholds"
     if task_name not in celery_app.conf.task_routes:
-        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+        pytest.skip("TF-788: Premium-Task nur bei DEPLOYMENT_MODE=full registriert")
     assert "check-ops-alert-thresholds" in celery_app.conf.beat_schedule
 
 
@@ -246,7 +246,7 @@ def test_portfolio_ingestion_task_is_registered_and_routed_in_running_app():
 
     task_name = "premium.tasks.portfolio_ingestion_tasks.run_portfolio_ingestion"
     if task_name not in celery_app.conf.task_routes:
-        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+        pytest.skip("TF-921: Premium-Task nur bei DEPLOYMENT_MODE=full registriert")
     assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
 
 
@@ -289,7 +289,7 @@ def test_portfolio_classification_task_is_registered_and_routed_in_running_app()
         "premium.tasks.portfolio_classification_tasks.run_portfolio_classification"
     )
     if task_name not in celery_app.conf.task_routes:
-        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+        pytest.skip("TF-941: Premium-Task nur bei DEPLOYMENT_MODE=full registriert")
     assert celery_app.conf.task_routes[task_name]["queue"] == "document_processing"
 
 
@@ -452,7 +452,7 @@ def test_portfolio_watchdog_task_is_registered_and_routed_in_running_app():
         "premium.tasks.portfolio_watchdog_tasks.reap_stuck_portfolio_ingestion_jobs"
     )
     if task_name not in celery_app.conf.task_routes:
-        pytest.skip("DEPLOYMENT_MODE != full in dieser Testumgebung")
+        pytest.skip("TF-936: Premium-Task nur bei DEPLOYMENT_MODE=full registriert")
     assert (
         "reap-stuck-portfolio-ingestion-jobs-every-5-minutes"
         in celery_app.conf.beat_schedule
