@@ -7,7 +7,7 @@
  * real network call for the caller's Org-Unit memberships.
  */
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { useDropzone } from 'react-dropzone';
@@ -72,7 +72,9 @@ beforeEach(() => {
   } as ReturnType<typeof useDropzone>);
   // Default: caller has no Org-Unit memberships (Team radio stays disabled) —
   // matches the pre-TF-620 test baseline unless a test opts in below.
-  mockOrgUnitsService.mine.mockResolvedValue({ items: [] });
+  // Stay pending by default: the initial state already has no memberships,
+    // and a resolved promise would update state after the test has returned.
+    mockOrgUnitsService.mine.mockReturnValue(new Promise<never>(() => undefined));
 });
 
 describe('DocumentUpload visibility selector (TF-354/TF-620)', () => {
@@ -153,7 +155,9 @@ describe('DocumentUpload visibility selector (TF-354/TF-620)', () => {
     // Queue a file via the dropzone onDrop callback.
     const onDrop = mockUseDropzone.mock.calls[0][0]!.onDrop as (files: File[]) => void;
     const file = createMockFile('test.pdf', 1024, 'application/pdf');
-    onDrop([file]);
+    act(() => {
+      onDrop([file]);
+    });
 
     // Switch to institution visibility (index 2: private, team, institution).
     const radios = screen.getAllByRole('radio') as HTMLInputElement[];
@@ -167,6 +171,11 @@ describe('DocumentUpload visibility selector (TF-354/TF-620)', () => {
         DocumentVisibility.INSTITUTION,
         null,
       );
+    });
+
+    // The upload chain runs on to the results summary; let it finish inside the test.
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
     });
   });
 
@@ -198,7 +207,9 @@ describe('DocumentUpload visibility selector (TF-354/TF-620)', () => {
     render(wrap(<DocumentUpload />));
     const onDrop = mockUseDropzone.mock.calls[0][0]!.onDrop as (files: File[]) => void;
     const file = createMockFile('test.pdf', 1024, 'application/pdf');
-    onDrop([file]);
+    act(() => {
+      onDrop([file]);
+    });
 
     await waitFor(() => {
       const radios = screen.getAllByRole('radio') as HTMLInputElement[];
@@ -218,6 +229,11 @@ describe('DocumentUpload visibility selector (TF-354/TF-620)', () => {
         DocumentVisibility.TEAM,
         42,
       );
+    });
+
+    // The upload chain runs on to the results summary; let it finish inside the test.
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
     });
   });
 });

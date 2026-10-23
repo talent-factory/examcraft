@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { MemoryRouter } from 'react-router-dom';
@@ -114,6 +115,18 @@ const waitForQuestions = () => screen.findByText('What is a heap data structure?
 /** Card actions exist once per card; the first one belongs to question 1. */
 const firstCardButton = (name: string) => screen.getAllByRole('button', { name })[0];
 
+/**
+ * The component clears `loading` in the finally block of every async handler.
+ * A test that clicks an action must wait for that to settle, otherwise the
+ * state update lands after the test has returned, outside act(...). Waiting
+ * for the refresh button (disabled while loading) covers it. hidden: an open
+ * MUI dialog marks the page behind it aria-hidden.
+ */
+const waitForIdle = () =>
+  waitFor(() => {
+    expect(screen.getByRole('button', { name: 'Aktualisieren', hidden: true })).toBeEnabled();
+  });
+
 describe('ReviewQueue', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -175,7 +188,7 @@ describe('ReviewQueue', () => {
     // via labelId), so they are addressed by position: status, difficulty, type.
     const pickFilter = async (index: number, option: string) => {
       fireEvent.mouseDown(screen.getAllByRole('combobox')[index]);
-      fireEvent.click(within(await screen.findByRole('listbox')).getByText(option));
+      await userEvent.click(within(await screen.findByRole('listbox')).getByText(option));
     };
 
     it.each([
@@ -199,7 +212,7 @@ describe('ReviewQueue', () => {
       renderQueue();
       await waitForQuestions();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Archiv anzeigen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Archiv anzeigen' }));
 
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenLastCalledWith(
@@ -207,6 +220,7 @@ describe('ReviewQueue', () => {
         );
       });
       expect(screen.getByRole('button', { name: 'Aktive anzeigen' })).toBeInTheDocument();
+      await waitForIdle();
     });
 
     it('reloads the queue when refresh is clicked', async () => {
@@ -214,11 +228,12 @@ describe('ReviewQueue', () => {
       await waitForQuestions();
       mockReviewService.getReviewQueue.mockClear();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Aktualisieren' }));
 
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
       });
+      await waitForIdle();
     });
   });
 
@@ -231,12 +246,12 @@ describe('ReviewQueue', () => {
 
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(firstCardButton('Genehmigen'));
+      await userEvent.click(firstCardButton('Genehmigen'));
 
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).getByText('Frage genehmigen')).toBeInTheDocument();
       mockReviewService.getReviewQueue.mockClear();
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
 
       await waitFor(() => {
         expect(mockReviewService.approveQuestion).toHaveBeenCalledWith(1, { reason: undefined });
@@ -245,6 +260,7 @@ describe('ReviewQueue', () => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
       });
       expect(mockReviewService.rejectQuestion).not.toHaveBeenCalled();
+      await waitForIdle();
     });
 
     it('rejects a question and passes the entered reason', async () => {
@@ -255,14 +271,14 @@ describe('ReviewQueue', () => {
 
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(firstCardButton('Ablehnen'));
+      await userEvent.click(firstCardButton('Ablehnen'));
 
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).getByText('Frage ablehnen')).toBeInTheDocument();
       fireEvent.change(within(dialog).getByLabelText('Begründung (optional)'), {
         target: { value: 'Question is ambiguous' }
       });
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
 
       await waitFor(() => {
         expect(mockReviewService.rejectQuestion).toHaveBeenCalledWith(1, {
@@ -270,6 +286,7 @@ describe('ReviewQueue', () => {
         });
       });
       expect(mockReviewService.approveQuestion).not.toHaveBeenCalled();
+      await waitForIdle();
     });
 
     it('keeps the dialog open and shows the error when the action fails', async () => {
@@ -277,12 +294,13 @@ describe('ReviewQueue', () => {
 
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(firstCardButton('Genehmigen'));
+      await userEvent.click(firstCardButton('Genehmigen'));
       const dialog = await screen.findByRole('dialog');
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Genehmigen' }));
 
       expect(await screen.findByText('Aktion fehlgeschlagen')).toBeInTheDocument();
       expect(screen.getByRole('dialog')).toBeInTheDocument();
+      await waitForIdle();
     });
   });
 
@@ -292,28 +310,30 @@ describe('ReviewQueue', () => {
 
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(firstCardButton('Review starten'));
+      await userEvent.click(firstCardButton('Review starten'));
 
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith('/questions/review/1');
       });
       expect(mockReviewService.startReview).toHaveBeenCalledWith(1);
+      await waitForIdle();
     });
 
     it('opens the editor for the clicked question', async () => {
       renderQueue();
       await waitForQuestions();
 
-      fireEvent.click(firstCardButton('Frage bearbeiten'));
+      await userEvent.click(firstCardButton('Frage bearbeiten'));
 
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).getByDisplayValue('What is a heap data structure?')).toBeInTheDocument();
+      await waitForIdle();
     });
 
     it('adds a comment through the comment dialog', async () => {
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(firstCardButton('Kommentar hinzufügen'));
+      await userEvent.click(firstCardButton('Kommentar hinzufügen'));
 
       const dialog = await screen.findByRole('dialog');
       const submit = within(dialog).getByRole('button', { name: 'Kommentar hinzufügen' });
@@ -322,7 +342,7 @@ describe('ReviewQueue', () => {
       fireEvent.change(within(dialog).getByLabelText('Kommentar'), {
         target: { value: 'Distractor B is too obvious' }
       });
-      fireEvent.click(submit);
+      await userEvent.click(submit);
 
       await waitFor(() => {
         expect(mockReviewService.addComment).toHaveBeenCalledWith(1, {
@@ -330,13 +350,14 @@ describe('ReviewQueue', () => {
           comment_type: 'general'
         });
       });
+      await waitForIdle();
     });
 
     it('archives a question and reloads', async () => {
       renderQueue();
       await waitForQuestions();
       mockReviewService.getReviewQueue.mockClear();
-      fireEvent.click(firstCardButton('Archivieren'));
+      await userEvent.click(firstCardButton('Archivieren'));
 
       await waitFor(() => {
         expect(mockReviewService.archiveQuestion).toHaveBeenCalledWith(1);
@@ -344,6 +365,7 @@ describe('ReviewQueue', () => {
       await waitFor(() => {
         expect(mockReviewService.getReviewQueue).toHaveBeenCalledTimes(1);
       });
+      await waitForIdle();
     });
   });
 
@@ -371,14 +393,15 @@ describe('ReviewQueue', () => {
 
       renderQueue();
       await waitForQuestions();
-      fireEvent.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
 
       const dialog = await screen.findByRole('dialog');
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
 
       expect(await within(dialog).findByText('Löschen fehlgeschlagen')).toBeInTheDocument();
       expect(mockReviewService.deleteQuestion).toHaveBeenCalledWith(1);
       expect(screen.getByRole('dialog')).toBeInTheDocument();
+      await waitForIdle();
     });
   });
 });

@@ -42,7 +42,9 @@ const createMockFile = (name: string, type: string): File =>
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockOrgUnitsService.mine.mockResolvedValue({ items: [] });
+  // Stay pending by default: the initial state already has no memberships,
+    // and a resolved promise would update state after the test has returned.
+    mockOrgUnitsService.mine.mockReturnValue(new Promise<never>(() => undefined));
   mockUseDropzone.mockReturnValue({
     getRootProps: jest.fn().mockReturnValue({}),
     getInputProps: jest.fn().mockReturnValue({}),
