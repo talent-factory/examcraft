@@ -9,6 +9,57 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-23
+
+### Added
+
+- **Tarifgrenzen vorab sichtbar:** Aktionen in der Auswertung, die der
+  aktuelle Tarif nicht umfasst, erscheinen von Anfang an deaktiviert,
+  mit einem Hinweis, ab welchem Tarif sie verfügbar sind. Bisher wurden
+  sie angeboten und erst beim Ausführen abgelehnt.
+- **Standardtexte in der App-Sprache:** Eingebaute Texte von
+  Bedienelementen wie «Schliessen» oder Tabellen-Seitenangaben folgen
+  jetzt der gewählten Sprache (Deutsch, Englisch,
+  Französisch, Italienisch). Deutsch erscheint in Schweizer
+  Orthografie.
+
+### Changed
+
+- **Weniger Personendaten in KI-Anfragen:** Vor jeder Anfrage an ein
+  KI-Modell werden E-Mail-Adressen, AHV-Nummern und die Namen der
+  betroffenen Lernenden entfernt. Das gilt für alle KI-Funktionen, auch
+  für die Korrektur. Importierte Moodle-Versuche speichern keine
+  E-Mail-Adresse mehr als Kennung; bestehende Kennungen werden beim
+  Update umgewandelt.
+- **Keine automatische Newsletter-Anmeldung:** Wer die E-Mail-Adresse
+  bestätigt, wird nicht mehr automatisch für den Newsletter angemeldet.
+- **Prüfung der KI-Anbindung beim Start:** Server und Hintergrunddienste
+  prüfen beim Start, ob alle benötigten KI-Modelle freigeschaltet sind,
+  und melden fehlende Freigaben sofort statt erst bei der ersten
+  Anfrage.
+
+### Fixed
+
+- **Lesbare Musterlösungen:** Bei Freitextfragen mit gegliederter
+  Musterlösung oder Punkteraster erschien in der Fragen-Review teilweise
+  roher JSON-Text. Musterlösung und Bewertungskriterien werden jetzt als
+  formatierter Text angezeigt.
+- **Tarifgrenzen durchgesetzt:** Sammelfreigabe im Fragen-Review und
+  eigene Notenmodelle sind wie vorgesehen nur in den Tarifen verfügbar,
+  die sie enthalten.
+- **Startzeit laufender Generierungen:** Die Liste der laufenden
+  Generierungen zeigte die Startzeit um eine bzw. zwei Stunden zu früh
+  an.
+- **Letzte Anmeldung im Profil:** Das Profil zeigt unter «Letzte
+  Anmeldung» wieder die Anmeldung vor der aktuellen Sitzung.
+- **Seitenwechsel in der Dokumentbibliothek:** Ein Link auf eine
+  bestimmte Seite der Dokumentbibliothek oder ein Neuladen der Seite
+  sprang auf Seite 1 zurück.
+- **Fehlermeldungen beim Import:** Schlägt ein Import fehl, erscheint
+  eine verständliche Meldung statt technischer Fehlerdetails.
+- **Barrierefreiheit im Fragen-Assistenten:** Die Auswahl des
+  Kompetenzrahmens ist für Screenreader korrekt beschriftet.
+
 ## [1.14.0] - 2026-10-01
 
 ### Added
