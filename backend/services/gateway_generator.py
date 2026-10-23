@@ -12,12 +12,13 @@ from __future__ import annotations
 import logging
 from typing import List, NoReturn, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
 
 from services import llm_gateway
 from services.claude_service import ModelUnavailableError
+from services.structured_text import structured_to_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,9 @@ class GeneratedQuestion(BaseModel):
     Der frühere Legacy-Pfad (``claude_service._parse_claude_response``,
     reines ``json.loads`` ohne Schema — inzwischen entfernt, TF-440) kannte
     dieses Problem nicht, weil er jedes Feld unverändert durchreichte. Alle
-    Zusatzfelder sind rein additiv/optional — bestehende
-    single_choice/true_false-Generierung bleibt unverändert.
+    Zusatzfelder sind rein additiv/optional. Ausnahme: ``explanation`` läuft
+    wie ``sample_answer``/``evaluation_criteria`` bei allen Fragetypen durch
+    ``_flatten_structured_text`` (siehe dort).
     """
 
     id: str
@@ -55,6 +57,23 @@ class GeneratedQuestion(BaseModel):
     bloom_level: Optional[int] = None
     competency_code: Optional[str] = None
     ln_level: Optional[int] = None
+
+    @field_validator(
+        "sample_answer", "evaluation_criteria", "explanation", mode="before"
+    )
+    @classmethod
+    def _flatten_structured_text(cls, value):
+        """Render structured model answers/rubrics as Markdown.
+
+        For structured model answers or scoring rubrics the model sometimes
+        returns an object instead of text. ``mode="before"`` matters: a dict
+        would fail ``Optional[str]`` validation, failing the whole typed run
+        and dropping it to the raw-Markdown fallback in ``claude_service``. A
+        JSON string of such an object would otherwise show up raw in the
+        review view. Other values (prose, unrelated JSON) pass unchanged, so
+        single_choice/true_false explanations are not affected in practice.
+        """
+        return structured_to_markdown(value)
 
 
 class GeneratedQuestions(BaseModel):

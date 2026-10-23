@@ -7,7 +7,6 @@ Automatically persists generated questions to question_reviews (status: pending)
 import contextlib
 import dataclasses
 import enum
-import json
 import logging
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, NoReturn, Optional
@@ -25,6 +24,7 @@ from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
 from schemas.task import ProgressCode
 from services.claude_service import ModelUnavailableError
+from services.structured_text import structured_to_markdown
 from tasks.document_tasks import ProgressTask, run_async
 
 logger = logging.getLogger(__name__)
@@ -516,6 +516,13 @@ def _coerce_ln_level(value) -> Optional[int]:
     return level if 1 <= level <= 4 else None
 
 
+def _is_plain_list(value: Any) -> bool:
+    """A list without nested dicts/lists, stored as a "; "-joined string."""
+    return isinstance(value, list) and not any(
+        isinstance(item, (dict, list)) for item in value
+    )
+
+
 def _persist_questions(
     questions: list,
     exam_id: str,
@@ -581,15 +588,18 @@ def _persist_questions(
         question_pairs: list[tuple[Any, Any]] = []
         for question in questions:
             # explanation can be str, list, or dict — Premium RAG open_ended rubrics
-            # may return a dict. Serialize consistently so the TEXT column always
-            # receives a string; psycopg2 cannot adapt a bare dict.
+            # may return a dict or a list of criterion dicts. Those are rendered as
+            # Markdown so the TEXT column receives readable text (psycopg2 cannot
+            # adapt a bare dict). Strings are stored as-is: JSON strings from the
+            # gateway are already converted by the GeneratedQuestion validator, so
+            # this branch only serves callers that bypass it.
             explanation_raw = question.explanation
             if isinstance(explanation_raw, str):
                 explanation_text = explanation_raw
-            elif isinstance(explanation_raw, list):
+            elif _is_plain_list(explanation_raw):
                 explanation_text = "; ".join(str(item) for item in explanation_raw)
-            elif isinstance(explanation_raw, dict):
-                explanation_text = json.dumps(explanation_raw, ensure_ascii=False)
+            elif isinstance(explanation_raw, (dict, list)):
+                explanation_text = structured_to_markdown(explanation_raw)
             elif explanation_raw is not None:
                 # Unexpected type — fall back to str() but warn so a new
                 # Premium return shape doesn't land silently as "<obj at 0x..>".
@@ -622,15 +632,15 @@ def _persist_questions(
                     f"question_options.unsupported_type log entry above."
                 )
             # correct_answer can be str, dict, or list — Premium RAG open_ended
-            # rubrics return a dict. Serialize to JSON so the TEXT column receives
-            # a string; psycopg2 cannot adapt a bare dict.
+            # rubrics may return a dict or a list of dicts. Render those as Markdown,
+            # as for explanation above; plain lists keep the "; " join.
             correct_answer_raw = question.correct_answer
-            if isinstance(correct_answer_raw, dict):
-                correct_answer_text = json.dumps(correct_answer_raw, ensure_ascii=False)
-            elif isinstance(correct_answer_raw, list):
+            if _is_plain_list(correct_answer_raw):
                 correct_answer_text = "; ".join(
                     str(item) for item in correct_answer_raw
                 )
+            elif isinstance(correct_answer_raw, (dict, list)):
+                correct_answer_text = structured_to_markdown(correct_answer_raw)
             elif correct_answer_raw is not None:
                 # Unexpected type — fall back to str() but warn so a new
                 # Premium return shape doesn't land silently as "<obj at 0x..>".

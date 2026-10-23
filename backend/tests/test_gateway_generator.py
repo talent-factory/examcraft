@@ -167,3 +167,94 @@ async def test_raw_4xx_maps_to_model_unavailable(monkeypatch):
     monkeypatch.setattr(gg.Agent, "run", boom, raising=True)
     with pytest.raises(ModelUnavailableError):
         await gg.generate_raw_via_gateway("prompt")
+
+
+def test_open_ended_json_string_fields_become_markdown():
+    """For structured model answers the model sometimes writes a JSON object
+    as a string into sample_answer/evaluation_criteria. The validator renders
+    it as Markdown instead of passing the raw JSON through."""
+    q = gg.GeneratedQuestion(
+        id="q1",
+        type="open_ended",
+        question="Fallstudie Projektplanung",
+        sample_answer='{"structure":"Drei Teile","key_points":["Bauleitung"],'
+        '"model_answer":"1. Planung\\n2. SWOT"}',
+        evaluation_criteria='{"total_points":20,"criteria":[{"aspect":"SWOT",'
+        '"points":5,"description":"Mit Massnahmen"}]}',
+    )
+    assert q.sample_answer == (
+        "**Empfohlene Struktur:**\n\nDrei Teile\n\n**Kernpunkte:**\n\n"
+        "- Bauleitung\n\n**Musterantwort:**\n\n1. Planung\n2. SWOT"
+    )
+    assert q.evaluation_criteria == (
+        "**Gesamtpunkte: 20**\n\n**Bewertungskriterien:**\n\n"
+        "- **SWOT** (5 Punkte): Mit Massnahmen"
+    )
+
+
+def test_open_ended_object_fields_are_accepted_as_markdown():
+    """If the model returns a real object instead of a string, str validation
+    must not fail (otherwise the run falls back to the raw-Markdown path)."""
+    q = gg.GeneratedQuestion(
+        id="q1",
+        type="open_ended",
+        question="Q",
+        sample_answer={"model_answer": "Text"},
+        evaluation_criteria=["Kriterium A", "Kriterium B"],
+    )
+    assert q.sample_answer == "**Musterantwort:**\n\nText"
+    assert q.evaluation_criteria == "- Kriterium A\n- Kriterium B"
+
+
+def test_plain_text_fields_pass_through_unchanged():
+    q = gg.GeneratedQuestion(
+        id="q1",
+        type="open_ended",
+        question="Q",
+        sample_answer="Fliesstext",
+        evaluation_criteria="Kriterien als Text",
+        explanation="Erklärung",
+    )
+    assert q.sample_answer == "Fliesstext"
+    assert q.evaluation_criteria == "Kriterien als Text"
+    assert q.explanation == "Erklärung"
+
+
+def test_explanation_json_rubric_string_becomes_markdown():
+    q = gg.GeneratedQuestion(
+        id="q1",
+        type="open_ended",
+        question="Q",
+        explanation='{"total_points":20,"criteria":[{"aspect":"SWOT",'
+        '"points":5,"description":"Mit Massnahmen"}]}',
+    )
+    assert q.explanation == (
+        "**Gesamtpunkte: 20**\n\n**Bewertungskriterien:**\n\n"
+        "- **SWOT** (5 Punkte): Mit Massnahmen"
+    )
+
+
+def test_json_sample_answer_that_is_not_a_rubric_is_unchanged():
+    """A legitimate JSON answer (e.g. to "write a JSON object") must survive."""
+    answer = '{"name": "Max", "age": 30}'
+    q = gg.GeneratedQuestion(
+        id="q1", type="open_ended", question="Q", sample_answer=answer
+    )
+    assert q.sample_answer == answer
+
+
+def test_multiple_choice_answers_are_untouched():
+    """multiple_choice answers are JSON arrays by design (DeterministicGrader
+    parses them); the validator must not cover correct_answer(s)."""
+    q = gg.GeneratedQuestion(
+        id="q1",
+        type="multiple_choice",
+        question="Q",
+        options=["A", "B", "C"],
+        correct_answers=["A", "B"],
+        correct_answer='["A", "B"]',
+        explanation="A und B sind richtig",
+    )
+    assert q.correct_answers == ["A", "B"]
+    assert q.correct_answer == '["A", "B"]'
+    assert q.explanation == "A und B sind richtig"

@@ -1005,11 +1005,10 @@ def _capture_persisted_correct_answer(fake_question):
     return captured[0]
 
 
-def test_persist_questions_serializes_dict_correct_answer_to_json():
-    """Premium open_ended rubric dicts must be JSON-serialized before INSERT —
-    psycopg2 cannot adapt a bare dict to the TEXT column."""
-    import json
-
+def test_persist_questions_renders_dict_correct_answer_as_markdown():
+    """Premium open_ended rubric dicts must become a string before INSERT —
+    psycopg2 cannot adapt a bare dict to the TEXT column. It is rendered as
+    readable Markdown instead of raw JSON, which reviewers could not read."""
     rubric = {
         "overview": "Vollständige Antwort beschreibt Sender-Empfänger-Modell.",
         "excellent": "Alle drei Komponenten korrekt benannt.",
@@ -1021,8 +1020,10 @@ def test_persist_questions_serializes_dict_correct_answer_to_json():
     persisted = _capture_persisted_correct_answer(_make_open_ended_question(rubric))
 
     assert isinstance(persisted, str), "dict must be serialized to str for TEXT column"
-    parsed = json.loads(persisted)
-    assert parsed == rubric
+    assert not persisted.lstrip().startswith("{")
+    for value in rubric.values():
+        assert value in persisted
+    assert "**Overview:**" in persisted
 
 
 def test_persist_questions_serializes_list_correct_answer_to_string():
@@ -1054,11 +1055,9 @@ def test_persist_questions_passes_empty_string_correct_answer_unchanged():
     assert persisted == ""
 
 
-def test_persist_questions_serializes_nested_dict_correct_answer_to_json():
-    """Nested rubric dicts (Premium open_ended) must round-trip via JSON, not
-    end up as Python repr (``"{'key': {'nested': ...}}"``) in the TEXT column."""
-    import json
-
+def test_persist_questions_renders_nested_dict_correct_answer_as_markdown():
+    """Nested rubric dicts (Premium open_ended) must not end up as Python repr
+    (``"{'key': {'nested': ...}}"``) or raw JSON in the TEXT column."""
     nested_rubric = {
         "criteria": {
             "content_accuracy": {
@@ -1074,10 +1073,23 @@ def test_persist_questions_serializes_nested_dict_correct_answer_to_json():
         _make_open_ended_question(nested_rubric)
     )
 
-    assert isinstance(persisted, str)
-    assert not persisted.startswith("{'"), "Must not be Python repr"
-    parsed = json.loads(persisted)
-    assert parsed == nested_rubric
+    # Every criterion name, description and point value must survive.
+    assert persisted == (
+        "**Bewertungskriterien:**\n\n"
+        "- **Content accuracy** (5 Punkte): Sachliche Richtigkeit\n"
+        "- **Completeness** (3 Punkte): Vollständigkeit"
+        "\n\n**Overview:**\n\n"
+        "Vollständige Antwort beschreibt Sender-Empfänger-Modell."
+    )
+
+
+def test_persist_questions_renders_list_of_criterion_dicts_correct_answer():
+    """A list of rubric dicts must not be stored as "; "-joined Python repr."""
+    rubric = [{"aspect": "Analyse", "points": 5, "description": "Vollständig"}]
+
+    persisted = _capture_persisted_correct_answer(_make_open_ended_question(rubric))
+
+    assert persisted == "- **Analyse** (5 Punkte): Vollständig"
 
 
 def test_persist_questions_preserves_none_correct_answer():
@@ -1163,22 +1175,22 @@ def _make_question_with_explanation(explanation):
     )
 
 
-def test_persist_questions_serializes_dict_explanation_to_json():
-    """explanation dict (Premium open_ended rubrics) must be JSON-serialized,
-    not str()-repr — same contract as correct_answer above."""
-    import json
-
+def test_persist_questions_renders_dict_explanation_as_markdown():
+    """explanation dict (Premium open_ended rubrics) must be rendered as
+    Markdown, not str()-repr or raw JSON — same contract as correct_answer."""
     rubric = {
-        "content_accuracy": {"description": "Sachliche Richtigkeit", "max_points": 5},
-        "completeness": {"description": "Vollständigkeit", "max_points": 3},
+        "total_points": 20,
+        "criteria": [
+            {"aspect": "Analyse", "points": 5, "description": "Alle Engpässe"},
+        ],
     }
 
     persisted = _capture_persisted_explanation(_make_question_with_explanation(rubric))
 
-    assert isinstance(persisted, str)
-    # Must be valid JSON, not Python repr like "{'key': 'value'}"
-    parsed = json.loads(persisted)
-    assert parsed == rubric
+    assert persisted == (
+        "**Gesamtpunkte: 20**\n\n**Bewertungskriterien:**\n\n"
+        "- **Analyse** (5 Punkte): Alle Engpässe"
+    )
 
 
 def test_persist_questions_explanation_dict_is_not_python_repr():
@@ -1208,6 +1220,14 @@ def test_persist_questions_explanation_list_joined_with_semicolons():
         persisted
         == "Sender korrekt benannt; Empfänger korrekt benannt; Kanal beschrieben"
     )
+
+
+def test_persist_questions_explanation_list_of_dicts_is_not_python_repr():
+    rubric = [{"aspect": "Analyse", "points": 5}, {"aspect": "Form", "points": 2}]
+
+    persisted = _capture_persisted_explanation(_make_question_with_explanation(rubric))
+
+    assert persisted == "- **Analyse** (5 Punkte)\n- **Form** (2 Punkte)"
 
 
 def test_persist_questions_explanation_empty_list_becomes_empty_string():
