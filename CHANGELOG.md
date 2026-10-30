@@ -9,6 +9,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-10-30
+
+### Changed
+
+- **Aussagekräftige Fragetitel im ILIAS-Export:** Fragen erscheinen
+  nach dem Import in ILIAS mit Nummer und Thema, zum Beispiel
+  «01 – Hobelarten», statt nur als «Frage 1», «Frage 2». Ohne
+  hinterlegtes Thema bleibt der bisherige Titel erhalten.
+
 ## [1.15.0] - 2026-10-23
 
 ### Added
