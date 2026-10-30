@@ -645,6 +645,86 @@ class TestIliasQtiExporter:
         assert "<fieldentry>assTextQuestion</fieldentry>" in xml
         assert 'scoremodel="HumanRater"' in xml
 
+    @staticmethod
+    def _item_titles(xml: str) -> list[str]:
+        from xml.etree.ElementTree import fromstring
+
+        return [item.get("title") for item in fromstring(xml).iter("item")]
+
+    def test_item_title_without_topic_falls_back_to_frage_n(self, sample_exam_data):
+        """No topic on the question: the title stays ``Frage N`` (BWZ EXAMCRAFT-1)."""
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert self._item_titles(xml) == ["Frage 1", "Frage 2"]
+
+    def test_item_title_contains_position_and_topic(self, sample_exam_data):
+        """Topic is appended to the zero-padded position so questions are
+        identifiable (and sorted) in ILIAS (BWZ EXAMCRAFT-1)."""
+        sample_exam_data["questions"][0]["topic"] = "Heap-Operationen"
+        sample_exam_data["questions"][1]["topic"] = "  Zeit-\n komplexität "
+        xml = IliasQtiExporter.export(sample_exam_data)
+        assert self._item_titles(xml) == [
+            "01 – Heap-Operationen",
+            "02 – Zeit- komplexität",
+        ]
+
+    def test_item_title_truncates_long_topic(self, sample_exam_data):
+        """A long topic is cut to 120 characters including the ellipsis."""
+        sample_exam_data["questions"][0]["topic"] = "x" * 300
+        titles = self._item_titles(IliasQtiExporter.export(sample_exam_data))
+        assert titles[0] == "01 – " + "x" * 119 + "…"
+
+    def test_item_title_topic_at_limit_is_not_truncated(self, sample_exam_data):
+        """Exactly 120 characters stay untouched, 121 get the ellipsis."""
+        sample_exam_data["questions"][0]["topic"] = "y" * 120
+        sample_exam_data["questions"][1]["topic"] = "z" * 121
+        titles = self._item_titles(IliasQtiExporter.export(sample_exam_data))
+        assert titles[0] == "01 – " + "y" * 120
+        assert titles[1] == "02 – " + "z" * 119 + "…"
+
+    @pytest.mark.parametrize("topic", ["", "   ", "\n\t", None])
+    def test_item_title_blank_topic_falls_back(self, sample_exam_data, topic):
+        """Empty, whitespace-only or None topics keep the ``Frage N`` title."""
+        sample_exam_data["questions"][0]["topic"] = topic
+        titles = self._item_titles(IliasQtiExporter.export(sample_exam_data))
+        assert titles[0] == "Frage 1"
+
+    def test_item_title_survives_xml_special_characters(self, sample_exam_data):
+        """Markup characters and emoji in the topic round-trip through the XML."""
+        topic = 'A & B <c> "d" 😀'
+        sample_exam_data["questions"][0]["topic"] = topic
+        titles = self._item_titles(IliasQtiExporter.export(sample_exam_data))
+        assert titles[0] == f"01 – {topic}"
+
+    def test_item_title_applies_to_true_false_and_multiple_choice(self):
+        """The title comes from the shared item builder, so every type gets it."""
+        questions = [
+            {
+                "position": 1,
+                "points": 2.0,
+                "question_text": "Hobel?",
+                "question_type": "true_false",
+                "topic": "Werkzeuge",
+                "options": None,
+                "correct_answer": "wahr",
+            },
+            {
+                "position": 2,
+                "points": 2.0,
+                "question_text": "Welche?",
+                "question_type": "multiple_choice",
+                "topic": "Holzarten",
+                "options": ["A", "B", "C"],
+                "correct_answer": "A, B",
+            },
+        ]
+        exam_data = {
+            "title": "Titel-Test",
+            "language": "de",
+            "questions": questions,
+        }
+        titles = self._item_titles(IliasQtiExporter.export(exam_data))
+        assert titles == ["01 – Werkzeuge", "02 – Holzarten"]
+
     def test_multiple_choice_question_type(self):
         """multiple_choice maps to ILIAS assMultipleChoice, multiple cardinality."""
         exam_data = {

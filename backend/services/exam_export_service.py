@@ -419,6 +419,29 @@ def _format_ilias_points(value: float) -> str:
     return str(int(rounded)) if rounded == int(rounded) else str(rounded)
 
 
+_ILIAS_TITLE_MAX_TOPIC_CHARS = 120
+
+
+def _ilias_item_title(q: dict, order: int) -> str:
+    """Question title shown in ILIAS after import (BWZ EXAMCRAFT-1).
+
+    ILIAS takes the ``<item title>`` attribute as the question title. A bare
+    ``"Frage N"`` made imported questions indistinguishable in the question
+    list, so the question's topic is appended: ``"01 – Hobelarten"``. The
+    position is zero-padded to two digits so exams of up to 99 questions
+    sort in exam order. Longer exams and questions without a topic (title
+    ``"Frage N"``) can sort out of order; the position stays visible in
+    every case. The topic is cut at ``_ILIAS_TITLE_MAX_TOPIC_CHARS`` to stay
+    well inside ILIAS's title column (255 characters)."""
+    position = q.get("position") or order
+    topic = " ".join((q.get("topic") or "").split())
+    if not topic:
+        return f"Frage {position}"
+    if len(topic) > _ILIAS_TITLE_MAX_TOPIC_CHARS:
+        topic = topic[: _ILIAS_TITLE_MAX_TOPIC_CHARS - 1].rstrip() + "…"
+    return f"{position:02d} – {topic}"
+
+
 def _ilias_item(section: Element, q: dict, question_type: str, order: int) -> Element:
     """New ``<item>`` with ILIAS's ``QUESTIONTYPE`` metadata field set and
     the question text as ``<presentation>`` material. ``ident`` uses the
@@ -432,7 +455,7 @@ def _ilias_item(section: Element, q: dict, question_type: str, order: int) -> El
         section,
         "item",
         ident=f"exam_q_{order}",
-        title=f"Frage {q.get('position', order)}",
+        title=_ilias_item_title(q, order),
     )
     itemmetadata = SubElement(item, "itemmetadata")
     qtimetadata = SubElement(itemmetadata, "qtimetadata")
