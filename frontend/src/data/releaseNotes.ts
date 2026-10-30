@@ -96,6 +96,74 @@ export const resolveScreenshotSrc = (
  */
 export const RELEASE_NOTES: readonly ReleaseNoteEntry[] = [
   {
+    version: '1.15.1',
+    date: '2026-10-30',
+    groups: [{ kind: 'improvements', items: [{ id: 'v1_15_1_ilias_titles' }] }],
+  },
+  {
+    version: '1.15.0',
+    date: '2026-10-23',
+    groups: [
+      {
+        kind: 'new',
+        items: [{ id: 'v1_15_0_plan_limits' }, { id: 'v1_15_0_ui_language' }],
+      },
+      {
+        kind: 'security',
+        items: [{ id: 'v1_15_0_less_personal_data' }],
+      },
+      {
+        kind: 'fixes',
+        items: [
+          { id: 'v1_15_0_readable_solutions' },
+          { id: 'v1_15_0_library_paging' },
+          { id: 'v1_15_0_generation_start_time' },
+        ],
+      },
+    ],
+  },
+  {
+    version: '1.14.0',
+    date: '2026-10-01',
+    groups: [
+      {
+        kind: 'new',
+        items: [
+          { id: 'v1_14_0_portfolio_assessment' },
+          { id: 'v1_14_0_password_reset' },
+          { id: 'v1_14_0_ai_labelling' },
+        ],
+      },
+      {
+        kind: 'improvements',
+        items: [{ id: 'v1_14_0_low_material_hint' }],
+      },
+      {
+        kind: 'fixes',
+        items: [{ id: 'v1_14_0_no_duplicate_questions' }],
+      },
+    ],
+  },
+  {
+    version: '1.13.1',
+    date: '2026-09-29',
+    groups: [{ kind: 'fixes', items: [{ id: 'v1_13_1_generic_templates' }] }],
+  },
+  {
+    version: '1.12.0',
+    date: '2026-09-22',
+    groups: [
+      {
+        kind: 'new',
+        items: [{ id: 'v1_12_0_ilias_export' }, { id: 'v1_12_0_sidebar_collapsible' }],
+      },
+      {
+        kind: 'improvements',
+        items: [{ id: 'v1_12_0_underfilled_visible' }],
+      },
+    ],
+  },
+  {
     version: '1.11.0',
     date: '2026-09-09',
     groups: [

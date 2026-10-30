@@ -9,6 +9,13 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- **«Was ist neu» zeigt wieder die aktuelle Version:** Der Dialog zeigte
+  als neuesten Eintrag weiterhin 1.11.0. Die Einträge für 1.12.0 bis
+  1.15.1 sind nachgetragen (Auswahl der für Endnutzende relevanten
+  Änderungen), in Deutsch, Englisch, Französisch und Italienisch.
+
 ## [1.15.1] - 2026-10-30
 
 ### Changed
