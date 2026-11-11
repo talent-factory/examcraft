@@ -17,6 +17,7 @@ from database import get_db
 import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
+from services.generation_job_state import TERMINAL_STATUSES
 from services.rag_errors import TASK_FAILED, user_facing_task_error
 from models.auth import User
 from models.competency import CompetencyFramework
@@ -920,7 +921,6 @@ async def rag_service_health():
         ) from e
 
 
-TERMINAL_STATUSES = {"SUCCESS", "FAILURE", "REVOKED"}
 ACTIVE_TASK_MAX_AGE = timedelta(hours=2)
 # TF-608: window for already-completed jobs. A task that finished during a
 # page navigation/reload was reachable neither via `active-tasks` nor via
@@ -960,17 +960,17 @@ async def get_active_tasks(
     (resource_type="question_generation_job_list", action="list_all_active").
 
     Defense-in-depth: a job whose DB status is non-terminal but whose Celery
-    state is already terminal (e.g. worker died before ``_update_job_status``
+    state is already terminal (e.g. worker died before the status write
     committed) is treated as a phantom — excluded from the response and the
-    DB row is synced idempotently via ``_try_update_job_status`` (single attempt
-    only — the watchdog from TF-329 reconciles persistent failures, so the HTTP
-    handler never blocks on the multi-attempt retry loop in ``_update_job_status``).
+    DB row is synced idempotently via ``record_terminal(retry=False)`` (single
+    attempt only — the watchdog from TF-329 reconciles persistent failures, so
+    the HTTP handler never blocks on a retry loop).
     The synced job reappears as a completed task on the next call.
     """
     from celery.result import AsyncResult
     from sqlalchemy import and_, or_
 
-    from tasks.question_tasks import _try_update_job_status
+    from services.generation_job_state import record_terminal
 
     # created_at is timestamptz since TF-972 — use aware cutoffs
     now = datetime.now(timezone.utc)
@@ -1082,20 +1082,18 @@ async def get_active_tasks(
                 job.status,
                 celery_state,
             )
+            # Single attempt, no inline retry: TF-329's watchdog reconciles
+            # persistent failures so the request handler never blocks. A failed
+            # write is logged ERROR by record_terminal; the phantom job stays
+            # excluded from the response either way. The broad guard keeps an
+            # unexpected error in the sync from failing the whole read-only list.
             try:
-                _try_update_job_status(job.task_id, celery_state)
-            except Exception as sync_err:
-                # Includes JobNotFoundError, SQLAlchemyError, OSError. We don't
-                # retry inline — TF-329's watchdog reconciles persistent
-                # failures so the request handler never blocks. ERROR (not
-                # WARNING) so log aggregation surfaces a real DB outage; the
-                # phantom job stays excluded from the response (same effect as
-                # before), but operators see the symptom loudly.
+                record_terminal(job.task_id, celery_state, retry=False)
+            except Exception:
                 logger.error(
-                    "Failed to sync DB status for phantom job %s (celery_state=%s): %s",
+                    "Unexpected error syncing phantom job %s (celery_state=%s)",
                     job.task_id,
                     celery_state,
-                    sync_err,
                     exc_info=True,
                 )
             continue

@@ -11,11 +11,13 @@ Verifies:
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from main import app
+from services.generation_job_state import WriteOutcome
 
 
 # ---------------------------------------------------------------------------
@@ -509,13 +511,13 @@ class TestPhantomJobFiltering:
         mock_db.query.return_value = query_mock
 
     def test_phantom_failure_excluded_and_db_synced(self, auth_client, mock_db):
-        """DB status PENDING + Celery state FAILURE → omitted, _try_update_job_status('FAILURE') called."""
+        """DB status PENDING + Celery state FAILURE → omitted, record_terminal('FAILURE', retry=False) called."""
         job = _make_job("task-phantom", status="PENDING")
         self._setup_db_query(mock_db, [job])
 
         with (
             patch("celery.result.AsyncResult") as mock_ar_cls,
-            patch("tasks.question_tasks._try_update_job_status") as mock_sync,
+            patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             mock_result = Mock()
             mock_result.state = "FAILURE"
@@ -526,7 +528,7 @@ class TestPhantomJobFiltering:
 
         assert response.status_code == 200
         assert response.json() == {"tasks": []}
-        mock_sync.assert_called_once_with("task-phantom", "FAILURE")
+        mock_sync.assert_called_once_with("task-phantom", "FAILURE", retry=False)
 
     @pytest.mark.parametrize("celery_state", ["SUCCESS", "FAILURE", "REVOKED"])
     def test_all_terminal_celery_states_excluded(
@@ -538,7 +540,7 @@ class TestPhantomJobFiltering:
 
         with (
             patch("celery.result.AsyncResult") as mock_ar_cls,
-            patch("tasks.question_tasks._try_update_job_status") as mock_sync,
+            patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             mock_result = Mock()
             mock_result.state = celery_state
@@ -549,7 +551,9 @@ class TestPhantomJobFiltering:
 
         assert response.status_code == 200
         assert response.json()["tasks"] == []
-        mock_sync.assert_called_once_with(f"task-{celery_state.lower()}", celery_state)
+        mock_sync.assert_called_once_with(
+            f"task-{celery_state.lower()}", celery_state, retry=False
+        )
 
     def test_active_celery_states_still_returned(self, auth_client, mock_db):
         """Jobs with PROGRESS or STARTED Celery state remain in the response."""
@@ -570,7 +574,7 @@ class TestPhantomJobFiltering:
 
         with (
             patch("celery.result.AsyncResult", side_effect=make_result),
-            patch("tasks.question_tasks._try_update_job_status") as mock_sync,
+            patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
@@ -580,14 +584,38 @@ class TestPhantomJobFiltering:
         mock_sync.assert_not_called()
 
     def test_db_sync_failure_does_not_break_endpoint(self, auth_client, mock_db):
-        """If _try_update_job_status raises, the endpoint still returns 200 and excludes the job."""
+        """If the sync write fails (record_terminal reports FAILED), the endpoint
+        still returns 200 and excludes the job."""
         job = _make_job("task-sync-broken", status="PENDING")
         self._setup_db_query(mock_db, [job])
 
         with (
             patch("celery.result.AsyncResult") as mock_ar_cls,
             patch(
-                "tasks.question_tasks._try_update_job_status",
+                "services.generation_job_state.record_terminal",
+                return_value=WriteOutcome.FAILED,
+            ),
+        ):
+            mock_result = Mock()
+            mock_result.state = "FAILURE"
+            mock_result.info = None
+            mock_ar_cls.return_value = mock_result
+
+            response = auth_client.get("/api/v1/rag/active-tasks")
+
+        assert response.status_code == 200
+        assert response.json()["tasks"] == []
+
+    def test_unexpected_sync_error_does_not_break_endpoint(self, auth_client, mock_db):
+        """Even an unexpected error from the sync (not just the expected DB
+        errors record_terminal handles) must not turn the read-only list into a 500."""
+        job = _make_job("task-sync-raises", status="PENDING")
+        self._setup_db_query(mock_db, [job])
+
+        with (
+            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch(
+                "services.generation_job_state.record_terminal",
                 side_effect=RuntimeError("DB down"),
             ),
         ):
@@ -610,7 +638,7 @@ class TestPhantomJobFiltering:
             patch(
                 "celery.result.AsyncResult", side_effect=Exception("Broker unreachable")
             ),
-            patch("tasks.question_tasks._try_update_job_status") as mock_sync,
+            patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
@@ -639,7 +667,7 @@ class TestPhantomJobFiltering:
 
         with (
             patch("celery.result.AsyncResult", side_effect=make_result),
-            patch("tasks.question_tasks._try_update_job_status") as mock_sync,
+            patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
@@ -647,24 +675,24 @@ class TestPhantomJobFiltering:
         task_ids = [t["task_id"] for t in response.json()["tasks"]]
         assert task_ids == ["active-1"]
         assert mock_sync.call_args_list == [
-            (("phantom-1", "FAILURE"),),
-            (("phantom-2", "REVOKED"),),
+            call("phantom-1", "FAILURE", retry=False),
+            call("phantom-2", "REVOKED", retry=False),
         ]
 
     def test_phantom_sync_never_blocks_on_retry_loop(self, auth_client, mock_db):
-        """Phantom sync uses _try_update_job_status (single attempt). The endpoint
-        must NEVER invoke the multi-attempt _update_job_status retry loop nor
-        time.sleep — those would block the HTTP request handler for up to 17 s
-        on a transient DB hiccup. The watchdog (TF-329) handles persistence.
+        """A failing phantom sync is a single attempt: the endpoint must NEVER
+        run the multi-attempt retry loop nor time.sleep — that would block the
+        HTTP request handler for up to 17 s on a transient DB hiccup. The
+        watchdog (TF-329) handles persistence.
         """
         job = _make_job("phantom-no-block", status="PENDING")
         self._setup_db_query(mock_db, [job])
+        db_down = OperationalError("SELECT 1", {}, Exception("db down"))
 
         with (
             patch("celery.result.AsyncResult") as mock_ar_cls,
-            patch("tasks.question_tasks._try_update_job_status") as mock_try,
-            patch("tasks.question_tasks._update_job_status") as mock_retry,
-            patch("tasks.question_tasks.time.sleep") as mock_sleep,
+            patch("database.SessionLocal", side_effect=db_down) as session_factory,
+            patch("services.generation_job_state.time.sleep") as mock_sleep,
         ):
             mock_result = Mock()
             mock_result.state = "FAILURE"
@@ -675,8 +703,7 @@ class TestPhantomJobFiltering:
 
         assert response.status_code == 200
         assert response.json()["tasks"] == []
-        mock_try.assert_called_once_with("phantom-no-block", "FAILURE")
-        mock_retry.assert_not_called()
+        session_factory.assert_called_once()
         mock_sleep.assert_not_called()
 
 

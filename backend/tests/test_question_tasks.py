@@ -103,7 +103,7 @@ def test_generate_questions_task_emits_step_zero():
         patch("tasks.question_tasks.run_async", side_effect=fake_run_async),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
         patch("tasks.question_tasks._persist_questions", return_value=[1]),
-        patch("tasks.question_tasks._safe_update_job_status"),
+        patch("tasks.question_tasks.record_terminal"),
     ):
         task = generate_questions_task
         task.update_state = MagicMock(
@@ -164,7 +164,7 @@ def test_generate_questions_task_relays_service_progress_codes():
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
         patch("tasks.question_tasks._persist_questions", return_value=[]),
-        patch("tasks.question_tasks._safe_update_job_status"),
+        patch("tasks.question_tasks.record_terminal"),
         patch.object(
             generate_questions_task,
             "update_state",
@@ -248,7 +248,7 @@ def test_generate_questions_task_returns_correct_format():
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=mock_rag_service),
         patch("tasks.question_tasks._persist_questions", return_value=[1]),
-        patch("tasks.question_tasks._safe_update_job_status"),
+        patch("tasks.question_tasks.record_terminal"),
         patch(
             "tasks.question_tasks.set_span_tag",
             side_effect=lambda key, value: captured_tags.__setitem__(key, value),
@@ -307,254 +307,10 @@ def test_generate_questions_task_rejects_when_rag_service_unavailable():
             assert e.requeue is False
 
 
-def test_update_job_status_succeeds_first_attempt():
-    """Happy path: first attempt succeeds, no sleep, no extra retries."""
-    with (
-        patch("database.SessionLocal") as mock_session_cls,
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
-    ):
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_job = MagicMock()
-        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = mock_job
-
-        from tasks.question_tasks import _update_job_status
-
-        _update_job_status("task-1", "SUCCESS")
-
-        assert mock_job.status == "SUCCESS"
-        mock_sleep.assert_not_called()
-
-
-def test_update_job_status_recovers_on_second_attempt():
-    """Transient DB error on attempt 1, success on attempt 2 → no exception."""
-    from sqlalchemy.exc import OperationalError
-
-    failing_session = MagicMock()
-    failing_session.query.side_effect = OperationalError(
-        "stmt", {}, Exception("conn closed")
-    )
-
-    healthy_session = MagicMock()
-    healthy_job = MagicMock()
-    healthy_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = healthy_job
-
-    with (
-        patch("database.SessionLocal", side_effect=[failing_session, healthy_session]),
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
-    ):
-        from tasks.question_tasks import _update_job_status
-
-        _update_job_status("task-1", "FAILURE")  # no exception
-
-        assert healthy_job.status == "FAILURE"
-        # Slept exactly once, with the first backoff (2 s).
-        mock_sleep.assert_called_once_with(2)
-
-
-def test_update_job_status_raises_after_four_failures():
-    """All 4 attempts fail → JobStatusUpdateError, three sleeps with backoffs 2, 5, 10."""
-    from sqlalchemy.exc import OperationalError
-    from tasks.question_tasks import JobStatusUpdateError
-
-    def make_failing_session():
-        s = MagicMock()
-        s.query.side_effect = OperationalError("stmt", {}, Exception("conn closed"))
-        return s
-
-    sessions = [make_failing_session() for _ in range(4)]
-
-    with (
-        patch("database.SessionLocal", side_effect=sessions),
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
-    ):
-        from tasks.question_tasks import _update_job_status
-
-        try:
-            _update_job_status("task-1", "FAILURE")
-            raise AssertionError("expected JobStatusUpdateError")
-        except JobStatusUpdateError as e:
-            assert "task-1" in str(e)
-            assert isinstance(e.__cause__, OperationalError)
-
-        assert mock_sleep.call_args_list == [((2,),), ((5,),), ((10,),)]
-
-
-def test_update_job_status_propagates_job_not_found_immediately():
-    """Missing job → JobNotFoundError propagates without retry, without sleep."""
-    from tasks.question_tasks import JobNotFoundError, _update_job_status
-
-    with (
-        patch("database.SessionLocal") as mock_session_cls,
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
-    ):
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
-
-        try:
-            _update_job_status("ghost", "SUCCESS")
-            raise AssertionError("expected JobNotFoundError")
-        except JobNotFoundError:
-            pass
-
-        mock_sleep.assert_not_called()
-        # SessionLocal called exactly once — no retry
-        assert mock_session_cls.call_count == 1
-
-
-def test_update_job_status_does_not_retry_programmer_errors():
-    """AttributeError / TypeError must propagate immediately, not be retried."""
-    from tasks.question_tasks import _update_job_status
-
-    failing_session = MagicMock()
-    failing_session.query.side_effect = AttributeError("simulated programmer error")
-
-    with (
-        patch("database.SessionLocal", return_value=failing_session),
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
-    ):
-        try:
-            _update_job_status("task-1", "SUCCESS")
-            raise AssertionError("expected AttributeError")
-        except AttributeError:
-            pass
-
-        mock_sleep.assert_not_called()
-
-
-def test_job_status_update_error_is_exported():
-    """JobStatusUpdateError is importable from tasks.question_tasks."""
-    from tasks.question_tasks import JobStatusUpdateError
-
-    assert issubclass(JobStatusUpdateError, Exception)
-
-
-def test_try_update_job_status_sets_status_and_commits():
-    """_try_update_job_status sets job.status, commits, closes session."""
-    with patch("database.SessionLocal") as mock_session_cls:
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_job = MagicMock()
-        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = mock_job
-
-        from tasks.question_tasks import _try_update_job_status
-
-        _try_update_job_status("task-1", "SUCCESS")
-
-        assert mock_job.status == "SUCCESS"
-        mock_session.commit.assert_called_once()
-        mock_session.close.assert_called_once()
-
-
-def test_try_update_job_status_raises_when_job_missing():
-    """Missing job → JobNotFoundError. NOT retriable; data-integrity issue."""
-    from tasks.question_tasks import JobNotFoundError, _try_update_job_status
-
-    with patch("database.SessionLocal") as mock_session_cls:
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_session.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = None
-
-        try:
-            _try_update_job_status("ghost", "SUCCESS")
-            raise AssertionError("expected JobNotFoundError")
-        except JobNotFoundError as e:
-            assert e.task_id == "ghost"
-            assert e.status == "SUCCESS"
-
-        mock_session.commit.assert_not_called()
-        mock_session.rollback.assert_called_once()
-        mock_session.close.assert_called_once()
-
-
-def test_try_update_job_status_propagates_db_errors():
-    """DB errors must bubble — retry loop in _update_job_status decides what to do."""
-    from sqlalchemy.exc import OperationalError
-
-    with patch("database.SessionLocal") as mock_session_cls:
-        mock_session = MagicMock()
-        mock_session_cls.return_value = mock_session
-        mock_session.query.side_effect = OperationalError(
-            "stmt", {}, Exception("conn closed")
-        )
-
-        from tasks.question_tasks import _try_update_job_status
-
-        try:
-            _try_update_job_status("task-1", "FAILURE")
-            raise AssertionError("expected OperationalError")
-        except OperationalError:
-            pass
-
-        mock_session.rollback.assert_called_once()
-        mock_session.close.assert_called_once()
-
-
-def test_safe_update_job_status_swallows_job_status_update_error_and_logs(mocker):
-    """When _update_job_status raises JobStatusUpdateError, _safe_update_job_status
-    logs at CRITICAL level with traceback (logger.critical + exc_info=True), and
-    does NOT re-raise.
-
-    mocker.patch directly on the module logger instead of caplog: pytest 7.4.3
-    (the CI-pinned version) leaves caplog.records empty here; the direct mock
-    is version-independent.
-    """
-    from tasks.question_tasks import (
-        JobStatusUpdateError,
-        JobStatusWrite,
-        _safe_update_job_status,
-    )
-
-    mock_logger = mocker.patch("tasks.question_tasks.logger")
-    err = JobStatusUpdateError("task-x", "FAILURE", 4, RuntimeError("simulated cause"))
-
-    with patch("tasks.question_tasks._update_job_status", side_effect=err):
-        outcome = _safe_update_job_status("task-x", "FAILURE")  # no exception
-
-    assert outcome is JobStatusWrite.FAILED
-
-    mock_logger.critical.assert_called_once()
-    call = mock_logger.critical.call_args
-    rendered = call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
-    assert "task-x" in rendered
-    assert call.kwargs.get("exc_info") is True
-
-
-def test_safe_update_job_status_swallows_job_not_found_error_and_logs(mocker):
-    """When _update_job_status raises JobNotFoundError, _safe_update_job_status
-    logs at CRITICAL with exc_info and does NOT re-raise."""
-    from tasks.question_tasks import JobNotFoundError, _safe_update_job_status
-
-    mock_logger = mocker.patch("tasks.question_tasks.logger")
-
-    with patch(
-        "tasks.question_tasks._update_job_status",
-        side_effect=JobNotFoundError("ghost", "SUCCESS"),
-    ):
-        _safe_update_job_status("ghost", "SUCCESS")  # no exception
-
-    mock_logger.critical.assert_called_once()
-    call = mock_logger.critical.call_args
-    rendered = call.args[0] % call.args[1:] if len(call.args) > 1 else call.args[0]
-    assert "ghost" in rendered
-    assert call.kwargs.get("exc_info") is True
-
-
-def test_safe_update_job_status_passes_through_on_success():
-    """Happy path: _safe_update_job_status delegates to _update_job_status."""
-    from tasks.question_tasks import _safe_update_job_status
-
-    with patch("tasks.question_tasks._update_job_status") as mock_update:
-        _safe_update_job_status("task-1", "SUCCESS")
-
-    mock_update.assert_called_once_with("task-1", "SUCCESS")
-
-
 def test_generate_questions_task_writes_success_in_the_save_commit():
     """TF-964: on success, SUCCESS is written inside ``_save_generation``'s
     single commit together with the questions — not afterwards through
-    ``_safe_update_job_status``, whose separate commit was the window in
+    ``record_terminal``, whose separate commit was the window in
     which a crash left saved questions on a PENDING job."""
     from tasks.question_tasks import generate_questions_task
 
@@ -608,7 +364,7 @@ def test_generate_questions_task_writes_success_in_the_save_commit():
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
         patch("tasks.question_tasks._save_generation", return_value=[1]) as mock_save,
-        patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
+        patch("tasks.question_tasks.record_terminal") as mock_safe,
     ):
         generate_questions_task.update_state = MagicMock()
         result = generate_questions_task.run(request_data, "42")
@@ -618,8 +374,8 @@ def test_generate_questions_task_writes_success_in_the_save_commit():
     assert result["review_question_ids"] == [1]
 
 
-def test_generate_questions_task_uses_safe_update_on_reject():
-    """Reject path goes through _safe_update_job_status with FAILURE status."""
+def test_generate_questions_task_records_failure_on_reject():
+    """Reject path goes through record_terminal with FAILURE status."""
     from celery.exceptions import Reject
 
     from tasks.question_tasks import generate_questions_task
@@ -637,7 +393,7 @@ def test_generate_questions_task_uses_safe_update_on_reject():
 
     with (
         patch("tasks.question_tasks.RAGService", None),  # forces Reject
-        patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
+        patch("tasks.question_tasks.record_terminal") as mock_safe,
     ):
         generate_questions_task.update_state = MagicMock()
         try:
@@ -646,15 +402,15 @@ def test_generate_questions_task_uses_safe_update_on_reject():
         except Reject:
             pass
 
-    # _safe_update_job_status MUST be called with FAILURE on the Reject path
+    # record_terminal MUST be called with FAILURE on the Reject path
     mock_safe.assert_called_once()
     args, _ = mock_safe.call_args
     assert args[1] == "FAILURE"
 
 
-def test_generate_questions_task_uses_safe_update_on_model_unavailable():
+def test_generate_questions_task_records_failure_on_model_unavailable():
     """TF-438: a ModelUnavailableError (whole fallback chain 404) is permanent —
-    it must fail the job immediately via _safe_update_job_status FAILURE and
+    it must fail the job immediately via record_terminal FAILURE and
     re-raise, NOT fall through to the generic handler that only marks FAILURE on
     the final retry (which would re-introduce the TF-351 ghost-task symptom)."""
     from services.claude_service import ModelUnavailableError
@@ -677,7 +433,7 @@ def test_generate_questions_task_uses_safe_update_on_model_unavailable():
             "tasks.question_tasks.run_async",
             side_effect=ModelUnavailableError("all models returned 404"),
         ),
-        patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
+        patch("tasks.question_tasks.record_terminal") as mock_safe,
     ):
         generate_questions_task.update_state = MagicMock()
         try:
@@ -692,8 +448,8 @@ def test_generate_questions_task_uses_safe_update_on_model_unavailable():
     assert args[1] == "FAILURE"
 
 
-def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
-    """Generic exception with retries >= max_retries goes through _safe_update_job_status FAILURE.
+def test_generate_questions_task_records_failure_on_final_retry_failure():
+    """Generic exception with retries >= max_retries goes through record_terminal FAILURE.
 
     Celery task.request is a property backed by a thread-local stack and cannot be
     patched with patch.object. Instead we patch retry_kwargs to {"max_retries": 0}
@@ -718,7 +474,7 @@ def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
     with (
         patch("tasks.question_tasks.run_async", side_effect=boom),
         patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
-        patch("tasks.question_tasks._safe_update_job_status") as mock_safe,
+        patch("tasks.question_tasks.record_terminal") as mock_safe,
         patch.dict(generate_questions_task.retry_kwargs, {"max_retries": 0}),
     ):
         generate_questions_task.update_state = MagicMock()
@@ -742,55 +498,34 @@ def test_generate_questions_task_uses_safe_update_on_final_retry_failure():
     assert args[1] == "FAILURE"
 
 
-def test_update_job_status_recovers_on_fourth_attempt():
-    """Three failures, success on attempt 4 → no exception, three sleeps consumed."""
-    from sqlalchemy.exc import OperationalError
+def test_generate_questions_task_keeps_pending_while_retries_remain():
+    """A transient failure with retries left must not record FAILURE: the
+    retry would find a non-PENDING row and discard its questions
+    (``_save_generation``)."""
+    from tasks.question_tasks import generate_questions_task
 
-    failing = [MagicMock() for _ in range(3)]
-    for s in failing:
-        s.query.side_effect = OperationalError("stmt", {}, Exception("conn closed"))
-
-    healthy = MagicMock()
-    healthy_job = MagicMock()
-    healthy.query.return_value.filter_by.return_value.with_for_update.return_value.first.return_value = healthy_job
+    request_data = {
+        "topic": "T",
+        "question_count": 1,
+        "question_types": ["single_choice"],
+        "difficulty": "medium",
+        "language": "de",
+        "document_ids": None,
+        "context_chunks_per_question": 3,
+        "prompt_config": None,
+    }
 
     with (
-        patch("database.SessionLocal", side_effect=[*failing, healthy]),
-        patch("tasks.question_tasks.time.sleep") as mock_sleep,
+        patch("tasks.question_tasks.run_async", side_effect=RuntimeError("transient")),
+        patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
+        patch("tasks.question_tasks.record_terminal") as mock_record,
+        patch.dict(generate_questions_task.retry_kwargs, {"max_retries": 5}),
     ):
-        from tasks.question_tasks import _update_job_status
+        generate_questions_task.update_state = MagicMock()
+        with pytest.raises(RuntimeError):
+            generate_questions_task.run(request_data, "42")
 
-        _update_job_status("task-1", "SUCCESS")  # no exception
-
-        assert healthy_job.status == "SUCCESS"
-        assert mock_sleep.call_args_list == [((2,),), ((5,),), ((10,),)]
-
-
-def test_job_status_update_error_carries_structured_fields():
-    """JobStatusUpdateError exposes task_id, status, attempts, last_err for observability tagging."""
-    from tasks.question_tasks import JobStatusUpdateError
-
-    cause = RuntimeError("simulated")
-    err = JobStatusUpdateError("task-1", "FAILURE", 4, cause)
-
-    assert err.task_id == "task-1"
-    assert err.status == "FAILURE"
-    assert err.attempts == 4
-    assert err.last_err is cause
-    assert "task-1" in str(err)
-    assert "FAILURE" in str(err)
-
-
-def test_job_not_found_error_carries_structured_fields():
-    """JobNotFoundError exposes task_id and status for diagnostics."""
-    from tasks.question_tasks import JobNotFoundError
-
-    err = JobNotFoundError("ghost", "SUCCESS")
-
-    assert err.task_id == "ghost"
-    assert err.status == "SUCCESS"
-    assert "ghost" in str(err)
-    assert "SUCCESS" in str(err)
+    mock_record.assert_not_called()
 
 
 # === TF-330: write-path normalization in _persist_questions ===
@@ -1252,7 +987,7 @@ def test_persist_questions_preserves_none_explanation():
 
 def test_programming_error_marks_job_failure_and_propagates():
     """End-to-end: when _persist_questions raises ProgrammingError (e.g. psycopg2
-    ``can't adapt type 'dict'``), the task must call _safe_update_job_status
+    ``can't adapt type 'dict'``), the task must call record_terminal
     with ``FAILURE`` *and* re-raise, so the frontend sees a terminal state
     instead of a PENDING ghost-task. This is the TF-351 anti-pattern."""
     import dataclasses
@@ -1286,7 +1021,7 @@ def test_programming_error_marks_job_failure_and_propagates():
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService", return_value=MagicMock()),
         patch("tasks.question_tasks._persist_questions", side_effect=boom),
-        patch("tasks.question_tasks._safe_update_job_status") as mock_status,
+        patch("tasks.question_tasks.record_terminal") as mock_status,
     ):
         generate_questions_task.update_state = MagicMock()
 
@@ -1636,7 +1371,7 @@ def test_generate_questions_task_passes_tag_ids_from_request_data():
         patch("tasks.question_tasks.run_async", return_value=mock_result),
         patch("tasks.question_tasks.RAGService"),
         patch("tasks.question_tasks._persist_questions", mock_persist),
-        patch("tasks.question_tasks._safe_update_job_status"),
+        patch("tasks.question_tasks.record_terminal"),
     ):
         generate_questions_task.update_state = MagicMock()
 
@@ -2493,32 +2228,6 @@ def test_parallel_give_up_discards_the_run(tf964_job_session):
     _assert_marked_failure(mark)
 
 
-@pytest.mark.parametrize(
-    ("update", "expected"),
-    [
-        pytest.param({"return_value": True}, "WRITTEN", id="written"),
-        pytest.param({"return_value": False}, "KEPT_SUCCESS", id="kept-success"),
-        pytest.param(
-            {"side_effect": RuntimeError("never raised as such")},
-            None,
-            id="unexpected-error-propagates",
-        ),
-    ],
-)
-def test_safe_update_job_status_reports_outcome(update, expected):
-    """The watchdog tells a kept SUCCESS row from a written one (TF-964):
-    only a real write counts as reconciled and is mirrored into Celery."""
-    from tasks.question_tasks import JobStatusWrite, _safe_update_job_status
-
-    with patch("tasks.question_tasks._update_job_status", **update):
-        if expected is None:
-            with pytest.raises(RuntimeError):
-                _safe_update_job_status("task-1", "FAILURE")
-        else:
-            outcome = _safe_update_job_status("task-1", "FAILURE")
-            assert outcome is JobStatusWrite[expected]
-
-
 def test_second_redelivery_still_generates(tf964_job_session):
     """Boundary below the limit: the 2nd redelivery still runs."""
     session, bound, user, institution = tf964_job_session
@@ -2640,7 +2349,7 @@ def test_failed_save_commit_leaves_neither_questions_nor_success(tf964_committed
     with (
         patch("database.SessionLocal", session_failing_the_success_commit),
         # Old-design status writes retry with backoffs; don't wait for them.
-        patch("tasks.question_tasks.time.sleep"),
+        patch("services.generation_job_state.time.sleep"),
     ):
         with pytest.raises(OperationalError):
             _run_tf964(user, institution)
@@ -2700,21 +2409,3 @@ def test_failure_after_commit_on_last_retry_keeps_success(tf964_job_session):
 
     assert _tf964_job(session).status == "SUCCESS"
     assert _tf964_review_count(session) == 3
-
-
-@pytest.mark.parametrize("status", ["FAILURE", "REVOKED", "PENDING"])
-def test_try_update_job_status_never_downgrades_success(tf964_job_session, status):
-    """Every status writer (task, watchdog, /active-tasks phantom sync) goes
-    through _try_update_job_status; a SUCCESS row stays SUCCESS."""
-    from tasks.question_tasks import _try_update_job_status
-
-    session, bound, _, _ = tf964_job_session
-    db = bound()
-    job = db.query(type(_tf964_job(session))).filter_by(task_id=_TF964_TASK_ID).one()
-    job.status = "SUCCESS"
-    db.commit()
-    db.close()
-
-    assert _try_update_job_status(_TF964_TASK_ID, status) is False
-
-    assert _tf964_job(session).status == "SUCCESS"

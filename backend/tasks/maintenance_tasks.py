@@ -10,8 +10,6 @@ incident on 2026-04-28 as a third line of defense after TF-325
 import logging
 from datetime import datetime, timedelta, timezone
 
-from celery.result import AsyncResult
-
 from celery_app import celery_app
 from database import SessionLocal
 from enums import ImportJobStatus, MoodleFeedbackPushStatus
@@ -19,7 +17,7 @@ from models.auth import ImpersonationSession
 from models.question_generation_job import QuestionGenerationJob
 from models.submission import ImportJob, MoodleFeedbackPushJob
 from services.auth_service import AuthService, IMPERSONATION_TOKEN_EXPIRE_MINUTES
-from tasks.question_tasks import JobStatusWrite, _safe_update_job_status
+from services.generation_job_state import Reconciliation, reconcile_stuck
 
 logger = logging.getLogger(__name__)
 
@@ -61,45 +59,17 @@ _MOODLE_PUSH_NON_TERMINAL_STATUSES = (
     MoodleFeedbackPushStatus.PROCESSING.value,
 )
 
-# In-progress states the watchdog does NOT touch — these tasks are actually running.
-_IN_PROGRESS_STATES = frozenset({"PROGRESS", "STARTED", "RETRY"})
-
-# Terminal states the watchdog mirrors 1:1 into the DB.
-_TERMINAL_STATES = frozenset({"SUCCESS", "FAILURE", "REVOKED"})
-
-
-class WatchdogReconciliationFailure(RuntimeError):
-    """Marker exception persisted to the Celery result backend when the
-    watchdog forces a stuck job to FAILURE.
-
-    Stored via ``celery_app.backend.mark_as_failure`` so subsequent
-    ``AsyncResult.state`` reads return ``FAILURE``. Without this, the WebSocket
-    progress endpoint (TF-328) would keep observing ``PENDING`` from Celery —
-    even though the DB row already reads ``FAILURE`` — and clients hang on
-    the pending-timeout countdown until the 120 s ceiling.
-    """
-
-
-def _notify_celery_backend_failure(task_id: str) -> None:
-    """Mirror the watchdog's DB-FAILURE write into Celery's result backend so
-    AsyncResult.state reflects the terminal state. Best-effort: a failure here
-    only delays UI signaling, not data integrity, so we log and move on.
-    """
-    try:
-        celery_app.backend.mark_as_failure(
-            task_id,
-            WatchdogReconciliationFailure(
-                f"Job {task_id} reconciled to FAILURE by watchdog "
-                "(stuck in PENDING beyond threshold)"
-            ),
-        )
-    except Exception:
-        logger.error(
-            "Watchdog: failed to mirror FAILURE into Celery backend for task %s "
-            "— UI may show pending-timeout instead of immediate failure",
-            task_id,
-            exc_info=True,
-        )
+# How each per-job outcome of reconcile_stuck is counted. LOST also counts as
+# reconciled (see the counter semantics in reconcile_stuck_jobs).
+_COUNTER_FOR = {
+    Reconciliation.RECONCILED: "reconciled",
+    Reconciliation.LOST: "lost",
+    Reconciliation.IN_PROGRESS: "skipped_in_progress",
+    Reconciliation.KEPT_SUCCESS: "skipped_succeeded",
+    Reconciliation.UNEXPECTED: "skipped_unexpected",
+    Reconciliation.READ_ERROR: "errors",
+    Reconciliation.WRITE_FAILED: "errors",
+}
 
 
 @celery_app.task(name="tasks.maintenance_tasks.reconcile_stuck_jobs")
@@ -120,7 +90,8 @@ def reconcile_stuck_jobs() -> dict:
             vocabulary (a typo in a custom state, a compatibility break
             on upgrade, …) — not reconciled, but visible in the counter
             so operators see the symptom in the Beat health metric.
-          - ``errors``: AsyncResult read errors OR persistence errors.
+          - ``errors``: Celery result backend unreadable (READ_ERROR) OR DB
+            write failed (WRITE_FAILED).
         Good for Sentry metrics and Beat health checks — gives an
         operationally honest signal during DB outages, instead of
         staying green.
@@ -147,72 +118,10 @@ def reconcile_stuck_jobs() -> dict:
         )
 
         for job in stuck:
-            try:
-                celery_state = AsyncResult(job.task_id).state
-            except Exception as err:
-                logger.warning(
-                    "Watchdog: failed to read Celery state for task %s: %s",
-                    job.task_id,
-                    err,
-                )
-                counters["errors"] += 1
-                continue
-
-            if celery_state in _TERMINAL_STATES:
-                logger.info(
-                    "Watchdog: reconciling task %s — DB=PENDING celery=%s",
-                    job.task_id,
-                    celery_state,
-                )
-                write = _safe_update_job_status(job.task_id, celery_state)
-                if write is JobStatusWrite.WRITTEN:
-                    counters["reconciled"] += 1
-                elif write is JobStatusWrite.KEPT_SUCCESS:
-                    counters["skipped_succeeded"] += 1
-                else:
-                    counters["errors"] += 1
-            elif celery_state == "PENDING":
-                # Task is lost from the broker — no worker ever saw it,
-                # or the result-backend entry expired. Mark FAILURE and
-                # mirror the state into the Celery backend, so the
-                # WebSocket doesn't wait 120s for the pending timeout.
-                logger.warning(
-                    "Watchdog: task %s lost from broker (celery=PENDING) — marking FAILURE",
-                    job.task_id,
-                )
-                write = _safe_update_job_status(job.task_id, "FAILURE")
-                if write is JobStatusWrite.WRITTEN:
-                    _notify_celery_backend_failure(job.task_id)
-                    counters["lost"] += 1
-                    counters["reconciled"] += 1
-                elif write is JobStatusWrite.KEPT_SUCCESS:
-                    # Finished meanwhile: don't mirror a FAILURE into Celery.
-                    counters["skipped_succeeded"] += 1
-                else:
-                    counters["errors"] += 1
-            elif celery_state in _IN_PROGRESS_STATES:
-                # Task is actually still running — leave it alone. If the
-                # job is older than the threshold and still PROGRESS,
-                # it's slow, but not stuck. Operational visibility via log.
-                logger.debug(
-                    "Watchdog: task %s still in_progress (celery=%s) — skipping",
-                    job.task_id,
-                    celery_state,
-                )
-                counters["skipped_in_progress"] += 1
-            else:
-                # Unknown state — log defensively, leave it alone, but
-                # count it. Without the counter, a gradual drift (e.g. a
-                # Celery upgrade introduces a new state, a custom state
-                # with a typo) would be invisible to operators — the
-                # summary log below wouldn't fire and the watchdog would
-                # stay "green".
-                logger.warning(
-                    "Watchdog: task %s in unexpected celery state %r — skipping",
-                    job.task_id,
-                    celery_state,
-                )
-                counters["skipped_unexpected"] += 1
+            outcome = reconcile_stuck(job.task_id)
+            counters[_COUNTER_FOR[outcome]] += 1
+            if outcome is Reconciliation.LOST:
+                counters["reconciled"] += 1
 
         if (
             counters["reconciled"]
