@@ -2,11 +2,13 @@
 
 The Celery state is the seam: ``InMemoryCelery`` stands in for the result
 backend. The DB side runs against the real test Postgres (savepoint isolation
-from ``conftest.test_db``). That isolation shares one connection, so the row
-lock itself is not exercised here; the tests pin the check-then-write
-decision (SUCCESS is never overwritten, TF-964), not the locking.
+from ``conftest.test_db``). That isolation shares one connection, so most tests
+pin the check-then-write decision (SUCCESS is never overwritten, TF-964). The
+row lock itself is exercised by one test on separate, really committing
+connections (``test_a_waiting_writer_sees_the_success_the_task_commits``).
 """
 
+import threading
 import uuid
 from typing import get_args
 from unittest.mock import MagicMock, patch
@@ -20,6 +22,7 @@ from models.auth import Institution, User
 from models.question_generation_job import QuestionGenerationJob
 from services.generation_job_state import (
     IN_PROGRESS_STATES,
+    Progress,
     TERMINAL_STATUSES,
     CeleryBackendAdapter,
     CeleryKnown,
@@ -30,8 +33,10 @@ from services.generation_job_state import (
     Reconciliation,
     WatchdogReconciliationFailure,
     WriteOutcome,
+    read_state,
     reconcile_stuck,
     record_terminal,
+    sync_phantom,
 )
 from tests.generation_job_fakes import InMemoryCelery
 
@@ -206,9 +211,8 @@ def test_record_terminal_succeeds_on_the_fourth_attempt(bound, make_job):
 
 
 def test_write_locks_the_job_row(bound, make_job):
-    """The row lock is what makes "watchdog loaded PENDING, task committed
-    SUCCESS meanwhile" safe (TF-964). The shared test connection cannot show
-    a real lock wait, so pin that the SELECT asks for FOR UPDATE."""
+    """Cheap complement to the real lock test below: the SELECT asks for
+    FOR UPDATE."""
     task_id = make_job("PENDING")
     statements: list[str] = []
 
@@ -224,6 +228,87 @@ def test_write_locks_the_job_row(bound, make_job):
 
     selects = [s for s in statements if s.lstrip().upper().startswith("SELECT")]
     assert any("FOR UPDATE" in s.upper() for s in selects)
+
+
+def test_a_waiting_writer_sees_the_success_the_task_commits(test_engine, monkeypatch):
+    """The row lock for real (TF-964): a writer that wants FAILURE blocks while
+    the task holds the row, then finds the SUCCESS the task commits and keeps
+    it. Needs separate, really committing connections, so it cleans up after
+    itself instead of using the savepoint isolation of ``test_db``."""
+    factory = sessionmaker(bind=test_engine)
+    suffix = uuid.uuid4().hex[:8]
+    task_id = f"lock-{suffix}"
+    setup = factory()
+    institution = Institution(
+        name=f"Lock {suffix}",
+        slug=f"lock-{suffix}",
+        subscription_tier="free",
+        max_users=10,
+        max_documents=50,
+        max_questions_per_month=100,
+    )
+    setup.add(institution)
+    setup.flush()
+    user = User(
+        email=f"lock-{suffix}@example.ch",
+        first_name="L",
+        last_name="K",
+        institution_id=institution.id,
+        status="active",
+    )
+    setup.add(user)
+    setup.flush()
+    setup.add(QuestionGenerationJob(task_id=task_id, user_id=user.id, status="PENDING"))
+    setup.commit()
+    ids = (user.id, institution.id)
+    setup.close()
+
+    writer = None
+    task = factory()
+    try:
+        # The task holds the row, like _save_generation before its commit.
+        task.query(QuestionGenerationJob).filter_by(
+            task_id=task_id
+        ).with_for_update().one()
+        monkeypatch.setattr("database.SessionLocal", factory)
+        outcome: dict = {}
+
+        def _write():
+            try:
+                outcome["value"] = record_terminal(task_id, "FAILURE", retry=False)
+            except BaseException as exc:  # surfaced by the assertion below
+                outcome["error"] = exc
+
+        writer = threading.Thread(target=_write)
+        writer.start()
+        writer.join(timeout=1)
+        assert writer.is_alive(), "the writer must wait for the row lock"
+
+        task.query(QuestionGenerationJob).filter_by(task_id=task_id).update(
+            {"status": "SUCCESS"}
+        )
+        task.commit()
+        writer.join(timeout=10)
+
+        assert not writer.is_alive()
+        assert "error" not in outcome, outcome.get("error")
+        assert outcome["value"] is WriteOutcome.KEPT_SUCCESS
+        check = factory()
+        try:
+            stored = check.query(QuestionGenerationJob).filter_by(task_id=task_id)
+            assert stored.one().status == "SUCCESS"
+        finally:
+            check.close()
+    finally:
+        task.close()
+        if writer is not None:
+            writer.join(timeout=10)
+        cleanup = factory()
+        cleanup.query(QuestionGenerationJob).filter_by(task_id=task_id).delete()
+        cleanup.query(User).filter_by(id=ids[0]).delete()
+        cleanup.query(Institution).filter_by(id=ids[1]).delete()
+        cleanup.commit()
+        cleanup.close()
 
 
 def test_record_terminal_gives_up_after_four_attempts(bound, make_job, mocker):
@@ -450,13 +535,24 @@ def test_reconcile_keeps_success_the_task_committed_meanwhile(
 # --- Celery adapter ------------------------------------------------------------
 
 
-def test_adapter_reads_the_state_only():
-    result = MagicMock(state="PROGRESS")
+def test_adapter_reads_state_and_info():
+    result = MagicMock(state="PROGRESS", info={"progress": 40})
 
     with patch("services.generation_job_state.AsyncResult", return_value=result):
         reading = CeleryBackendAdapter().read("task-1")
 
-    assert reading == CeleryKnown(state="PROGRESS")
+    assert reading == CeleryKnown(state="PROGRESS", info={"progress": 40})
+
+
+def test_adapter_does_not_read_info_for_pending():
+    """PENDING has nothing to report; skip the second backend round trip."""
+    result = MagicMock(state="PENDING")
+    type(result).info = property(lambda self: pytest.fail("info read"))
+
+    with patch("services.generation_job_state.AsyncResult", return_value=result):
+        reading = CeleryBackendAdapter().read("task-1")
+
+    assert reading == CeleryKnown(state="PENDING")
 
 
 def test_adapter_turns_backend_errors_into_unknown():
@@ -490,3 +586,354 @@ def test_adapter_swallows_mirror_errors():
     with patch("celery_app.celery_app") as celery_app:
         celery_app.backend.mark_as_failure.side_effect = RuntimeError("redis down")
         CeleryBackendAdapter().mark_failed("task-1", RuntimeError("x"))  # no raise
+
+
+# --- read_state ----------------------------------------------------------------
+
+
+def test_read_state_running_task_opens_no_session(mocker):
+    """A WebSocket tick on a running task must not touch the DB."""
+    celery = InMemoryCelery()
+    celery.set("t1", "PROGRESS", {"current": 1, "total": 4, "progress": 25})
+    session = mocker.patch("database.SessionLocal", side_effect=AssertionError)
+
+    state = read_state("t1", celery=celery)
+
+    session.assert_not_called()
+    assert state.status == "PENDING"
+    assert state.celery_status == "PROGRESS"
+    assert state.progress == Progress(25, None, None, None)
+    assert state.db_status is None
+
+
+def test_read_state_progress_carries_code_and_params():
+    celery = InMemoryCelery()
+    info = {"progress": 50, "message": "", "code": "x", "params": {"n": 2}}
+    celery.set("t1", "PROGRESS", info)
+
+    progress = read_state("t1", celery=celery).progress
+
+    assert progress == Progress(50, None, "x", {"n": 2})
+
+
+@pytest.mark.parametrize(
+    ("celery_state", "code"),
+    [("STARTED", "task_started"), ("RETRY", "task_retrying")],
+)
+def test_read_state_started_and_retry_report_a_progress_code(celery_state, code):
+    celery = InMemoryCelery()
+    celery.set("t1", celery_state, {"pid": 7})
+
+    state = read_state("t1", celery=celery)
+
+    assert state.progress == Progress(0, None, code, {})
+
+
+def test_read_state_celery_success_carries_the_celery_result():
+    celery = InMemoryCelery()
+    celery.set("t1", "SUCCESS", {"questions": [1]})
+
+    state = read_state("t1", celery=celery)
+
+    assert state.status == "SUCCESS"
+    assert state.result == {"questions": [1]}
+    assert state.error is None
+
+
+def test_read_state_unreadable_celery_is_unknown_not_an_error():
+    celery = InMemoryCelery()
+    celery.break_backend()
+
+    state = read_state("t1", celery=celery)
+
+    assert isinstance(state.celery, CeleryUnknown)
+    assert state.celery_status is None
+    assert state.status == "PENDING"
+
+
+def test_read_state_failure_maps_to_a_safe_user_error(bound, make_job, mocker):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, "FAILURE", RuntimeError("secret internals"))
+    log = mocker.patch("services.generation_job_state.logger")
+
+    state = read_state(task_id, celery=celery)
+
+    assert state.status == "FAILURE"
+    assert state.error is not None
+    assert "secret internals" not in state.error.message
+    log.error.assert_called_once()
+
+
+def test_read_state_failure_log_can_be_silenced(bound, make_job, mocker):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, "FAILURE", RuntimeError("boom"))
+    log = mocker.patch("services.generation_job_state.logger")
+
+    read_state(task_id, celery=celery, log_error=False)
+
+    log.error.assert_not_called()
+
+
+@pytest.mark.parametrize("celery_state", ["FAILURE", "REVOKED"])
+def test_read_state_db_success_wins_over_celery_failure(
+    bound, make_job, mocker, celery_state
+):
+    """TF-964: the worker was lost after the commit; the row is the truth."""
+    task_id = make_job("SUCCESS")
+    celery = InMemoryCelery()
+    celery.set(task_id, celery_state, RuntimeError("late"))
+    mocker.patch(
+        "services.generation_job_result.build_job_result", return_value={"q": 1}
+    )
+    log = mocker.patch("services.generation_job_state.logger")
+
+    state = read_state(task_id, celery=celery)
+
+    assert state.status == "SUCCESS"
+    assert state.db_overrode_celery is True
+    assert state.result == {"q": 1}
+    assert state.error is None
+    log.warning.assert_called_once()
+    log.error.assert_not_called()
+
+
+def test_read_state_db_success_wins_over_an_expired_celery_entry(
+    bound, make_job, mocker
+):
+    task_id = make_job("SUCCESS")
+    mocker.patch(
+        "services.generation_job_result.build_job_result", return_value={"q": 1}
+    )
+
+    state = read_state(task_id, celery=InMemoryCelery(), consult_db=True)
+
+    assert state.celery_status == "PENDING"
+    assert state.status == "SUCCESS"
+    assert state.db_overrode_celery is True
+
+
+def test_read_state_pending_without_consult_does_not_ask_the_db(bound, make_job):
+    """The WebSocket asks the DB for a PENDING task only after its timeout."""
+    task_id = make_job("SUCCESS")
+
+    state = read_state(task_id, celery=InMemoryCelery())
+
+    assert state.db_status is None
+    assert state.db_overrode_celery is False
+
+
+def test_read_state_with_a_session_reads_the_row_for_any_celery_state(bound, make_job):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, "PROGRESS", {"progress": 10})
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery)
+    finally:
+        db.close()
+
+    assert state.db_status == "PENDING"
+    assert state.status == "PENDING"
+    assert state.phantom is False
+
+
+def test_read_state_missing_row_leaves_celery_in_charge(bound):
+    celery = InMemoryCelery()
+    celery.set("doc-task", "FAILURE", RuntimeError("x"))
+
+    state = read_state("doc-task", celery=celery)
+
+    assert state.db_status is None
+    assert state.status == "FAILURE"
+    assert state.phantom is False
+
+
+def test_read_state_failing_to_open_the_session_bubbles(bound, mocker):
+    celery = InMemoryCelery()
+    celery.set("t1", "FAILURE", RuntimeError("x"))
+    mocker.patch("database.SessionLocal", side_effect=_DB_DOWN)
+
+    with pytest.raises(OperationalError):
+        # Opening the session itself failing is not a read error: it bubbles.
+        read_state("t1", celery=celery)
+
+
+def test_read_state_own_session_query_error_reports_celery(bound, mocker):
+    celery = InMemoryCelery()
+    celery.set("t1", "FAILURE", RuntimeError("x"))
+    broken = MagicMock()
+    broken.query.side_effect = _DB_DOWN
+    mocker.patch("database.SessionLocal", return_value=broken)
+
+    state = read_state("t1", celery=celery)
+
+    assert state.status == "FAILURE"
+    assert state.db_status is None
+    broken.close.assert_called_once()
+
+
+def test_read_state_given_session_propagates_a_db_error():
+    broken = MagicMock()
+    broken.query.side_effect = _DB_DOWN
+
+    with pytest.raises(OperationalError):
+        read_state("t1", db=broken, celery=InMemoryCelery())
+
+
+@pytest.mark.parametrize("celery_state", ["SUCCESS", "FAILURE", "REVOKED"])
+def test_read_state_flags_a_phantom_job(bound, make_job, celery_state):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, celery_state, None)
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery, log_error=False)
+    finally:
+        db.close()
+
+    assert state.phantom is True
+    assert state.status == celery_state
+
+
+def test_sync_phantom_makes_a_single_attempt_when_the_write_fails(bound, make_job):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, "FAILURE", None)
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery, log_error=False)
+    finally:
+        db.close()
+    flaky = _flaky(bound, 99, _DB_DOWN)
+
+    with (
+        patch("database.SessionLocal", flaky),
+        patch("services.generation_job_state.time.sleep") as sleep,
+    ):
+        outcome = sync_phantom(state)
+
+    assert outcome is WriteOutcome.FAILED
+    assert flaky.calls["n"] == 1
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("info", "expected"),
+    [
+        ({"progress": 40}, 40),
+        ({"current": 1, "total": 4}, 25),
+        ({"current": 5, "total": 0}, 100),
+        ({"progress": 250}, 100),
+        ({"progress": -5}, 0),
+        ({"progress": None}, 0),
+        ({"progress": "half"}, 0),
+        ({"current": None, "total": 3}, 0),
+        ({"current": 2, "total": None}, 100),
+        (RuntimeError("retry"), 0),
+        (None, 0),
+    ],
+)
+def test_progress_percent_never_raises_on_foreign_meta(info, expected):
+    from services.generation_job_state import _percent_of
+
+    assert _percent_of(info) == expected
+
+
+@pytest.mark.parametrize("celery_state", ["SUCCESS", "FAILURE", "REVOKED", "PENDING"])
+def test_read_state_ignores_the_info_of_non_running_states_for_progress(celery_state):
+    celery = InMemoryCelery()
+    celery.set("t1", celery_state, {"progress": 99, "total": "x"})
+
+    state = read_state("t1", celery=celery, log_error=False)
+
+    assert state.progress is None
+
+
+def test_read_state_override_warning_survives_log_error_false(bound, make_job, mocker):
+    """Silencing the task-error log must not hide a failure after the commit."""
+    task_id = make_job("SUCCESS")
+    celery = InMemoryCelery()
+    celery.set(task_id, "FAILURE", RuntimeError("late"))
+    mocker.patch(
+        "services.generation_job_result.build_job_result", return_value={"q": 1}
+    )
+    log = mocker.patch("services.generation_job_state.logger")
+
+    state = read_state(task_id, celery=celery, log_error=False)
+
+    assert state.db_overrode_celery is True
+    log.warning.assert_called_once()
+    log.error.assert_not_called()
+
+
+@pytest.mark.parametrize("celery_state", ["SUCCESS", "FAILURE", "REVOKED"])
+def test_read_state_terminal_row_is_not_a_phantom(bound, make_job, celery_state):
+    task_id = make_job("FAILURE")
+    celery = InMemoryCelery()
+    celery.set(task_id, celery_state, None)
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery, log_error=False)
+    finally:
+        db.close()
+
+    assert state.phantom is False
+
+
+def test_read_state_unreadable_celery_with_a_success_row_reports_success(
+    bound, make_job, mocker
+):
+    task_id = make_job("SUCCESS")
+    mocker.patch(
+        "services.generation_job_result.build_job_result", return_value={"q": 1}
+    )
+    celery = MagicMock()
+    celery.read.return_value = CeleryUnknown(ConnectionError("redis down"))
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery)
+    finally:
+        db.close()
+
+    assert state.status == "SUCCESS"
+    assert state.db_overrode_celery is True
+    assert state.celery_status is None
+
+
+def test_read_state_uses_a_given_job_without_querying_again():
+    job = MagicMock()
+    job.status = "PENDING"
+    db = MagicMock()
+    celery = InMemoryCelery()
+    celery.set("t1", "FAILURE", None)
+
+    state = read_state("t1", db=db, celery=celery, job=job, log_error=False)
+
+    db.query.assert_not_called()
+    assert state.db_status == "PENDING"
+    assert state.phantom is True
+
+
+def test_sync_phantom_mirrors_the_terminal_state(bound, make_job):
+    task_id = make_job("PENDING")
+    celery = InMemoryCelery()
+    celery.set(task_id, "REVOKED", None)
+    db = bound()
+    try:
+        state = read_state(task_id, db=db, celery=celery, log_error=False)
+    finally:
+        db.close()
+
+    assert sync_phantom(state) is WriteOutcome.WRITTEN
+    assert _status(bound, task_id) == "REVOKED"
+
+
+def test_sync_phantom_rejects_a_job_that_is_not_a_phantom():
+    celery = InMemoryCelery()
+    celery.set("t1", "PROGRESS", {})
+    state = read_state("t1", celery=celery)
+
+    with pytest.raises(ValueError):
+        sync_phantom(state)

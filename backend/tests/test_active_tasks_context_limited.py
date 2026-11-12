@@ -343,6 +343,6 @@ class TestDismiss:
 
         test_db.refresh(job)
         assert job.dismissed_at is None
-        with patch("celery.result.AsyncResult") as async_result:
+        with patch("services.generation_job_state.AsyncResult") as async_result:
             async_result.return_value = Mock(state="PROGRESS", info={})
             assert stage.tid("tf736-running") in _listed_ids(test_db, stage.owner)

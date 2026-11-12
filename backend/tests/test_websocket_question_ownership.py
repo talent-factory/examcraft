@@ -14,6 +14,8 @@ from starlette.testclient import TestClient
 from fastapi import FastAPI
 from starlette.websockets import WebSocketDisconnect
 
+from tests.generation_job_fakes import job_state
+
 
 @pytest.fixture
 def ws_module():
@@ -43,8 +45,6 @@ class TestQuestionJobOwnership:
         mock_job = MagicMock()
         mock_job.user_id = 42  # Same as current_user.id
 
-        mock_task_data = {"state": "PENDING", "info": None, "result": None}
-
         with (
             patch(
                 "api.v1.websocket_test._authenticate_websocket",
@@ -52,7 +52,7 @@ class TestQuestionJobOwnership:
             ),
             patch("api.v1.websocket_test.SessionLocal") as mock_session_cls,
             patch(
-                "api.v1.websocket_test._get_task_result", return_value=mock_task_data
+                "api.v1.websocket_test.read_state", return_value=job_state("PENDING")
             ),
         ):
             mock_db = MagicMock()
@@ -132,7 +132,6 @@ class TestQuestionJobOwnership:
         mock_doc.id = 500
         mock_doc.user_id = 42  # foreign owner
 
-        mock_task_data = {"state": "PENDING", "info": None, "result": None}
         mock_audit = MagicMock()
 
         with (
@@ -142,7 +141,7 @@ class TestQuestionJobOwnership:
             ),
             patch("api.v1.websocket_test.SessionLocal") as mock_session_cls,
             patch(
-                "api.v1.websocket_test._get_task_result", return_value=mock_task_data
+                "api.v1.websocket_test.read_state", return_value=job_state("PENDING")
             ),
             patch("services.audit_service.AuditService") as mock_audit_cls,
         ):
@@ -174,7 +173,6 @@ class TestQuestionJobOwnership:
         mock_job.id = 700
         mock_job.user_id = 42
 
-        mock_task_data = {"state": "PENDING", "info": None, "result": None}
         mock_audit = MagicMock()
 
         with (
@@ -184,7 +182,7 @@ class TestQuestionJobOwnership:
             ),
             patch("api.v1.websocket_test.SessionLocal") as mock_session_cls,
             patch(
-                "api.v1.websocket_test._get_task_result", return_value=mock_task_data
+                "api.v1.websocket_test.read_state", return_value=job_state("PENDING")
             ),
             patch("services.audit_service.AuditService") as mock_audit_cls,
         ):

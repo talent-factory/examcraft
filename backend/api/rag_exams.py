@@ -17,8 +17,12 @@ from database import get_db
 import services.rag_service as rag_service_module
 from services.rag_service import RAGExamRequest
 from services.document_service import document_service
-from services.generation_job_state import TERMINAL_STATUSES
-from services.rag_errors import TASK_FAILED, user_facing_task_error
+from services.generation_job_state import (
+    TERMINAL_STATUSES,
+    CeleryUnknown,
+    read_state,
+    sync_phantom,
+)
 from models.auth import User
 from models.competency import CompetencyFramework
 from models.document import Document, DocumentStatus
@@ -26,8 +30,6 @@ from models.question_generation_job import QuestionGenerationJob
 from tasks.question_tasks import generate_questions_task
 from schemas.task import (
     GenerateExamTaskResponse,
-    ProgressCode,
-    progress_code_fields,
 )
 from schemas.active_tasks import (
     ActiveTaskInfo,
@@ -962,15 +964,12 @@ async def get_active_tasks(
     Defense-in-depth: a job whose DB status is non-terminal but whose Celery
     state is already terminal (e.g. worker died before the status write
     committed) is treated as a phantom — excluded from the response and the
-    DB row is synced idempotently via ``record_terminal(retry=False)`` (single
+    DB row is synced idempotently via ``sync_phantom`` (single
     attempt only — the watchdog from TF-329 reconciles persistent failures, so
     the HTTP handler never blocks on a retry loop).
     The synced job reappears as a completed task on the next call.
     """
-    from celery.result import AsyncResult
     from sqlalchemy import and_, or_
-
-    from services.generation_job_state import record_terminal
 
     # created_at is timestamptz since TF-972 — use aware cutoffs
     now = datetime.now(timezone.utc)
@@ -1048,52 +1047,36 @@ async def get_active_tasks(
             )
             continue
 
-        progress = 0
-        message = None
+        # Read-only list: the loaded row is reused (no extra query) and the
+        # task error is not logged here; get_task_result and the WebSocket
+        # report it to the user, the phantom sync below logs its own write.
+        state = read_state(job.task_id, db=db, job=job, log_error=False)
+        if isinstance(state.celery, CeleryUnknown):
+            logger.warning(
+                "Failed to fetch Celery state for task %s: %r",
+                job.task_id,
+                state.celery.cause,
+            )
         # TF-736: progress code + params instead of a German text, same as
         # the WebSocket relays them.
-        message_code: Optional[str] = None
-        message_params: Optional[Dict[str, Any]] = None
-        celery_state: Optional[str] = None
-        try:
-            result = AsyncResult(job.task_id)
-            celery_state = result.state
-            if celery_state == "PROGRESS" and isinstance(result.info, dict):
-                current = result.info.get("current", 0)
-                total = result.info.get("total", 1)
-                progress = int((current / max(total, 1)) * 100)
-                message = result.info.get("message") or None
-                message_code, message_params = progress_code_fields(result.info)
-            elif celery_state == "STARTED":
-                progress = 0
-                message_code = ProgressCode.TASK_STARTED.value
-                message_params = {}
-        except Exception as celery_err:
-            logger.warning(
-                "Failed to fetch Celery state for task %s: %s",
-                job.task_id,
-                celery_err,
-            )
+        progress = state.progress.percent if state.progress else 0
+        message = state.progress.message if state.progress else None
+        message_code = state.progress.code if state.progress else None
+        message_params = state.progress.params if state.progress else None
 
-        if celery_state in TERMINAL_STATUSES:
-            logger.info(
-                "Phantom job detected: task_id=%s db_status=%s celery_state=%s — syncing DB",
-                job.task_id,
-                job.status,
-                celery_state,
-            )
+        if state.phantom:
             # Single attempt, no inline retry: TF-329's watchdog reconciles
             # persistent failures so the request handler never blocks. A failed
             # write is logged ERROR by record_terminal; the phantom job stays
             # excluded from the response either way. The broad guard keeps an
             # unexpected error in the sync from failing the whole read-only list.
             try:
-                record_terminal(job.task_id, celery_state, retry=False)
+                sync_phantom(state)
             except Exception:
                 logger.error(
                     "Unexpected error syncing phantom job %s (celery_state=%s)",
                     job.task_id,
-                    celery_state,
+                    state.celery_status,
                     exc_info=True,
                 )
             continue
@@ -1206,59 +1189,21 @@ async def get_task_result(
         request=http_request,
     )
 
-    from celery.result import AsyncResult
-
-    celery_state: Optional[str] = None
-    payload: Any = None
-    error: Optional[str] = None
-    error_code: Optional[str] = None
-    try:
-        async_result = AsyncResult(job.task_id)
-        celery_state = async_result.state
-        if celery_state == "SUCCESS":
-            payload = async_result.result
-        elif celery_state in ("FAILURE", "REVOKED") and job.status != "SUCCESS":
-            raw_info = async_result.result
-            error_code, error = user_facing_task_error(raw_info)
-            # Log the real error fully server-side (with traceback if
-            # available); send the user only the safe, actionable message —
-            # no raw internals/PII (TF-358). Same mapper + logging pattern as
-            # the WebSocket path (api/v1/websocket.py), so a task shows the
-            # same message regardless of recovery path, and errors stay
-            # alertable on this path too.
-            unmapped = error_code == TASK_FAILED
-            logger.error(
-                "Task %s failed (%s): %r",
-                job.task_id,
-                "unmapped error class" if unmapped else "mapped error",
-                raw_info,
-                exc_info=raw_info if isinstance(raw_info, BaseException) else None,
-            )
-        elif celery_state in ("FAILURE", "REVOKED"):
-            # TF-964: the row's SUCCESS wins below, but the error after the
-            # commit must stay visible to ops.
-            logger.warning(
-                "Task %s: Celery=%s, DB=SUCCESS — reporting SUCCESS from the "
-                "DB; Celery info: %r",
-                job.task_id,
-                celery_state,
-                async_result.result,
-            )
-    except Exception as celery_err:
+    state = read_state(job.task_id, db=db, job=job)
+    if isinstance(state.celery, CeleryUnknown):
         # Broker/result backend unreachable: the DB status remains the
         # source of truth, the result is just missing. No 5xx — the bar
         # should still be able to display the task.
         logger.warning(
-            "Failed to fetch Celery result for task %s: %s", job.task_id, celery_err
+            "Failed to fetch Celery result for task %s: %r",
+            job.task_id,
+            state.celery.cause,
         )
 
-    if job.status == "SUCCESS" and celery_state != "SUCCESS":
-        from services.generation_job_result import build_job_result
-
-        status = "SUCCESS"
-        payload = build_job_result(db, job)
-    else:
-        status = celery_state if celery_state in TERMINAL_STATUSES else job.status
+    status = state.status
+    payload = state.result
+    error = state.error.message if state.error else None
+    error_code = state.error.code if state.error else None
     # TF-736: the DB row keeps the counts after the Celery result expired, so
     # an under-filled generation stays explainable after a reload. Always
     # populated for SUCCESS regardless of whether the Celery result is still

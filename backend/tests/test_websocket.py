@@ -1,10 +1,32 @@
 """Tests for the WebSocket task progress endpoint"""
 
+import dataclasses
+
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 from starlette.websockets import WebSocketDisconnect
+
+from services.rag_errors import TASK_FAILED, user_facing_task_error
+
+
+@pytest.fixture(autouse=True)
+def no_generation_job_row():
+    """``read_state`` opens its own session for a failed task. Keep it off the
+    real database: these tests are about the frames, and a task without a job
+    row (document task) is the plain Celery case."""
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = None
+    with patch("database.SessionLocal", return_value=db):
+        yield db
+
+
+def _error():
+    from services.generation_job_state import JobError
+
+    mapped = user_facing_task_error(RuntimeError("x"))
+    return JobError(mapped.code, mapped.message)
 
 
 @pytest.fixture
@@ -56,7 +78,7 @@ class TestWebSocketConnection:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -159,7 +181,7 @@ class TestWebSocketProgressUpdates:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult", side_effect=make_result),
+            patch("services.generation_job_state.AsyncResult", side_effect=make_result),
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -232,7 +254,7 @@ class TestWebSocketProgressUpdates:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult", side_effect=make_result),
+            patch("services.generation_job_state.AsyncResult", side_effect=make_result),
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -261,7 +283,7 @@ class TestWebSocketProgressUpdates:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -294,7 +316,7 @@ class TestWebSocketProgressUpdates:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -333,7 +355,7 @@ class TestWebSocketProgressUpdates:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -371,7 +393,7 @@ class TestWebSocketDisconnect:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -414,23 +436,21 @@ class TestUserFacingError:
 
     def test_no_context_maps_to_actionable_message(self, ws_module):
         # The exact production error from TF-358.
-        code, msg = ws_module.user_facing_task_error(
+        code, msg = user_facing_task_error(
             ValueError("No context available for question generation")
         )
         assert code == "rag_task_no_context"
         assert "durchsuchbaren Inhalt" in msg
 
     def test_no_relevant_context_maps_to_actionable_message(self, ws_module):
-        code, msg = ws_module.user_facing_task_error(
+        code, msg = user_facing_task_error(
             ValueError("No relevant context found for topic: Foo")
         )
         assert code == "rag_task_no_context"
         assert "durchsuchbaren Inhalt" in msg
 
     def test_unknown_question_type_maps_to_actionable_message(self, ws_module):
-        code, msg = ws_module.user_facing_task_error(
-            ValueError("Unknown question type: xyz")
-        )
+        code, msg = user_facing_task_error(ValueError("Unknown question type: xyz"))
         assert code == "rag_task_unknown_question_type"
         assert "Fragetyp" in msg
 
@@ -440,13 +460,13 @@ class TestUserFacingError:
             "IntegrityError: duplicate key value violates unique constraint "
             '"question_source_doc_pkey" DETAIL: Key (id)=(42) at /app/secret.py'
         )
-        code, msg = ws_module.user_facing_task_error(leaky)
-        assert code == ws_module.TASK_FAILED
+        code, msg = user_facing_task_error(leaky)
+        assert code == TASK_FAILED
         assert "question_source_doc" not in msg
         assert "secret" not in msg
 
     def test_none_info_falls_back_to_generic(self, ws_module):
-        assert ws_module.user_facing_task_error(None).code == ws_module.TASK_FAILED
+        assert user_facing_task_error(None).code == TASK_FAILED
 
     def test_maps_via_stable_code_independent_of_message(self, ws_module):
         # TF-358: Mapping must work via the stable .code, even if the raw
@@ -454,14 +474,12 @@ class TestUserFacingError:
         # rewording/localization). The typed errors live in core.
         from services.rag_errors import NoContextError, UnknownQuestionTypeError
 
-        no_ctx = ws_module.user_facing_task_error(
+        no_ctx = user_facing_task_error(
             NoContextError("völlig andere Formulierung ohne Schlüsselwörter")
         )
         assert no_ctx.code == "rag_task_no_context"
 
-        unknown_type = ws_module.user_facing_task_error(
-            UnknownQuestionTypeError("anderer Text")
-        )
+        unknown_type = user_facing_task_error(UnknownQuestionTypeError("anderer Text"))
         assert unknown_type.code == "rag_task_unknown_question_type"
 
     def test_message_is_the_german_locale_text_of_the_code(self, ws_module):
@@ -470,7 +488,7 @@ class TestUserFacingError:
         from services.translation_service import t
 
         for raw in (None, ValueError("no context available"), ValueError("x")):
-            code, msg = ws_module.user_facing_task_error(raw)
+            code, msg = user_facing_task_error(raw)
             assert msg == t(code, "de")
 
 
@@ -543,7 +561,7 @@ class TestFailureMessageMapping:
         with (
             patch("api.v1.websocket.AuthService") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
-            patch("api.v1.websocket.AsyncResult") as mock_result,
+            patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
             mock_auth.decode_token.return_value = valid_token_payload
             mock_auth.is_token_revoked.return_value = False
@@ -623,7 +641,7 @@ class TestFailureFramesCarryErrorCode:
         return task
 
     def test_case_1_unmapped_error(self, connect):
-        with patch("api.v1.websocket.AsyncResult") as mock_result:
+        with patch("services.generation_job_state.AsyncResult") as mock_result:
             mock_result.return_value = self._failed_task(RuntimeError("boom"))
             data = connect()
         self._assert_frame(data, "rag_task_failed")
@@ -631,7 +649,7 @@ class TestFailureFramesCarryErrorCode:
     def test_case_2_no_context(self, connect):
         from services.rag_errors import NoContextError
 
-        with patch("api.v1.websocket.AsyncResult") as mock_result:
+        with patch("services.generation_job_state.AsyncResult") as mock_result:
             mock_result.return_value = self._failed_task(NoContextError("x"))
             data = connect()
         self._assert_frame(data, "rag_task_no_context")
@@ -639,14 +657,17 @@ class TestFailureFramesCarryErrorCode:
     def test_case_3_unknown_question_type(self, connect):
         from services.rag_errors import UnknownQuestionTypeError
 
-        with patch("api.v1.websocket.AsyncResult") as mock_result:
+        with patch("services.generation_job_state.AsyncResult") as mock_result:
             mock_result.return_value = self._failed_task(UnknownQuestionTypeError("x"))
             data = connect()
         self._assert_frame(data, "rag_task_unknown_question_type")
 
     def test_case_4_redis_unreachable(self, connect):
         with (
-            patch("api.v1.websocket.AsyncResult", side_effect=ConnectionError("down")),
+            patch(
+                "services.generation_job_state.AsyncResult",
+                side_effect=ConnectionError("down"),
+            ),
             patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
         ):
             data = connect()
@@ -660,7 +681,7 @@ class TestFailureFramesCarryErrorCode:
         pending.info = None
         ws_logger = logging.getLogger("api.v1.websocket")
         with (
-            patch("api.v1.websocket.AsyncResult", return_value=pending),
+            patch("services.generation_job_state.AsyncResult", return_value=pending),
             patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
             patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0),
             patch.object(ws_logger, "error") as mock_error,
@@ -675,17 +696,73 @@ class TestFailureFramesCarryErrorCode:
         mock_error.assert_called_once()
         assert mock_error.call_args[0][1] == "test-task-id"
 
-    def test_case_6_unexpected_stream_error(self, connect):
-        with patch(
-            "api.v1.websocket._get_task_result", side_effect=RuntimeError("bug")
+    def test_the_db_is_asked_once_and_only_at_the_pending_timeout(self, connect):
+        """consult_db escalates exactly once: ticks before the timeout stay
+        DB-free, the timeout tick is re-read with the DB, then the timeout."""
+        from tests.generation_job_fakes import job_state
+
+        pending = job_state("PENDING")
+        with (
+            patch("api.v1.websocket.read_state", return_value=pending) as read,
+            patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0.01),
+            patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0.025),
         ):
+            data = connect()
+
+        self._assert_frame(data, "rag_task_pending_timeout", {"seconds": 0.025})
+        flags = [c.kwargs.get("consult_db", False) for c in read.call_args_list]
+        assert flags == [False, False, False, True]
+
+    def test_a_celery_outage_during_the_db_re_read_is_not_a_timeout(self, connect):
+        from services.generation_job_state import CeleryUnknown
+        from tests.generation_job_fakes import job_state
+
+        unknown = dataclasses.replace(
+            job_state("PENDING"),
+            celery=CeleryUnknown(ConnectionError("redis")),
+            celery_status=None,
+        )
+        reads = [job_state("PENDING"), unknown, unknown, unknown]
+        with (
+            patch("api.v1.websocket.read_state", side_effect=reads),
+            patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
+            patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0),
+        ):
+            data = connect()
+
+        self._assert_frame(data, "rag_task_status_unavailable")
+
+    def test_a_task_that_starts_during_the_db_re_read_is_reported_not_timed_out(
+        self, connect
+    ):
+        from services.generation_job_state import Progress
+        from tests.generation_job_fakes import job_state
+
+        running = job_state(
+            "PROGRESS", progress=Progress(40, "working", "task_started", {})
+        )
+        reads = [job_state("PENDING"), running]
+        with (
+            patch("api.v1.websocket.read_state", side_effect=reads) as read,
+            patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
+            patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0),
+        ):
+            data = connect()
+
+        assert data["status"] == "PROGRESS"
+        assert data["progress"] == 40
+        flags = [c.kwargs.get("consult_db", False) for c in read.call_args_list]
+        assert flags[:2] == [False, True]
+
+    def test_case_6_unexpected_stream_error(self, connect):
+        with patch("api.v1.websocket.read_state", side_effect=RuntimeError("bug")):
             data = connect()
         self._assert_frame(data, "rag_task_stream_error")
 
     def test_revoked_frame_carries_the_code_too(self, connect):
         task = self._failed_task(RuntimeError("revoked"))
         task.state = "REVOKED"
-        with patch("api.v1.websocket.AsyncResult", return_value=task):
+        with patch("services.generation_job_state.AsyncResult", return_value=task):
             data = connect()
         assert data["status"] == "REVOKED"
         assert data["error_code"] == "rag_task_failed"
@@ -698,13 +775,13 @@ class TestFailureFramesCarryErrorCode:
 
         from services.rag_errors import NoContextError
 
-        ws_logger = logging.getLogger("api.v1.websocket")
+        ws_logger = logging.getLogger("services.generation_job_state")
         for info, expected in (
             (RuntimeError("boom"), "unmapped error class"),
             (NoContextError("x"), "mapped error"),
         ):
             with (
-                patch("api.v1.websocket.AsyncResult") as mock_result,
+                patch("services.generation_job_state.AsyncResult") as mock_result,
                 patch.object(ws_logger, "error") as mock_error,
             ):
                 mock_result.return_value = self._failed_task(info)

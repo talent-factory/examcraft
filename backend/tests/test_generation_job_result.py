@@ -181,7 +181,8 @@ class TestResultEndpoint:
             RuntimeError("WorkerLostError") if celery_state != "PENDING" else None
         )
         with patch(
-            "celery.result.AsyncResult", return_value=_celery(celery_state, celery_info)
+            "services.generation_job_state.AsyncResult",
+            return_value=_celery(celery_state, celery_info),
         ):
             response = api_client.get(f"/api/v1/rag/tasks/{TASK_ID}/result")
 
@@ -197,7 +198,10 @@ class TestResultEndpoint:
     def test_live_celery_result_is_still_preferred(self, api_client):
         """While Celery still has the result, it is the fresher source."""
         live = {"exam_id": "live", "questions": []}
-        with patch("celery.result.AsyncResult", return_value=_celery("SUCCESS", live)):
+        with patch(
+            "services.generation_job_state.AsyncResult",
+            return_value=_celery("SUCCESS", live),
+        ):
             body = api_client.get(f"/api/v1/rag/tasks/{TASK_ID}/result").json()
 
         assert body["result"] == live
@@ -208,7 +212,7 @@ class TestActiveTasks:
         """/active-tasks takes terminal rows from the DB without asking
         Celery, so Celery's FAILURE can't turn the entry red."""
         with patch(
-            "celery.result.AsyncResult", return_value=_celery("FAILURE")
+            "services.generation_job_state.AsyncResult", return_value=_celery("FAILURE")
         ) as async_result:
             body = api_client.get("/api/v1/rag/active-tasks").json()
 
@@ -233,9 +237,10 @@ class TestWebSocket:
         )
         with (
             patch("api.v1.websocket.SessionLocal", bound),
+            patch("database.SessionLocal", bound),
             patch("api.v1.websocket.AuthService") as auth,
             patch(
-                "api.v1.websocket.AsyncResult",
+                "services.generation_job_state.AsyncResult",
                 return_value=_celery("FAILURE", RuntimeError("WorkerLostError")),
             ),
         ):
@@ -247,6 +252,40 @@ class TestWebSocket:
         assert message["status"] == "SUCCESS"
         assert message["progress"] == 100
         assert message["error"] is None
+        assert message["result"]["review_question_ids"] == finished_job.review_ids
+
+    def test_expired_celery_entry_reports_db_success_after_the_timeout(
+        self, test_db, finished_job
+    ):
+        """An expired result-backend entry reads as PENDING. Only once the
+        pending timeout is reached does the WebSocket ask the DB, and a job
+        finished there is SUCCESS, not a timeout."""
+        from sqlalchemy.orm import sessionmaker
+
+        from api.v1 import websocket as ws_module
+
+        app = FastAPI()
+        app.include_router(ws_module.router)
+        bound = sessionmaker(
+            bind=test_db.get_bind(), join_transaction_mode="create_savepoint"
+        )
+        with (
+            patch("api.v1.websocket.SessionLocal", bound),
+            patch("database.SessionLocal", bound),
+            patch("api.v1.websocket.AuthService") as auth,
+            patch(
+                "services.generation_job_state.AsyncResult",
+                return_value=_celery("PENDING"),
+            ),
+            patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
+            patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0),
+        ):
+            auth.decode_token.return_value = {"sub": str(finished_job.user.id)}
+            with TestClient(app).websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
+                ws.send_json({"token": "t"})
+                message = ws.receive_json()
+
+        assert message["status"] == "SUCCESS"
         assert message["result"]["review_question_ids"] == finished_job.review_ids
 
     def test_db_lookup_error_reports_the_task_error(self, test_db, finished_job):
@@ -267,13 +306,14 @@ class TestWebSocket:
         task_error = RuntimeError("WorkerLostError")
         with (
             patch("api.v1.websocket.SessionLocal", bound),
+            patch("database.SessionLocal", bound),
             patch("api.v1.websocket.AuthService") as auth,
             patch(
-                "api.v1.websocket.AsyncResult",
+                "services.generation_job_state.AsyncResult",
                 return_value=_celery("FAILURE", task_error),
             ),
             patch(
-                "api.v1.websocket._stored_success_result",
+                "services.generation_job_state._load_job",
                 side_effect=OperationalError("stmt", {}, Exception("db down")),
             ),
         ):
@@ -289,10 +329,16 @@ class TestWebSocket:
         """No job row in SUCCESS (here: none at all) → the old FAILURE path."""
         from sqlalchemy.orm import sessionmaker
 
-        from api.v1.websocket import _stored_success_result
+        from services.generation_job_state import read_state
+        from tests.generation_job_fakes import InMemoryCelery
 
         bound = sessionmaker(
             bind=test_db.get_bind(), join_transaction_mode="create_savepoint"
         )
-        with patch("api.v1.websocket.SessionLocal", bound):
-            assert _stored_success_result("no-such-task") == (False, None)
+        celery = InMemoryCelery()
+        celery.set("no-such-task", "FAILURE", RuntimeError("x"))
+        with patch("database.SessionLocal", bound):
+            state = read_state("no-such-task", celery=celery)
+
+        assert state.status == "FAILURE"
+        assert state.db_overrode_celery is False

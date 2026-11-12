@@ -160,7 +160,7 @@ class TestActiveTasksEndpoint:
         )
         job = _stored_job(test_db, owner, created_at, status="PENDING")
 
-        with patch("celery.result.AsyncResult") as async_result:
+        with patch("services.generation_job_state.AsyncResult") as async_result:
             async_result.return_value = Mock(state="PENDING", info=None)
             listed = (await _listed_tasks(owner, test_db))[job.task_id]
 

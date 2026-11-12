@@ -6,9 +6,13 @@ committed together with the questions and is never overwritten (TF-964). The
 *Celery state* is volatile (``result_expires``) and may report ``FAILURE`` /
 ``REVOKED`` / ``PENDING`` for a job that is already ``SUCCESS`` in the DB.
 
-This module owns the write side and the watchdog's reconcile decision, so that
-invariant lives in one place:
+This module owns the read side, the write side and the watchdog's reconcile
+decision, so that invariant lives in one place:
 
+- ``read_state``: one consistent ``JobState`` from Celery plus, where it
+  matters, the DB row (the TF-964 rule, phantom detection).
+- ``sync_phantom``: single-attempt mirror of Celery's terminal state into a
+  row that is still not terminal.
 - ``record_terminal``: write a terminal status; never overwrites ``SUCCESS``.
 - ``reconcile_stuck``: decide what to do with a job stuck in ``PENDING``.
 - ``CeleryStatePort``: the seam to Celery's result backend. Adapters:
@@ -22,12 +26,14 @@ import enum
 import logging
 import time
 from dataclasses import dataclass
-from typing import Literal, Protocol, get_args
+from typing import Any, Literal, Protocol, get_args
 
 from celery.result import AsyncResult
 from sqlalchemy.exc import SQLAlchemyError
 
 from models.question_generation_job import QuestionGenerationJob
+from schemas.task import ProgressCode, progress_code_fields
+from services.rag_errors import TASK_FAILED, user_facing_task_error
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +127,16 @@ class Reconciliation(enum.Enum):
 
 @dataclass(frozen=True)
 class CeleryKnown:
-    """Celery state was read."""
+    """Celery state was read.
+
+    ``info`` is the progress meta for ``PROGRESS``, the worker meta for
+    ``STARTED``, the exception for ``RETRY``/``FAILURE``/``REVOKED`` and the
+    result for ``SUCCESS``. It is not read for ``PENDING``, where Celery has
+    nothing to report.
+    """
 
     state: str
+    info: Any = None
 
 
 @dataclass(frozen=True)
@@ -169,7 +182,11 @@ class CeleryBackendAdapter:
             # callers that only need the status constants must not pay for.
             from celery_app import celery_app
 
-            return CeleryKnown(state=AsyncResult(task_id, app=celery_app).state)
+            result = AsyncResult(task_id, app=celery_app)
+            state = result.state
+            return CeleryKnown(
+                state=state, info=None if state == "PENDING" else result.info
+            )
         except Exception as err:
             return CeleryUnknown(cause=err)
 
@@ -432,3 +449,247 @@ def reconcile_stuck(
         "Watchdog: task %s in unexpected celery state %r — skipping", task_id, state
     )
     return Reconciliation.UNEXPECTED
+
+
+# --- Read side ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Progress:
+    """What a running task reports. ``code``/``params`` are what the frontend
+    translates (TF-736); ``message`` is the legacy text of document tasks."""
+
+    percent: int
+    message: str | None
+    code: str | None
+    params: dict | None
+
+
+@dataclass(frozen=True)
+class JobError:
+    """The safe, user-facing reason a task failed (TF-358, TF-967)."""
+
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class JobState:
+    """One consistent reading of a Generation Job: DB row and Celery state.
+
+    ``status`` is the HTTP contract: a DB ``SUCCESS`` wins, otherwise a
+    terminal Celery state, otherwise the DB column. It is ``PENDING`` without a
+    row and whenever the DB was not consulted and Celery reports no terminal
+    state, so a running task's state lives in ``celery_status`` and
+    ``progress``.
+    """
+
+    task_id: str
+    status: str
+    db_status: str | None
+    celery: CeleryReading
+    celery_status: str | None
+    progress: Progress | None
+    result: Any | None
+    error: JobError | None
+    db_overrode_celery: bool  # TF-964: the row says SUCCESS, Celery does not report SUCCESS (also when unreadable)
+    phantom: bool  # the row is not terminal, Celery is
+
+
+def _percent_of(info: Any) -> int:
+    """``progress`` as ``update_progress`` writes it, else derived from
+    ``current``/``total`` (a PROGRESS meta from elsewhere may carry only those).
+
+    Foreign or malformed meta never raises: a non-numeric value counts as 0 and
+    the result is clamped to 0..100.
+    """
+    if not isinstance(info, dict):
+        return 0
+
+    def number(key: str, default: float) -> float:
+        value = info.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return default
+        return value
+
+    if "progress" in info:
+        percent = number("progress", 0)
+    else:
+        percent = number("current", 0) / max(number("total", 1), 1) * 100
+    return max(0, min(100, int(percent)))
+
+
+def _progress_of(state: str, info: Any) -> Progress | None:
+    if state not in ("PROGRESS", "STARTED", "RETRY"):
+        return None
+    percent = _percent_of(info)
+    if state == "PROGRESS" and isinstance(info, dict):
+        code, params = progress_code_fields(info)
+        return Progress(percent, info.get("message") or None, code, params)
+    if state == "STARTED":
+        return Progress(percent, None, ProgressCode.TASK_STARTED.value, {})
+    if state == "RETRY":
+        return Progress(percent, None, ProgressCode.TASK_RETRYING.value, {})
+    return None
+
+
+def _load_job(db, task_id: str) -> QuestionGenerationJob | None:
+    return (
+        db.query(QuestionGenerationJob)
+        .filter(QuestionGenerationJob.task_id == task_id)
+        .first()
+    )
+
+
+def read_state(
+    task_id: str,
+    *,
+    db=None,
+    celery: CeleryStatePort | None = None,
+    consult_db: bool = False,
+    log_error: bool = True,
+    job: QuestionGenerationJob | None = None,
+) -> JobState:
+    """Read a task's state from Celery and, where it matters, from the DB.
+
+    The DB is consulted if ``db`` is given, if ``consult_db`` is set, or if
+    Celery reports ``FAILURE``/``REVOKED``: only then can the row overrule
+    Celery (TF-964). A caller polling a running task therefore opens no
+    session. Never raises because of Celery (``CeleryUnknown``). With its own
+    session (``db=None``) a DB read error is logged and swallowed, so the
+    caller reports Celery's state; with ``db=`` it propagates.
+
+    Ownership and 404 are the caller's business and happen before this call.
+    ``log_error=False`` silences only the server-side ERROR log of a task
+    failure, for a caller that reports it elsewhere (``/active-tasks`` is a
+    read-only list). The TF-964 warning (Celery failed after the commit) is
+    always logged. ``job`` is a row the caller has already loaded; it is used
+    instead of querying again.
+    """
+    celery = celery or CeleryBackendAdapter()
+    reading = celery.read(task_id)
+    known = reading if isinstance(reading, CeleryKnown) else None
+    celery_status = known.state if known else None
+    info = known.info if known else None
+
+    db_status: str | None = None
+    job_result: Any = None
+    if db is not None or consult_db or celery_status in ("FAILURE", "REVOKED"):
+        db_status, job_result = _read_db_side(
+            task_id, db, job=job, wants_result=celery_status != "SUCCESS"
+        )
+
+    overrode = db_status == "SUCCESS" and celery_status != "SUCCESS"
+    if overrode:
+        status = "SUCCESS"
+        result = job_result
+        if celery_status in ("FAILURE", "REVOKED"):
+            # The user sees the saved result, but the error after the commit
+            # must stay visible to ops — whatever ``log_error`` says.
+            logger.warning(
+                "Task %s: Celery=%s, DB=SUCCESS — reporting SUCCESS from the "
+                "DB; Celery info: %r",
+                task_id,
+                celery_status,
+                info,
+            )
+    else:
+        status = (
+            celery_status
+            if celery_status in TERMINAL_STATUSES
+            else (db_status or "PENDING")
+        )
+        result = info if celery_status == "SUCCESS" else None
+
+    error = None
+    if not overrode and celery_status in ("FAILURE", "REVOKED"):
+        mapped = user_facing_task_error(info)
+        error = JobError(mapped.code, mapped.message)
+        if log_error:
+            # Log the real error server-side (with traceback if available);
+            # the user only gets the safe message (TF-358). Unmapped error
+            # classes are flagged so new ones can be alerted on.
+            logger.error(
+                "Task %s failed (%s): %r",
+                task_id,
+                "unmapped error class"
+                if mapped.code == TASK_FAILED
+                else "mapped error",
+                info,
+                exc_info=info if isinstance(info, BaseException) else None,
+            )
+
+    return JobState(
+        task_id=task_id,
+        status=status,
+        db_status=db_status,
+        celery=reading,
+        celery_status=celery_status,
+        progress=_progress_of(celery_status, info) if celery_status else None,
+        result=result,
+        error=error,
+        db_overrode_celery=overrode,
+        phantom=(
+            db_status is not None
+            and db_status not in TERMINAL_STATUSES
+            and celery_status in TERMINAL_STATUSES
+        ),
+    )
+
+
+def _read_db_side(
+    task_id: str,
+    db,
+    *,
+    job: QuestionGenerationJob | None = None,
+    wants_result: bool,
+) -> tuple[str | None, Any]:
+    """The job row's status and, for a SUCCESS row, its stored result."""
+    from services.generation_job_result import build_job_result
+
+    own = db is None
+    if own:
+        from database import SessionLocal
+
+        db = SessionLocal()
+    try:
+        job = job or _load_job(db, task_id)
+        if job is None:
+            return None, None
+        result = (
+            build_job_result(db, job)
+            if wants_result and job.status == "SUCCESS"
+            else None
+        )
+        return job.status, result
+    except SQLAlchemyError:
+        if not own:
+            raise
+        logger.warning(
+            "DB lookup of generation job for task %s failed — reporting Celery's state",
+            task_id,
+            exc_info=True,
+        )
+        return None, None
+    finally:
+        if own:
+            db.close()
+
+
+def sync_phantom(state: JobState) -> WriteOutcome:
+    """Mirror Celery's terminal state into a job row that is still not terminal.
+
+    Single attempt, no inline retry: the TF-329 watchdog reconciles persistent
+    failures, so a request handler never blocks on the backoff. Programming
+    errors propagate (the request path catches them itself). Raises
+    ``ValueError`` if ``state`` is not a phantom job.
+    """
+    if not state.phantom or state.celery_status not in TERMINAL_STATUSES:
+        raise ValueError(f"sync_phantom: task {state.task_id} is not a phantom job")
+    logger.info(
+        "Phantom job detected: task_id=%s db_status=%s celery_state=%s — syncing DB",
+        state.task_id,
+        state.db_status,
+        state.celery_status,
+    )
+    return record_terminal(state.task_id, state.celery_status, retry=False)

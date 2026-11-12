@@ -99,7 +99,7 @@ class TestGetActiveTasks:
         """Endpoint returns empty tasks list when no active jobs exist."""
         self._setup_db_query(mock_db, [])
 
-        with patch("celery.result.AsyncResult"):
+        with patch("services.generation_job_state.AsyncResult"):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
         assert response.status_code == 200
@@ -111,7 +111,7 @@ class TestGetActiveTasks:
         job = _make_job("task-abc", status="STARTED")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "STARTED"
             mock_result.info = None
@@ -137,7 +137,7 @@ class TestGetActiveTasks:
         job = _make_job("task-progress", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {
@@ -160,7 +160,7 @@ class TestGetActiveTasks:
         job = _make_job("task-progress-code", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {
@@ -185,7 +185,7 @@ class TestGetActiveTasks:
         job = _make_job("task-no-broker", status="PENDING")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_ar_cls.side_effect = Exception("Broker unreachable")
 
             response = auth_client.get("/api/v1/rag/active-tasks")
@@ -204,7 +204,7 @@ class TestGetActiveTasks:
         ]
         self._setup_db_query(mock_db, jobs)
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PENDING"
             mock_result.info = {}
@@ -221,7 +221,7 @@ class TestGetActiveTasks:
         # arguments by inspecting the call chain on mock_db.
         self._setup_db_query(mock_db, [])
 
-        with patch("celery.result.AsyncResult"):
+        with patch("services.generation_job_state.AsyncResult"):
             auth_client.get("/api/v1/rag/active-tasks")
 
         # query(QuestionGenerationJob) was called
@@ -236,7 +236,7 @@ class TestGetActiveTasks:
         # (old_job would have created_at 3 hours ago, outside the 2h cutoff)
         self._setup_db_query(mock_db, [])  # DB returns nothing (filtered out)
 
-        with patch("celery.result.AsyncResult"):
+        with patch("services.generation_job_state.AsyncResult"):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
         assert response.status_code == 200
@@ -247,7 +247,7 @@ class TestGetActiveTasks:
         job = _make_job("task-full", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {"current": 10, "total": 10, "message": "Fast fertig"}
@@ -263,7 +263,7 @@ class TestGetActiveTasks:
         job = _make_job("task-zero-total", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {"current": 0, "total": 0, "message": None}
@@ -288,7 +288,7 @@ class TestGetActiveTasks:
         )
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PENDING"
             mock_result.info = {}
@@ -324,7 +324,7 @@ class TestRecentlyCompletedTasks:
         job = _make_job("task-done", status="SUCCESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             response = auth_client.get("/api/v1/rag/active-tasks")
 
         assert response.status_code == 200
@@ -343,7 +343,7 @@ class TestRecentlyCompletedTasks:
         job = _make_job(f"task-{status.lower()}", status=status)
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult"):
+        with patch("services.generation_job_state.AsyncResult"):
             response = auth_client.get("/api/v1/rag/active-tasks")
 
         assert response.status_code == 200
@@ -359,7 +359,7 @@ class TestRecentlyCompletedTasks:
         ]
         self._setup_db_query(mock_db, jobs)
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {"current": 1, "total": 4, "message": "läuft"}
@@ -410,7 +410,7 @@ class TestActiveTasksSuperuser:
         mock_db.query.return_value = query_chain
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.audit_service.AuditService") as mock_audit,
         ):
             mock_result = Mock()
@@ -449,7 +449,7 @@ class TestActiveTasksSuperuser:
         mock_db.query.return_value = query_chain
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.audit_service.AuditService") as mock_audit,
         ):
             mock_result = Mock()
@@ -483,7 +483,7 @@ class TestActiveTasksSuperuser:
         mock_db.query.return_value = query_chain
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.audit_service.AuditService") as mock_audit,
         ):
             mock_result = Mock()
@@ -516,7 +516,7 @@ class TestPhantomJobFiltering:
         self._setup_db_query(mock_db, [job])
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             mock_result = Mock()
@@ -539,7 +539,7 @@ class TestPhantomJobFiltering:
         self._setup_db_query(mock_db, [job])
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             mock_result = Mock()
@@ -566,14 +566,14 @@ class TestPhantomJobFiltering:
         states = iter(["PROGRESS", "STARTED"])
         infos = iter([{"current": 2, "total": 4, "message": "halb"}, None])
 
-        def make_result(_task_id):
+        def make_result(_task_id, **_kwargs):
             r = Mock()
             r.state = next(states)
             r.info = next(infos)
             return r
 
         with (
-            patch("celery.result.AsyncResult", side_effect=make_result),
+            patch("services.generation_job_state.AsyncResult", side_effect=make_result),
             patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             response = auth_client.get("/api/v1/rag/active-tasks")
@@ -590,7 +590,7 @@ class TestPhantomJobFiltering:
         self._setup_db_query(mock_db, [job])
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch(
                 "services.generation_job_state.record_terminal",
                 return_value=WriteOutcome.FAILED,
@@ -613,7 +613,7 @@ class TestPhantomJobFiltering:
         self._setup_db_query(mock_db, [job])
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch(
                 "services.generation_job_state.record_terminal",
                 side_effect=RuntimeError("DB down"),
@@ -636,7 +636,8 @@ class TestPhantomJobFiltering:
 
         with (
             patch(
-                "celery.result.AsyncResult", side_effect=Exception("Broker unreachable")
+                "services.generation_job_state.AsyncResult",
+                side_effect=Exception("Broker unreachable"),
             ),
             patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
@@ -659,14 +660,14 @@ class TestPhantomJobFiltering:
 
         states = iter(["FAILURE", "STARTED", "REVOKED"])
 
-        def make_result(_task_id):
+        def make_result(_task_id, **_kwargs):
             r = Mock()
             r.state = next(states)
             r.info = None
             return r
 
         with (
-            patch("celery.result.AsyncResult", side_effect=make_result),
+            patch("services.generation_job_state.AsyncResult", side_effect=make_result),
             patch("services.generation_job_state.record_terminal") as mock_sync,
         ):
             response = auth_client.get("/api/v1/rag/active-tasks")
@@ -690,7 +691,7 @@ class TestPhantomJobFiltering:
         db_down = OperationalError("SELECT 1", {}, Exception("db down"))
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("database.SessionLocal", side_effect=db_down) as session_factory,
             patch("services.generation_job_state.time.sleep") as mock_sleep,
         ):
@@ -718,7 +719,7 @@ class TestActiveTasksProgressFields:
         job = _make_job("task-odd-meta", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             # A non-string code and non-dict params must not turn the whole
@@ -736,7 +737,7 @@ class TestActiveTasksProgressFields:
         job = _make_job("task-bad-params", status="PROGRESS")
         self._setup_db_query(mock_db, [job])
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PROGRESS"
             mock_result.info = {
