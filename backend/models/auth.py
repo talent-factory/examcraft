@@ -302,6 +302,10 @@ class User(Base):
     oauth_provider = Column(String(50), nullable=True)  # google, microsoft, etc.
     oauth_id = Column(String(255), nullable=True, unique=True, index=True)
 
+    # Zitadel subject (tessera login, ADR 0008). NULL until the bulk import
+    # or the first OIDC login fills it.
+    zitadel_sub = Column(String(255), nullable=True, unique=True, index=True)
+
     # Security
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     # The login before last_login_at -- what the profile shows, since
