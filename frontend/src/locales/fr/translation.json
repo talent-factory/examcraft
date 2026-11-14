@@ -531,6 +531,10 @@
         "title": "Finalité du traitement des données",
         "text": "ExamCraft AI traite les données personnelles uniquement pour fournir l'assistance aux examens basée sur l'IA : comptes utilisateurs, traitement de documents, génération de questions, suggestions de notation et communication. Le traitement est fondé sur le RGPD ou la révision de la loi fédérale suisse sur la protection des données (nDSG)."
       },
+      "login": {
+        "title": "Connexion et compte utilisateur",
+        "text": "La connexion s'effectue via notre service d'identité exploité par nos soins « Talent Factory Login » (tessera/Zitadel, région de Francfort, DE). Il traite votre adresse e-mail, votre nom, l'empreinte du mot de passe, la langue préférée ainsi que des données techniques de connexion (adresse IP, user-agent, langue du navigateur). La base juridique est l'art. 6, par. 1, let. b RGPD (exécution du contrat). Cela vaut également pour la reprise unique des comptes existants, y compris l'empreinte du mot de passe, dans le service d'identité : elle permet de continuer à se connecter avec le mot de passe actuel. Les données techniques de connexion figurant dans les journaux d'événements du service d'identité sont supprimées après 90 jours. En cas de suppression de compte, le compte du service d'identité est supprimé en premier, et les données dans ExamCraft AI seulement après le succès de cette suppression. Les données de profil des comptes supprimés dans les journaux d'événements sont vidées par une suppression de champs. Les sauvegardes quotidiennes du service d'identité sont supprimées après 30 jours. Vous pouvez en option vous connecter avec Google, Microsoft ou GitHub ; la connexion a alors lieu auprès de ce fournisseur et est relayée par le service d'identité."
+      },
       "hosting": {
         "title": "Hébergement et localisation des données",
         "text": "La plateforme est exploitée dans la région Fly.io de Francfort (Allemagne). Les bases de données, la base vectorielle et la file de messages fonctionnent dans la même région. Le suivi des erreurs est géré via Specula, notre système de suivi des erreurs à hébergement propre (exploité dans la région de Francfort, DE), avec des données masquées."
@@ -573,8 +577,12 @@
             "description": "Envoi d'e-mails pour la newsletter et les e-mails transactionnels (fournisseur de transport de SubscribeFlow); Fournisseur : Sendinblue SA (Brevo), France — lieu d'hébergement/mécanisme de transfert en cours de clarification avec le service juridique/DPO"
           },
           {
+            "name": "tessera/Zitadel",
+            "description": "Connexion, compte utilisateur et intermédiation des fournisseurs d'authentification unique (exploité par nos soins, région de Francfort, DE) ; fait partie de notre hébergement Fly.io"
+          },
+          {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Connexion unique (SSO) facultative; Fournisseur : Google LLC / Microsoft Corporation, USA (CCT/DPF)"
+            "description": "Authentification unique facultative, relayée par notre service d'identité ; Fournisseur : Google LLC / Microsoft Corporation, USA (CCT/DPF)"
           }
         ]
       },

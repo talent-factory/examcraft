@@ -531,6 +531,10 @@
         "title": "Finalità del trattamento dei dati",
         "text": "ExamCraft AI tratta i dati personali esclusivamente per fornire l'assistenza agli esami basata sull'IA: account utente, elaborazione di documenti, generazione di domande, suggerimenti di valutazione e comunicazione. Il trattamento si basa sul GDPR o sulla revisione della Legge federale svizzera sulla protezione dei dati (nDSG)."
       },
+      "login": {
+        "title": "Accesso e account utente",
+        "text": "L'accesso avviene tramite il nostro servizio di identità gestito in proprio «Talent Factory Login» (tessera/Zitadel, regione di Francoforte, DE). Vengono trattati indirizzo e-mail, nome, hash della password, lingua preferita e dati tecnici di accesso (indirizzo IP, user agent, lingua del browser). La base giuridica è l'art. 6 par. 1 lett. b GDPR (esecuzione del contratto). Ciò vale anche per il trasferimento una tantum degli account esistenti, compreso l'hash della password, nel servizio di identità: serve a consentire di continuare ad accedere con la password attuale. I dati tecnici di accesso nei registri degli eventi del servizio di identità vengono rimossi dopo 90 giorni. In caso di cancellazione dell'account viene eliminato prima l'account nel servizio di identità, e i dati in ExamCraft AI solo dopo il successo di tale eliminazione. I dati di profilo degli account eliminati nei registri degli eventi vengono svuotati tramite una cancellazione dei campi. I backup giornalieri del servizio di identità vengono eliminati dopo 30 giorni. In alternativa è possibile accedere con Google, Microsoft o GitHub; l'accesso avviene allora presso tale fornitore e viene intermediato dal servizio di identità."
+      },
       "hosting": {
         "title": "Hosting e localizzazione dei dati",
         "text": "La piattaforma è gestita nella regione Fly.io di Francoforte (Germania). Database, database vettoriale e coda di messaggi operano nella stessa regione. Il tracciamento degli errori è gestito tramite Specula, il nostro sistema di tracciamento degli errori gestito internamente (nella regione di Francoforte, DE), con dati mascherati."
@@ -573,8 +577,12 @@
             "description": "Invio e-mail per newsletter ed e-mail transazionali (fornitore di trasporto di SubscribeFlow); Fornitore: Sendinblue SA (Brevo), Francia — sede/meccanismo di trasferimento in fase di chiarimento con Legal/DPO"
           },
           {
+            "name": "tessera/Zitadel",
+            "description": "Accesso, account utente e intermediazione dei provider di single sign-on (gestito in proprio, regione di Francoforte, DE); parte del nostro hosting Fly.io"
+          },
+          {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Accesso Single Sign-On facoltativo; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Single sign-on facoltativo, intermediato dal nostro servizio di identità; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },

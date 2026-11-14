@@ -531,6 +531,10 @@
         "title": "Zweck der Datenverarbeitung",
         "text": "ExamCraft AI verarbeitet personenbezogene Daten ausschliesslich zur Bereitstellung der KI-gestützten Prüfungsassistenz: Benutzerkonten, Dokumentenverarbeitung, Fragengenerierung, Korrekturvorschläge und Kommunikation. Die Verarbeitung erfolgt auf Grundlage der DSGVO bzw. des revidierten schweizerischen Datenschutzgesetzes (nDSG)."
       },
+      "login": {
+        "title": "Anmeldung und Benutzerkonto",
+        "text": "Die Anmeldung erfolgt über den selbst betriebenen Identitätsdienst «Talent Factory Login» (tessera/Zitadel, Region Frankfurt, DE). Dort werden E-Mail-Adresse, Name, Passwort-Hash, bevorzugte Sprache sowie technische Anmeldedaten (IP-Adresse, User-Agent, Spracheinstellung des Browsers) verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Dies gilt auch für die einmalige Übernahme bestehender Konten, einschliesslich des Passwort-Hashes, in den Identitätsdienst: Sie dient dazu, dass Sie sich weiterhin mit Ihrem bisherigen Passwort anmelden können. Technische Anmeldedaten in den Ereignisprotokollen des Identitätsdienstes werden nach 90 Tagen entfernt. Bei einer Kontolöschung wird zuerst das Konto im Identitätsdienst gelöscht, erst nach erfolgreicher Löschung die Daten in ExamCraft AI. Profildaten gelöschter Konten werden in den Ereignisprotokollen durch eine Feldlöschung geleert. Tägliche Sicherungen des Identitätsdienstes werden nach 30 Tagen gelöscht. Optional können Sie sich über Google, Microsoft oder GitHub anmelden; die Anmeldung erfolgt dann bei diesem Anbieter und wird über den Identitätsdienst vermittelt."
+      },
       "hosting": {
         "title": "Hosting und Speicherort",
         "text": "Die Plattform wird in der Fly.io-Region Frankfurt (Deutschland) betrieben. Datenbanken, Vektor-DB und Message-Queue laufen in derselben Region. Fehleranalysen werden über das selbst betriebene Error-Tracking-System Specula (Betrieb in der Region Frankfurt, DE) mit maskierten Daten verarbeitet."
@@ -573,8 +577,12 @@
             "description": "E-Mail-Versand für Newsletter- und Transaktions-Mails (Transport-Anbieter von SubscribeFlow); Anbieter: Sendinblue SA (Brevo), Frankreich — Sitz/Transfermechanismus in Abklärung mit Rechtsabteilung/DPO"
           },
           {
+            "name": "tessera/Zitadel",
+            "description": "Anmeldung, Benutzerkonto und Vermittlung der Single-Sign-On-Anbieter (selbst betrieben, Region Frankfurt, DE); Teil unseres Fly.io-Hostings"
+          },
+          {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Optionale Single-Sign-On-Anmeldung; Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Optionale Single-Sign-On-Anmeldung, vermittelt über unseren Identitätsdienst; Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },

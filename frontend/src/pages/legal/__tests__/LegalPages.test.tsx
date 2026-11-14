@@ -136,4 +136,22 @@ describe('Legal pages', () => {
       }
     );
   });
+
+  describe('Login section names tessera/Zitadel and Art. 6(1)(b) (EXAMCRAFT-131)', () => {
+    afterEach(async () => {
+      await i18n.changeLanguage('de');
+    });
+
+    it.each(['de', 'en', 'fr', 'it'])(
+      'locale "%s" renders the login section and lists tessera/Zitadel as subprocessor',
+      async (locale) => {
+        await i18n.changeLanguage(locale);
+        renderWithRouter(<PrivacyPage />);
+        expect(screen.getByText(/Talent Factory Login/)).toBeInTheDocument();
+        expect(screen.getByText(/art\. 6.{0,20}(lit\. b|let\. b|lett\. b|\(1\)\(b\))/i)).toBeInTheDocument();
+        // Exakter Treffer: nur der Subprozessor-Eintrag, nicht der Fliesstext.
+        expect(screen.getByText('tessera/Zitadel')).toBeInTheDocument();
+      }
+    );
+  });
 });
