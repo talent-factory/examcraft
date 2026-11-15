@@ -5,14 +5,13 @@ Dependencies für Token Validation und User Authentication
 
 import logging
 from typing import Optional
-from fastapi import Depends, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Cookie, Depends, Request, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from database import get_db
 from models.auth import User, UserStatus
 from models.org_unit import OrgUnit, UserOrgUnit
-from services.auth_service import AuthService
+from services import session_service
 from services.translation_service import get_request_locale
 from utils.impersonation_context import (
     ImpersonationContext,
@@ -23,56 +22,38 @@ from errors import api_error
 
 logger = logging.getLogger(__name__)
 
-# HTTP Bearer Token Security Scheme
-security = HTTPBearer()
-
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    session_token: Optional[str] = Cookie(
+        default=None, alias=session_service.SESSION_COOKIE_NAME
+    ),
+    impersonation_token: Optional[str] = Cookie(
+        default=None, alias=session_service.IMPERSONATION_COOKIE_NAME
+    ),
     db: Session = Depends(get_db),
-    request: Request = None,
 ) -> User:
     """
-    FastAPI Dependency: Get current authenticated user from JWT token
+    FastAPI Dependency: Get current authenticated user from the session cookie
 
-    Args:
-        credentials: HTTP Bearer credentials
-        db: Database session
-
-    Returns:
-        User object
+    EXAMCRAFT-125: the login is a server-side session (BFF); the browser
+    only holds an opaque httpOnly cookie. Impersonation is a session of its
+    own (``impersonator_id`` set), not a token claim.
 
     Raises:
-        HTTPException: If token is invalid or user not found
+        HTTPException: 401 if there is no valid session or its user is gone,
+        403 if the account is not active.
     """
-    token = credentials.credentials
-
     # No user is known yet on this path, so the locale can only come from
     # Accept-Language — get_request_locale falls back to "de" without one.
     locale = get_request_locale(request)
-    bearer = {"WWW-Authenticate": "Bearer"}
 
-    # Decode token
-    payload = AuthService.decode_token(token)
-
-    if not payload:
-        raise api_error(
-            status.HTTP_401_UNAUTHORIZED, "auth_token_invalid", locale, bearer
-        )
-
-    # Get user ID from token
-    user_id: str = payload.get("sub")
-    if user_id is None:
-        raise api_error(
-            status.HTTP_401_UNAUTHORIZED, "auth_token_invalid", locale, bearer
-        )
-
-    # Check if token is revoked
-    token_jti = payload.get("jti")
-    if token_jti and AuthService.is_token_revoked(token_jti, db):
-        raise api_error(
-            status.HTTP_401_UNAUTHORIZED, "auth_token_revoked", locale, bearer
-        )
+    auth_session = session_service.resolve_effective_session(
+        db, session_token, impersonation_token
+    )
+    if auth_session is None:
+        raise api_error(status.HTTP_401_UNAUTHORIZED, "auth_token_invalid", locale)
+    user_id = auth_session.user_id
 
     # Get user from database with roles (needed for permission checks).
     # TF-637 review fix: has_permission() now also walks
@@ -92,7 +73,7 @@ async def get_current_user(
             .joinedload(UserOrgUnit.org_unit)
             .joinedload(OrgUnit.role),
         )
-        .filter(User.id == int(user_id))
+        .filter(User.id == user_id)
         .first()
     )
 
@@ -104,25 +85,22 @@ async def get_current_user(
         # not a REST resource lookup, so it stays 401 with its own code
         # rather than reusing a 404 code under a different status.
         raise api_error(
-            status.HTTP_401_UNAUTHORIZED, "auth_token_user_not_found", locale, bearer
+            status.HTTP_401_UNAUTHORIZED, "auth_token_user_not_found", locale
         )
 
-    # TF-741: recognize impersonation claims minted by
-    # AuthService.create_impersonation_token and populate the
-    # request-scoped ImpersonationContext from them. This is the
-    # foundation the audit follow-up ticket (TF-742) will build on, and is
-    # also what the account-security guard (block_during_impersonation)
-    # reads.
-    impersonator_id = payload.get("impersonator_id")
-    impersonation_session_id = payload.get("impersonation_session_id")
+    # TF-741: an impersonation session populates the request-scoped
+    # ImpersonationContext. This is the foundation of the audit trail
+    # (TF-742) and what the account-security guard
+    # (block_during_impersonation) reads.
     is_impersonating = (
-        impersonator_id is not None and impersonation_session_id is not None
+        auth_session.impersonator_id is not None
+        and auth_session.impersonation_session_id is not None
     )
     set_impersonation_context(
         ImpersonationContext(
-            impersonator_id=impersonator_id,
-            impersonation_session_id=impersonation_session_id,
-            token_jti=token_jti,
+            impersonator_id=auth_session.impersonator_id,
+            impersonation_session_id=auth_session.impersonation_session_id,
+            auth_session_id=auth_session.id,
         )
         if is_impersonating
         else None
@@ -426,46 +404,27 @@ def enforce_resource_access(
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
+    session_token: Optional[str] = Cookie(
+        default=None, alias=session_service.SESSION_COOKIE_NAME
+    ),
+    impersonation_token: Optional[str] = Cookie(
+        default=None, alias=session_service.IMPERSONATION_COOKIE_NAME
     ),
     db: Session = Depends(get_db),
 ) -> Optional[User]:
     """
     FastAPI Dependency: Get current user if authenticated, None otherwise
     Useful for endpoints that work with or without authentication
-
-    Args:
-        credentials: Optional HTTP Bearer credentials
-        db: Database session
-
-    Returns:
-        User object or None
     """
-    if not credentials:
-        return None
-
     try:
-        token = credentials.credentials
-        payload = AuthService.decode_token(token)
-
-        if not payload:
+        auth_session = session_service.resolve_effective_session(
+            db, session_token, impersonation_token
+        )
+        if auth_session is None:
             return None
-
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-
-        # Check if token is revoked
-        token_jti = payload.get("jti")
-        if token_jti and AuthService.is_token_revoked(token_jti, db):
-            return None
-
-        user = db.query(User).filter(User.id == int(user_id)).first()
-
+        user = db.query(User).filter(User.id == auth_session.user_id).first()
         if user and user.status == UserStatus.ACTIVE.value:
             return user
-
         return None
     except Exception:
         return None

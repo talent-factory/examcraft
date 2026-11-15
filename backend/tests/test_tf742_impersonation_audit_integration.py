@@ -8,7 +8,7 @@ Covers the ticket's acceptance criteria:
   - new ``impersonation.start``/``impersonation.end`` actions, category
     ``admin``;
   - the target user is notified by email after every session end (manual,
-    lost-token fallback, logout-during-impersonation, and reaper timeout);
+    lost-cookie fallback, logout-during-impersonation, and reaper timeout);
   - the audit API surfaces an ``impersonator`` field, and institution-admins
     see SuperAdmin impersonations of their own institution's users.
 
@@ -27,6 +27,7 @@ from database import get_db
 from main import app
 from models.auth import AuditLog, Institution, Role, User, UserStatus
 from services.audit_service import AuditService
+from services import session_service
 from services.auth_service import AuthService
 from utils.impersonation_context import ImpersonationContext, set_impersonation_context
 
@@ -36,15 +37,43 @@ from utils.impersonation_context import ImpersonationContext, set_impersonation_
 # ---------------------------------------------------------------------------
 
 
+class _FakeRatelimitRedis:
+    """In-memory stand-in for the impersonation rate-limit Redis client."""
+
+    def __init__(self):
+        self._counts: dict[str, int] = {}
+
+    def incr(self, key: str) -> int:
+        self._counts[key] = self._counts.get(key, 0) + 1
+        return self._counts[key]
+
+    def expire(self, key: str, ttl: int) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _no_redis_or_broker(monkeypatch):
+    """No reachable Redis/Celery broker needed: stub the rate-limit client
+    (same as test_impersonation_api.py) and the started-email dispatch
+    (covered by test_tf759_impersonation_started_notification.py)."""
+    client = _FakeRatelimitRedis()
+    monkeypatch.setattr(
+        "middleware.rate_limit.RedisService.get_ratelimit_client", lambda: client
+    )
+    with patch("tasks.notification_tasks.send_impersonation_started_email"):
+        yield
+
+
 @pytest.fixture
 def test_client(test_db):
     def override_get_db():
         yield test_db
 
-    from api import admin, audit, auth, gdpr
+    from api import admin, audit, auth, auth_oidc, gdpr
     from api.v1 import billing
 
     app.include_router(auth.router)
+    app.include_router(auth_oidc.router)
     app.include_router(admin.router)
     app.include_router(audit.router)
     app.include_router(gdpr.router)
@@ -124,12 +153,25 @@ def _make_admin_role_user(db, inst, email):
     return user
 
 
-def _tokens(db, user):
-    return AuthService.create_tokens_for_user(user, db)
+def _login(db, user):
+    """Login-session cookie token with a fresh IdP login (step-up passes)."""
+    token, _row = session_service.create_session(
+        db, user.id, authenticated_at=datetime.now(timezone.utc)
+    )
+    return token
 
 
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+def _auth(token: str, impersonation_token: str | None = None) -> dict:
+    cookie = f"{session_service.SESSION_COOKIE_NAME}={token}"
+    if impersonation_token:
+        cookie += f"; {session_service.IMPERSONATION_COOKIE_NAME}={impersonation_token}"
+    return {"Cookie": cookie}
+
+
+def _imp_token(response) -> str:
+    token = response.cookies.get(session_service.IMPERSONATION_COOKIE_NAME)
+    assert token, "start did not set the impersonation cookie"
+    return token
 
 
 def _impersonate(
@@ -137,13 +179,15 @@ def _impersonate(
     admin_token,
     target_id,
     reason="Support-Anfrage TICKET-1",
-    admin_password="Test1234!",
 ):
-    return client.post(
+    response = client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason, "admin_password": admin_password},
+        json={"reason": reason},
         headers=_auth(admin_token),
     )
+    # Keep the TestClient jar clean; tests send their cookies explicitly.
+    client.cookies.clear()
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +204,7 @@ def test_log_action_autofills_impersonator_user_id_from_context(test_db):
     target = _make_user(test_db, inst, "target@tf742-unit-autofill.ch")
     test_db.commit()
 
-    set_impersonation_context(ImpersonationContext(admin.id, 1, "jti-1"))
+    set_impersonation_context(ImpersonationContext(admin.id, 1, 1))
 
     log = AuditService.log_action(
         db=test_db,
@@ -209,7 +253,7 @@ def test_log_action_explicit_impersonator_user_id_overrides_context(test_db):
     target = _make_user(test_db, inst, "target@tf742-explicit.ch")
     test_db.commit()
 
-    set_impersonation_context(ImpersonationContext(context_admin.id, 1, "jti-explicit"))
+    set_impersonation_context(ImpersonationContext(context_admin.id, 1, 1))
 
     log = AuditService.log_action(
         db=test_db,
@@ -229,7 +273,7 @@ def test_log_event_best_effort_forwards_impersonator_user_id(test_db):
     target = _make_user(test_db, inst, "target@tf742-unit-best-effort.ch")
     test_db.commit()
 
-    set_impersonation_context(ImpersonationContext(admin.id, 1, "jti-2"))
+    set_impersonation_context(ImpersonationContext(admin.id, 1, 1))
 
     AuditService.log_event_best_effort(
         test_db,
@@ -265,7 +309,7 @@ def test_start_impersonation_writes_audit_event(test_client, test_db):
     superadmin = _make_user(test_db, inst, "super@tf742-start.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf742-start.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = _impersonate(
         test_client, admin_token, target.id, reason="Kundenanfrage TICKET-42"
@@ -300,15 +344,16 @@ def test_end_impersonation_writes_audit_event_and_queues_email(test_client, test
     superadmin = _make_user(test_db, inst, "super@tf742-end.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf742-end.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id, reason="Ticket-7")
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
     session_id = start.json()["impersonation_session_id"]
 
     with patch("tasks.notification_tasks.send_impersonation_ended_email") as mock_task:
         end_response = test_client.post(
-            "/api/admin/impersonate/end", headers=_auth(impersonation_token)
+            "/api/admin/impersonate/end",
+            headers=_auth(admin_token, impersonation_token),
         )
     assert end_response.status_code == 204
 
@@ -346,7 +391,7 @@ def test_end_impersonation_via_lost_token_fallback_writes_audit_and_email(
     )
     target = _make_user(test_db, inst, "target@tf742-end-fallback.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id, reason="lost-token")
     assert start.status_code == 200
@@ -375,14 +420,14 @@ def test_logout_during_impersonation_writes_audit_and_email(test_client, test_db
     superadmin = _make_user(test_db, inst, "super@tf742-logout.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf742-logout.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id, reason="via-logout")
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
 
     with patch("tasks.notification_tasks.send_impersonation_ended_email") as mock_task:
         logout_response = test_client.post(
-            "/api/auth/logout", headers=_auth(impersonation_token)
+            "/api/v1/auth/logout", headers=_auth(admin_token, impersonation_token)
         )
     assert logout_response.status_code == 204
 
@@ -411,16 +456,17 @@ def test_end_impersonation_email_dispatch_failure_does_not_break_endpoint(
     )
     target = _make_user(test_db, inst, "target@tf742-email-fail.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id)
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
 
     mock_task = MagicMock()
     mock_task.delay.side_effect = RuntimeError("broker unreachable")
     with patch("tasks.notification_tasks.send_impersonation_ended_email", mock_task):
         end_response = test_client.post(
-            "/api/admin/impersonate/end", headers=_auth(impersonation_token)
+            "/api/admin/impersonate/end",
+            headers=_auth(admin_token, impersonation_token),
         )
 
     assert end_response.status_code == 204
@@ -526,16 +572,18 @@ def test_existing_call_site_gets_impersonator_autofilled_under_impersonation(
         test_db, inst, "target-admin@tf742-autofill-e2e.ch"
     )
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target_admin.id)
     assert start.status_code == 200
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
 
     # GET /api/v1/audit calls AuditService.log_action(action=ACTION_VIEW_AUDIT_LOG,
     # user_id=current_user.id, ...) directly, with no impersonator_user_id
     # argument at all -- exactly one of the ~90 untouched call sites.
-    response = test_client.get("/api/v1/audit", headers=_auth(impersonation_token))
+    response = test_client.get(
+        "/api/v1/audit", headers=_auth(admin_token, impersonation_token)
+    )
     assert response.status_code == 200
 
     row = (
@@ -561,7 +609,7 @@ def test_audit_log_out_includes_impersonator_field(test_client, test_db):
     )
     target = _make_user(test_db, inst, "target@tf742-out-field.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     _impersonate(test_client, admin_token, target.id)
 
@@ -590,15 +638,16 @@ def test_institution_admin_sees_superadmin_impersonation_of_own_institution_user
     )
     target = _make_user(test_db, inst, "target@tf742-inst-visibility.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-    inst_admin_token = _tokens(test_db, inst_admin)["access_token"]
+    admin_token = _login(test_db, superadmin)
+    inst_admin_token = _login(test_db, inst_admin)
 
     start = _impersonate(test_client, admin_token, target.id)
     assert start.status_code == 200
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
     with patch("tasks.notification_tasks.send_impersonation_ended_email"):
         end_response = test_client.post(
-            "/api/admin/impersonate/end", headers=_auth(impersonation_token)
+            "/api/admin/impersonate/end",
+            headers=_auth(admin_token, impersonation_token),
         )
     assert end_response.status_code == 204
 
@@ -639,15 +688,16 @@ def test_institution_admin_does_not_see_impersonation_of_other_institutions_user
     )
     target_a = _make_user(test_db, inst_a, "target@tf742-inst-visibility-a.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-    inst_b_admin_token = _tokens(test_db, inst_b_admin)["access_token"]
+    admin_token = _login(test_db, superadmin)
+    inst_b_admin_token = _login(test_db, inst_b_admin)
 
     start = _impersonate(test_client, admin_token, target_a.id)
     assert start.status_code == 200
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
     with patch("tasks.notification_tasks.send_impersonation_ended_email"):
         end_response = test_client.post(
-            "/api/admin/impersonate/end", headers=_auth(impersonation_token)
+            "/api/admin/impersonate/end",
+            headers=_auth(admin_token, impersonation_token),
         )
     assert end_response.status_code == 204
 

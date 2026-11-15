@@ -33,7 +33,7 @@ def test_get_impersonation_context_defaults_to_none():
 
 def test_set_and_get_impersonation_context_roundtrip():
     ctx = ImpersonationContext(
-        impersonator_id=1, impersonation_session_id=2, token_jti="abc"
+        impersonator_id=1, impersonation_session_id=2, auth_session_id=3
     )
     set_impersonation_context(ctx)
     assert get_impersonation_context() == ctx
@@ -42,7 +42,7 @@ def test_set_and_get_impersonation_context_roundtrip():
 def test_set_none_clears_context():
     set_impersonation_context(
         ImpersonationContext(
-            impersonator_id=1, impersonation_session_id=2, token_jti="x"
+            impersonator_id=1, impersonation_session_id=2, auth_session_id=3
         )
     )
     set_impersonation_context(None)

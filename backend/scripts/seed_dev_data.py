@@ -15,7 +15,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import SessionLocal
 from models.auth import User, Role, Institution, UserStatus
 from models.rbac import RBACRole, SubscriptionTier, Feature
-from services.auth_service import AuthService
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -73,7 +72,7 @@ def seed_admin_user(db, institution):
     """
     Erstellt Admin-User für Development
     Email: admin@talent-factory.ch
-    Password: admin123 (nur für Development!)
+    Kein Passwort: Login über tessera/Zitadel (Dummy-sub nur als Platzhalter)
     """
     logger.info("👤 Seeding Admin User...")
 
@@ -98,7 +97,9 @@ def seed_admin_user(db, institution):
     # Create admin user
     admin_user = User(
         email=admin_email,
-        password_hash=AuthService.get_password_hash("admin123"),  # Development only!
+        # No password: login runs through Zitadel (EXAMCRAFT-125). The dummy
+        # sub is only a placeholder, so the user is addressable by test-login.
+        zitadel_sub=f"dev-seed-{admin_email}",
         first_name="Admin",
         last_name="User",
         institution_id=institution.id,
@@ -122,7 +123,9 @@ def seed_admin_user(db, institution):
     db.refresh(admin_user)
 
     logger.info(f"   ✅ Created: {admin_user.email} (ID: {admin_user.id})")
-    logger.info("   🔑 Password: admin123 (DEVELOPMENT ONLY!)")
+    logger.info(
+        "   🔑 Kein Passwort: Login über tessera/Zitadel (E2E: /api/v1/auth/test-login)"
+    )
     logger.info(f"   👑 Superuser: {admin_user.is_superuser}")
     logger.info(f"   🎭 Roles: {[r.name for r in admin_user.roles]}")
 
@@ -229,9 +232,9 @@ def main():
         print("   - Institution: Talent Factory (Professional Tier)")
         print("   - Domain: talent-factory.ch (Auto-Assignment)")
         print("   - Admin User: admin@talent-factory.ch")
-        print("   - Password: admin123 (DEVELOPMENT ONLY!)")
+        print("   - Kein Passwort (Login über tessera/Zitadel)")
         print("\n💡 Next Steps:")
-        print("   1. Login with admin@talent-factory.ch / admin123")
+        print("   1. Login über tessera/Zitadel (Benutzer admin@talent-factory.ch)")
         print("   2. Any user with @talent-factory.ch email will be auto-assigned")
         print("   3. OAuth users with @talent-factory.ch will join this institution")
         print("\n")

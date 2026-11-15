@@ -91,7 +91,7 @@ seed:
     docker compose exec -T api python scripts/seed_dev_data.py
     echo ""
     echo "✓ Development data seeded."
-    echo "  Admin login: admin@talent-factory.ch / admin123"
+    echo "  Admin login: admin@talent-factory.ch (über tessera/Zitadel)"
 
 # ──────────────────────── Lint & Format ────────────────────────
 

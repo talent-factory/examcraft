@@ -222,6 +222,17 @@ class TestActiveTasks:
         async_result.assert_not_called()
 
 
+def _session_client(app, db, user) -> TestClient:
+    """TestClient carrying a real server-side session cookie of ``user``
+    (EXAMCRAFT-125): the WebSocket authenticates by cookie, not by token."""
+    from services import session_service
+
+    token, _row = session_service.create_session(db, user.id)
+    client = TestClient(app)
+    client.cookies.set(session_service.SESSION_COOKIE_NAME, token)
+    return client
+
+
 class TestWebSocket:
     def test_db_success_wins_over_celery_failure(self, test_db, finished_job):
         """The WebSocket reports SUCCESS with the saved questions instead of
@@ -238,15 +249,14 @@ class TestWebSocket:
         with (
             patch("api.v1.websocket.SessionLocal", bound),
             patch("database.SessionLocal", bound),
-            patch("api.v1.websocket.AuthService") as auth,
             patch(
                 "services.generation_job_state.AsyncResult",
                 return_value=_celery("FAILURE", RuntimeError("WorkerLostError")),
             ),
         ):
-            auth.decode_token.return_value = {"sub": str(finished_job.user.id)}
-            with TestClient(app).websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
-                ws.send_json({"token": "t"})
+            client = _session_client(app, test_db, finished_job.user)
+            with client.websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
+                ws.send_json({})
                 message = ws.receive_json()
 
         assert message["status"] == "SUCCESS"
@@ -272,7 +282,6 @@ class TestWebSocket:
         with (
             patch("api.v1.websocket.SessionLocal", bound),
             patch("database.SessionLocal", bound),
-            patch("api.v1.websocket.AuthService") as auth,
             patch(
                 "services.generation_job_state.AsyncResult",
                 return_value=_celery("PENDING"),
@@ -280,9 +289,9 @@ class TestWebSocket:
             patch("api.v1.websocket.POLL_INTERVAL_SECONDS", 0),
             patch("api.v1.websocket.PENDING_TIMEOUT_SECONDS", 0),
         ):
-            auth.decode_token.return_value = {"sub": str(finished_job.user.id)}
-            with TestClient(app).websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
-                ws.send_json({"token": "t"})
+            client = _session_client(app, test_db, finished_job.user)
+            with client.websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
+                ws.send_json({})
                 message = ws.receive_json()
 
         assert message["status"] == "SUCCESS"
@@ -307,7 +316,6 @@ class TestWebSocket:
         with (
             patch("api.v1.websocket.SessionLocal", bound),
             patch("database.SessionLocal", bound),
-            patch("api.v1.websocket.AuthService") as auth,
             patch(
                 "services.generation_job_state.AsyncResult",
                 return_value=_celery("FAILURE", task_error),
@@ -317,9 +325,9 @@ class TestWebSocket:
                 side_effect=OperationalError("stmt", {}, Exception("db down")),
             ),
         ):
-            auth.decode_token.return_value = {"sub": str(finished_job.user.id)}
-            with TestClient(app).websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
-                ws.send_json({"token": "t"})
+            client = _session_client(app, test_db, finished_job.user)
+            with client.websocket_connect(f"/ws/tasks/{TASK_ID}") as ws:
+                ws.send_json({})
                 message = ws.receive_json()
 
         assert message["status"] == "FAILURE"

@@ -846,3 +846,65 @@ class PasswordResetToken(Base):
 
     def __repr__(self):
         return f"<PasswordResetToken(id={self.id}, user_id={self.user_id}, is_used={self.is_used})>"
+
+
+class AuthSession(Base):
+    """Server-side login session (EXAMCRAFT-125, BFF pattern).
+
+    The browser only holds an opaque random token in an httpOnly cookie; this
+    table stores its SHA-256 hash, never the plaintext. A session is valid
+    until ``expires_at`` (absolute: 14 days for a normal login, a short
+    window for impersonation). There is no refresh and no sync with Zitadel:
+    user ``status`` is checked on every request instead.
+
+    Impersonation is its own session row: ``user_id`` is the impersonated
+    target, ``impersonator_id`` the admin. Both FKs cascade, so deleting
+    either user also ends the session; it can never silently degrade into a
+    plain session as the target.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # SHA-256 hex digest of the cookie token
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    impersonator_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    impersonation_session_id = Column(
+        Integer,
+        ForeignKey("impersonation_sessions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
+    # When the user last authenticated at the IdP (``auth_time`` of the
+    # verified ID token). The step-up for impersonation checks this, not the
+    # session age: a silent SSO login creates a fresh session without any
+    # re-authentication.
+    authenticated_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+    impersonator = relationship("User", foreign_keys=[impersonator_id])
+
+    def __repr__(self):
+        return (
+            f"<AuthSession(id={self.id}, user_id={self.user_id}, "
+            f"impersonator_id={self.impersonator_id})>"
+        )

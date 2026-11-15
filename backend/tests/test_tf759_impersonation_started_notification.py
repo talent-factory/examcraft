@@ -21,6 +21,7 @@ from database import get_db
 from main import app
 from models.auth import AuditLog, ImpersonationSession, Institution, User, UserStatus
 from services.audit_service import AuditService
+from services import session_service
 from services.auth_service import AuthService
 
 
@@ -34,9 +35,10 @@ def test_client(test_db):
     def override_get_db():
         yield test_db
 
-    from api import admin, audit, auth
+    from api import admin, audit, auth, auth_oidc
 
     app.include_router(auth.router)
+    app.include_router(auth_oidc.router)
     app.include_router(admin.router)
     app.include_router(audit.router)
 
@@ -75,12 +77,16 @@ def _make_user(db, inst, email, status=UserStatus.ACTIVE.value, is_superuser=Fal
     return user
 
 
-def _tokens(db, user):
-    return AuthService.create_tokens_for_user(user, db)
+def _login(db, user):
+    """Login-session cookie token with a fresh IdP login (step-up passes)."""
+    token, _row = session_service.create_session(
+        db, user.id, authenticated_at=datetime.now(timezone.utc)
+    )
+    return token
 
 
 def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Cookie": f"{session_service.SESSION_COOKIE_NAME}={token}"}
 
 
 def _impersonate(
@@ -88,17 +94,14 @@ def _impersonate(
     admin_token,
     target_id,
     reason="Support-Anfrage TICKET-1",
-    admin_password="Test1234!",
 ):
-    # TF-758 (merged after this file was written) added a required
-    # `admin_password` step-up field to `ImpersonateRequest` — matches
-    # the password `_make_user()` hashes below, and the same default
-    # already used by `test_impersonation_api.py::_impersonate`.
-    return client.post(
+    response = client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason, "admin_password": admin_password},
+        json={"reason": reason},
         headers=_auth(admin_token),
     )
+    client.cookies.clear()
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +114,7 @@ def test_start_impersonation_dispatches_started_email(test_client, test_db):
     superadmin = _make_user(test_db, inst, "super@tf759-start.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf759-start.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     with patch(
         "tasks.notification_tasks.send_impersonation_started_email"
@@ -158,7 +161,7 @@ def test_start_impersonation_email_dispatch_failure_does_not_break_endpoint(
     )
     target = _make_user(test_db, inst, "target@tf759-email-fail.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     mock_task = MagicMock()
     mock_task.delay.side_effect = RuntimeError("broker unreachable")

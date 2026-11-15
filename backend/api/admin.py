@@ -3,7 +3,7 @@ Admin API Endpoints
 User Management, Role Assignment, Institution Management
 """
 
-from fastapi import APIRouter, Depends, status, Query, Request
+from fastapi import APIRouter, Cookie, Depends, Response, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +23,7 @@ from utils.auth_utils import (
     require_permission,
 )
 from services.audit_service import AuditService
+from services import oidc_client, session_service
 from services.auth_service import AuthService
 from utils.permissions import KNOWN_PERMISSIONS, parse_role_permissions
 from utils.impersonation_context import get_impersonation_context
@@ -846,16 +847,9 @@ class ImpersonateRequest(BaseModel):
     """Request body for POST /users/{user_id}/impersonate."""
 
     reason: str = Field(..., min_length=3, max_length=500)
-    # TF-758: step-up re-authentication -- the admin re-enters their own
-    # (current) password so a hijacked/left-open admin session cannot be
-    # used to mint an impersonation token without proving fresh knowledge
-    # of the credential.
-    admin_password: str = Field(..., min_length=1)
 
 
 class ImpersonateResponse(BaseModel):
-    access_token: str
-    token_type: str
     expires_in: int
     impersonation_session_id: int
     target_user_id: int
@@ -867,7 +861,11 @@ async def start_impersonation(
     user_id: int,
     request: ImpersonateRequest,
     http_request: Request,
+    response: Response,
     current_user: User = Depends(require_permission("users:impersonate")),
+    session_token: Optional[str] = Cookie(
+        default=None, alias=session_service.SESSION_COOKIE_NAME
+    ),
     db: Session = Depends(get_db),
 ):
     """Start an impersonation session for ``user_id`` (TF-741).
@@ -902,27 +900,15 @@ async def start_impersonation(
             {"Retry-After": str(retry_after)},
         )
 
-    # TF-758: step-up re-authentication happens next, before anything about
-    # the target is revealed (404 vs 403 vs scope checks) -- a hijacked
-    # admin session shouldn't be able to probe target user IDs without
-    # first proving fresh knowledge of the admin's own password. This is a
-    # different defense than the TF-760 rate limit above: that one caps
-    # *overall* impersonation-start volume per admin regardless of
-    # correctness (abuse/support-burst protection); this one specifically
-    # locks the account after repeated *wrong* password guesses, mirroring
-    # POST /auth/login's own lockout.
-    #
-    # All three rejection branches below log to the audit trail under
-    # `user_id=current_user.id` (the admin), never `impersonator_user_id`.
-    # That's a deliberate asymmetry with the success path further down
-    # (`record_impersonation_started`, which attributes the row to
-    # `user_id=target_user_id` / `impersonator_user_id=admin_user_id`): at
-    # this point `target` is intentionally not loaded yet, and
-    # `AuditLog.user_id` has a FK to `users.id` -- attributing a failed
-    # attempt to an unconfirmed or nonexistent target could silently drop
-    # exactly the audit row a probing/brute-forcing attacker most needs
-    # captured.
-    if current_user.password_hash is None:
+    # EXAMCRAFT-125: step-up re-authentication. There is no local password
+    # anymore, so the admin must have logged in (at Zitadel) a short time
+    # ago; otherwise the frontend sends them through ``/api/v1/auth/login?reauth=true``
+    # (``prompt=login``) first. Checked before anything about the target is
+    # revealed (404 vs 403 vs scope checks). Failures are audited under the
+    # admin (``user_id=current_user.id``), never under an unconfirmed target:
+    # ``AuditLog.user_id`` has a FK to ``users.id``.
+    login_session = session_service.get_active_session(db, session_token)
+    if login_session is None or not session_service.is_recent_login(login_session):
         AuditService.log_action(
             db=db,
             action=AuditService.ACTION_IMPERSONATION_START,
@@ -930,48 +916,10 @@ async def start_impersonation(
             user_id=current_user.id,
             resource_type=AuditService.RESOURCE_USER,
             resource_id=user_id,
-            error_message="Impersonation step-up unavailable: admin has no password set",
+            error_message="Impersonation step-up required: login is too old",
             request=http_request,
         )
-        raise api_error(
-            status.HTTP_403_FORBIDDEN, "impersonation_no_password_set", locale
-        )
-
-    if AuthService.is_locked_out(current_user):
-        AuditService.log_action(
-            db=db,
-            action=AuditService.ACTION_IMPERSONATION_START,
-            status=AuditService.STATUS_FAILURE,
-            user_id=current_user.id,
-            resource_type=AuditService.RESOURCE_USER,
-            resource_id=user_id,
-            error_message="Impersonation step-up blocked: account locked after too many failed password attempts",
-            request=http_request,
-        )
-        raise api_error(
-            status.HTTP_429_TOO_MANY_REQUESTS, "auth_account_locked", locale
-        )
-
-    if not AuthService.verify_password(
-        request.admin_password, current_user.password_hash
-    ):
-        # Same failed-attempt counter POST /auth/login uses -- guessing the
-        # admin's password through the step-up locks the account exactly
-        # like guessing it at login would (TF-758).
-        AuthService.record_failed_own_password_attempt(current_user, db)
-        AuditService.log_action(
-            db=db,
-            action=AuditService.ACTION_IMPERSONATION_START,
-            status=AuditService.STATUS_FAILURE,
-            user_id=current_user.id,
-            resource_type=AuditService.RESOURCE_USER,
-            resource_id=user_id,
-            error_message="Incorrect admin password on impersonation step-up",
-            request=http_request,
-        )
-        raise api_error(status.HTTP_400_BAD_REQUEST, "auth_password_incorrect", locale)
-
-    AuthService.reset_failed_own_password_attempts(current_user, db)
+        raise api_error(status.HTTP_403_FORBIDDEN, "auth_reauth_required", locale)
 
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -1035,16 +983,16 @@ async def start_impersonation(
             status.HTTP_409_CONFLICT, "impersonation_already_active", locale
         )
 
-    # Minting the token and persisting the session are one transaction:
-    # create_impersonation_token() does the final db.commit(), covering
-    # both the (still just flushed) ImpersonationSession row and its own
-    # UserSession row together. If minting fails partway (decode failure,
-    # DB blip), the whole thing rolls back instead of leaving an orphaned
-    # "active" ImpersonationSession that no token was ever issued for --
-    # which previously locked the admin out of impersonating anyone until
-    # the reaper aged it out (TF-741 review fix).
+    # Creating the login session and persisting the impersonation row are one
+    # transaction: create_impersonation_session() does the final db.commit(),
+    # covering both the (still just flushed) ImpersonationSession row and its
+    # AuthSession row together. If it fails partway (DB blip), the whole thing
+    # rolls back instead of leaving an orphaned "active" ImpersonationSession
+    # that no session was ever created for -- which previously locked the
+    # admin out of impersonating anyone until the reaper aged it out
+    # (TF-741 review fix).
     try:
-        tokens = AuthService.create_impersonation_token(
+        imp_token, _imp_row = AuthService.create_impersonation_session(
             target,
             db,
             impersonator_id=current_user.id,
@@ -1053,7 +1001,7 @@ async def start_impersonation(
     except Exception:
         db.rollback()
         logger.error(
-            "Failed to mint impersonation token for admin %s -> target %s; "
+            "Failed to create impersonation session for admin %s -> target %s; "
             "rolled back, no session was created",
             current_user.id,
             target.id,
@@ -1061,6 +1009,17 @@ async def start_impersonation(
         raise api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "impersonation_start_failed", locale
         )
+
+    max_age = int(session_service.IMPERSONATION_SESSION_MAX_AGE.total_seconds())
+    response.set_cookie(
+        session_service.IMPERSONATION_COOKIE_NAME,
+        imp_token,
+        httponly=True,
+        secure=not oidc_client.is_dev_environment(),
+        samesite="lax",
+        max_age=max_age,
+        path="/",
+    )
 
     logger.info(
         f"Impersonation started: admin {current_user.email} (ID {current_user.id}) "
@@ -1082,9 +1041,7 @@ async def start_impersonation(
     )
 
     return ImpersonateResponse(
-        access_token=tokens["access_token"],
-        token_type=tokens["token_type"],
-        expires_in=tokens["expires_in"],
+        expires_in=max_age,
         impersonation_session_id=session.id,
         target_user_id=target.id,
         target_user_email=target.email,
@@ -1094,25 +1051,25 @@ async def start_impersonation(
 @router.post("/impersonate/end", status_code=status.HTTP_204_NO_CONTENT)
 async def end_impersonation(
     http_request: Request,
+    response: Response,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """End the current impersonation session (TF-741).
 
-    Revokes the impersonation access token immediately via the existing
-    ``AuthService.revoke_token`` mechanism — the admin's own original
-    token is untouched, so "back to my account" needs no further
-    server-side action.
+    Deletes the impersonation login session and its cookie immediately. The
+    admin's own login session is untouched, so "back to my account" needs no
+    further server-side action.
 
-    Also callable with the admin's *own* token instead of the impersonation
-    token: if the impersonation token was lost (closed tab, cleared
-    storage, browser crash) this falls back to closing the admin's own
-    open session by ``admin_user_id`` instead of leaving them locked out of
-    impersonating anyone else until the reaper eventually ages the row out
-    (TF-741 review fix).
+    Also callable without the impersonation cookie (lost, cleared): then it
+    falls back to closing the admin's own open impersonation session by
+    ``admin_user_id`` instead of leaving them locked out of impersonating
+    anyone else until the reaper eventually ages the row out (TF-741 review
+    fix).
     """
     locale = get_request_locale(http_request, current_user)
     ctx = get_impersonation_context()
+    response.delete_cookie(session_service.IMPERSONATION_COOKIE_NAME, path="/")
 
     if ctx is None:
         closed_session_id = AuthService.end_own_impersonation_session(
@@ -1131,7 +1088,6 @@ async def end_impersonation(
 
     result = AuthService.end_impersonation_session(
         impersonation_session_id=ctx.impersonation_session_id,
-        token_jti=ctx.token_jti,
         db=db,
         request=http_request,
     )
@@ -1144,9 +1100,8 @@ async def end_impersonation(
         )
     if not result["token_revoked"]:
         logger.warning(
-            "end_impersonation: no active UserSession found for the "
-            "impersonation token (session %s, admin ID %s) -- nothing to "
-            "revoke",
+            "end_impersonation: no impersonation login session found "
+            "(session %s, admin ID %s) -- nothing to delete",
             ctx.impersonation_session_id,
             ctx.impersonator_id,
         )

@@ -51,7 +51,7 @@ def test_client(db):
     from api import auth
 
     # Idempotent: avoid appending duplicate routes on every call.
-    if not any(getattr(r, "path", None) == "/api/auth/login" for r in app.routes):
+    if not any(getattr(r, "path", None) == "/api/v1/auth/login" for r in app.routes):
         app.include_router(auth.router)
     if not any(
         getattr(r, "path", None) == "/api/v1/billing/subscription" for r in app.routes

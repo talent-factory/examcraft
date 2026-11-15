@@ -47,9 +47,29 @@ def ws_app():
     return app
 
 
+def _session_found(mock_session_service, found: bool):
+    """Configure the patched ``session_service`` (EXAMCRAFT-125): the cookie
+    names stay the real ones, ``resolve_effective_session`` finds the session
+    of user 1 or nothing (unknown/expired/revoked)."""
+    mock_session_service.SESSION_COOKIE_NAME = "session_id"
+    mock_session_service.IMPERSONATION_COOKIE_NAME = "impersonation_id"
+    mock_session_service.resolve_effective_session.return_value = (
+        MagicMock(user_id=1) if found else None
+    )
+
+
+def _client(app, *, cookie: bool = True):
+    """TestClient whose handshake carries the ``session_id`` cookie; the
+    WebSocket authenticates by cookie, not by the first message."""
+    client = TestClient(app)
+    if cookie:
+        client.cookies.set("session_id", "valid-session")
+    return client
+
+
 @pytest.fixture
 def valid_token_payload():
-    return {"sub": "1", "jti": "test-jti-123", "email": "test@example.com"}
+    return {"sub": "1"}
 
 
 @pytest.fixture
@@ -76,12 +96,11 @@ class TestWebSocketConnection:
     ):
         """Connection with a valid token handshake is accepted"""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -96,39 +115,81 @@ class TestWebSocketConnection:
             mock_task_result.result = {"document_id": 1}
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
                 data = ws.receive_json()
                 assert data["status"] == "SUCCESS"
 
-    def test_websocket_invalid_token(self, ws_app):
-        """Invalid token → WebSocket is closed"""
-        with patch("api.v1.websocket.AuthService") as mock_auth:
-            mock_auth.decode_token.return_value = None
+    def test_websocket_without_session_cookie(self, ws_app):
+        """No ``session_id`` cookie on the handshake → closed, never resolved
+        (a token in the first message no longer authenticates)."""
+        with patch("api.v1.websocket.session_service") as mock_auth:
+            _session_found(mock_auth, True)
 
-            client = TestClient(ws_app)
+            client = _client(ws_app, cookie=False)
             with pytest.raises(WebSocketDisconnect):
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                    ws.send_json({"token": "invalid-token"})
+                    ws.send_json({"token": "valid-token"})
+                    ws.receive_json()
+            mock_auth.resolve_effective_session.assert_not_called()
+
+    def test_websocket_foreign_origin_is_rejected(self, ws_app):
+        """Cross-site WebSocket hijacking: a browser handshake from an origin
+        outside CORS_ORIGINS is closed before the session is even looked at."""
+        with patch("api.v1.websocket.session_service") as mock_auth:
+            _session_found(mock_auth, True)
+
+            client = _client(ws_app)
+            with pytest.raises(WebSocketDisconnect):
+                with client.websocket_connect(
+                    "/ws/tasks/test-task-id",
+                    headers={"origin": "https://evil.example"},
+                ) as ws:
+                    ws.send_json({})
+                    ws.receive_json()
+            mock_auth.resolve_effective_session.assert_not_called()
+
+    def test_websocket_allowed_origin_is_accepted(self, ws_app):
+        with patch("api.v1.websocket.session_service") as mock_auth:
+            _session_found(mock_auth, False)  # fails later, but not at Origin
+
+            client = _client(ws_app)
+            with pytest.raises(WebSocketDisconnect):
+                with client.websocket_connect(
+                    "/ws/tasks/test-task-id",
+                    headers={"origin": "http://localhost:3000"},
+                ) as ws:
+                    ws.send_json({})
+                    ws.receive_json()
+            mock_auth.resolve_effective_session.assert_called_once()
+
+    def test_websocket_invalid_token(self, ws_app):
+        """Invalid token → WebSocket is closed"""
+        with patch("api.v1.websocket.session_service") as mock_auth:
+            _session_found(mock_auth, False)
+
+            client = _client(ws_app)
+            with pytest.raises(WebSocketDisconnect):
+                with client.websocket_connect("/ws/tasks/test-task-id") as ws:
+                    ws.send_json({})
                     ws.receive_json()
 
     def test_websocket_revoked_token(self, ws_app, valid_token_payload, mock_user):
         """Revoked token → WebSocket is closed"""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = True
+            _session_found(mock_auth, False)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with pytest.raises(WebSocketDisconnect):
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                    ws.send_json({"token": "revoked-token"})
+                    ws.send_json({})
                     ws.receive_json()
 
     def test_websocket_wrong_ownership(self, ws_app, valid_token_payload, mock_user):
@@ -137,11 +198,10 @@ class TestWebSocketConnection:
         wrong_doc.user_id = 999
 
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -150,10 +210,10 @@ class TestWebSocketConnection:
                 wrong_doc
             )
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with pytest.raises(WebSocketDisconnect):
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                    ws.send_json({"token": "valid-token"})
+                    ws.send_json({})
                     ws.receive_json()
 
 
@@ -179,12 +239,11 @@ class TestWebSocketProgressUpdates:
             return r
 
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult", side_effect=make_result),
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -193,9 +252,9 @@ class TestWebSocketProgressUpdates:
                 mock_document
             )
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
 
                 first = ws.receive_json()
                 assert first["status"] == "PROGRESS"
@@ -252,12 +311,11 @@ class TestWebSocketProgressUpdates:
             return r
 
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult", side_effect=make_result),
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -266,9 +324,9 @@ class TestWebSocketProgressUpdates:
                 mock_document
             )
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
 
                 first = ws.receive_json()
                 assert first["status"] == "PROGRESS"
@@ -281,12 +339,11 @@ class TestWebSocketProgressUpdates:
     ):
         """Connection is closed after SUCCESS"""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -301,9 +358,9 @@ class TestWebSocketProgressUpdates:
             mock_task_result.result = {"document_id": 1}
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
                 data = ws.receive_json()
                 assert data["status"] == "SUCCESS"
                 with pytest.raises(Exception):
@@ -314,12 +371,11 @@ class TestWebSocketProgressUpdates:
     ):
         """Connection is closed after FAILURE"""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -334,9 +390,9 @@ class TestWebSocketProgressUpdates:
             mock_task_result.result = None
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
                 data = ws.receive_json()
                 assert data["status"] == "FAILURE"
                 assert data["error"] is not None
@@ -353,12 +409,11 @@ class TestWebSocketProgressUpdates:
         frame at all.
         """
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -373,9 +428,9 @@ class TestWebSocketProgressUpdates:
             mock_task_result.result = None
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
                 data = ws.receive_json()
                 assert data["status"] == "REVOKED"
                 assert data["error"] is not None
@@ -391,12 +446,11 @@ class TestWebSocketDisconnect:
     ):
         """Sauberes Cleanup bei Client-Disconnect"""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -410,10 +464,10 @@ class TestWebSocketDisconnect:
             mock_task_result.info = {}
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             try:
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                    ws.send_json({"token": "valid-token"})
+                    ws.send_json({})
             except Exception:
                 pass  # Disconnect is OK
 
@@ -559,12 +613,11 @@ class TestFailureMessageMapping:
         self, ws_app, valid_token_payload, mock_user, mock_document
     ):
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
             patch("services.generation_job_state.AsyncResult") as mock_result,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
 
             mock_db = MagicMock()
             mock_session.return_value = mock_db
@@ -581,9 +634,9 @@ class TestFailureMessageMapping:
             mock_task_result.result = None
             mock_result.return_value = mock_task_result
 
-            client = TestClient(ws_app)
+            client = _client(ws_app)
             with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                ws.send_json({"token": "valid-token"})
+                ws.send_json({})
                 data = ws.receive_json()
                 assert data["status"] == "FAILURE"
                 assert "durchsuchbaren Inhalt" in data["error"]
@@ -603,11 +656,10 @@ class TestFailureFramesCarryErrorCode:
         """Open an authenticated socket on an owned task; yields a function
         that sends the handshake and returns the first frame."""
         with (
-            patch("api.v1.websocket.AuthService") as mock_auth,
+            patch("api.v1.websocket.session_service") as mock_auth,
             patch("api.v1.websocket.SessionLocal") as mock_session,
         ):
-            mock_auth.decode_token.return_value = valid_token_payload
-            mock_auth.is_token_revoked.return_value = False
+            _session_found(mock_auth, True)
             mock_db = MagicMock()
             mock_session.return_value = mock_db
             mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = mock_user
@@ -616,9 +668,9 @@ class TestFailureFramesCarryErrorCode:
             )
 
             def _first_frame():
-                client = TestClient(ws_app)
+                client = _client(ws_app)
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
-                    ws.send_json({"token": "valid-token"})
+                    ws.send_json({})
                     return ws.receive_json()
 
             yield _first_frame

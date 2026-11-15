@@ -57,7 +57,7 @@ def test_blocks_request_when_impersonating(test_db):
     user = _make_user(test_db)
     set_impersonation_context(
         ImpersonationContext(
-            impersonator_id=1, impersonation_session_id=2, token_jti="jti"
+            impersonator_id=1, impersonation_session_id=2, auth_session_id=3
         )
     )
 

@@ -6,16 +6,17 @@ services.generation_job_state.read_state)
 
 import asyncio
 import logging
+import os
 from typing import Dict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import joinedload
 
 from database import SessionLocal
-from models.auth import User
+from models.auth import User, UserStatus
 from models.document import Document
 from schemas.task import TaskStatus, TaskStatusMessage
-from services.auth_service import AuthService
+from services import session_service
 from services.generation_job_state import CeleryUnknown, Progress, read_state
 from services.rag_errors import (
     TASK_PENDING_TIMEOUT,
@@ -69,46 +70,64 @@ PENDING_TIMEOUT_SECONDS = 120
 POLL_INTERVAL_SECONDS = 1
 
 
-async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | None:
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+
+
+async def _authenticate_websocket(websocket: WebSocket) -> User | None:
     """
-    Authenticates a WebSocket client via JWT token.
-    Replicates the logic of get_current_user() without FastAPI Depends.
+    Authenticates a WebSocket client via the session cookie (EXAMCRAFT-125).
+
+    The browser sends the httpOnly ``session_id`` cookie with the handshake
+    (same site). Replicates the logic of get_current_user() without FastAPI
+    Depends.
 
     Returns:
         User object on success, None on failure (WebSocket already closed)
     """
-    payload = AuthService.decode_token(token)
-    if not payload:
-        logger.warning("WebSocket Auth: Token decode fehlgeschlagen")
-        await websocket.close(code=1008)
-        return None
+    # Cross-site WebSocket hijacking: browsers always send Origin, and a
+    # SameSite=Lax cookie is no protection on every browser. Same list as CORS.
+    origin = websocket.headers.get("origin")
+    if origin is not None and "*" not in _allowed_origins():
+        if origin.rstrip("/") not in _allowed_origins():
+            logger.warning("WebSocket Auth: Origin %r nicht erlaubt", origin)
+            await websocket.close(code=1008)
+            return None
 
-    user_id = payload.get("sub")
-    if not user_id:
-        logger.warning("WebSocket Auth: Token enthält kein 'sub' Claim")
-        await websocket.close(code=1008)
-        return None
-
-    try:
-        user_id_int = int(user_id)
-    except (ValueError, TypeError):
-        logger.warning(f"WebSocket Auth: Ungültige user_id im Token: {user_id!r}")
+    session_token = websocket.cookies.get(session_service.SESSION_COOKIE_NAME)
+    impersonation_token = websocket.cookies.get(
+        session_service.IMPERSONATION_COOKIE_NAME
+    )
+    if not session_token:
+        logger.warning("WebSocket Auth: kein Session-Cookie")
         await websocket.close(code=1008)
         return None
 
     def _db_lookup() -> User | None:
         db = SessionLocal()
         try:
-            token_jti = payload.get("jti")
-            if token_jti and AuthService.is_token_revoked(token_jti, db):
+            auth_session = session_service.resolve_effective_session(
+                db, session_token, impersonation_token
+            )
+            if auth_session is None:
                 return None
 
-            return (
+            user = (
                 db.query(User)
                 .options(joinedload(User.roles))
-                .filter(User.id == user_id_int)
+                .filter(User.id == auth_session.user_id)
                 .first()
             )
+            # Same rule as get_current_user: only an impersonation may act as a
+            # non-active user (support use case).
+            if (
+                user is not None
+                and auth_session.impersonator_id is None
+                and user.status != UserStatus.ACTIVE.value
+            ):
+                return None
+            return user
         finally:
             db.close()
 
@@ -234,16 +253,16 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
 
     Protocol:
     1. Client connects
-    2. Client sends as first message: {"token": "<jwt>"}
-    3. Server validates token + ownership
+    2. Client sends a first message (content ignored; authentication uses
+       the httpOnly session cookie of the handshake)
+    3. Server validates the session + ownership
     4. Server streams TaskStatusMessage JSON until the terminal state
     5. Server closes the connection after SUCCESS/FAILURE/REVOKED
     """
     await manager.connect(task_id, websocket)
     try:
         try:
-            handshake = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
-            token = handshake.get("token", "")
+            await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
         except asyncio.TimeoutError:
             logger.warning(f"WebSocket Handshake-Timeout für Task {task_id}")
             await websocket.close(code=1008)
@@ -255,7 +274,7 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
             await websocket.close(code=1008)
             return
 
-        user = await _authenticate_websocket(websocket, token)
+        user = await _authenticate_websocket(websocket)
         if user is None:
             return
 
