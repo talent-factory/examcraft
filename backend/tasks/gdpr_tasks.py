@@ -8,14 +8,16 @@ Siehe docs/superpowers/specs/2026-08-27-tf745-gdpr-scheduled-deletion-design.md.
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 
 from celery_app import celery_app
 from database import SessionLocal
-from models.auth import User
+from models.auth import AuditLog, User
 from services.audit_service import AuditService
 from services.gdpr_deletion_service import delete_user_and_gdpr_data
+from services.zitadel_user_service import ZitadelError
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,10 @@ logger = logging.getLogger(__name__)
 # 15 Minuten Verzögerung pro betroffenem User, für jeden Sweep erneut.
 _TRANSIENT_ERRORS = (OperationalError, SATimeoutError, ConnectionError)
 
+# Maximale Anzahl pro Sweep dispatchter Löschungen (EXAMCRAFT-128): begrenzt
+# die Last auf Zitadel und die DB. Der Rest folgt im nächsten täglichen Lauf.
+SWEEP_BATCH_LIMIT = 25
+
 
 @celery_app.task(name="tasks.gdpr_tasks.process_scheduled_deletions")
 def process_scheduled_deletions() -> dict:
@@ -57,6 +63,19 @@ def process_scheduled_deletions() -> dict:
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
+        # Zeitpunkt des letzten endgültigen Fehlschlags je User (NULL = nie).
+        # Der Sweep läuft nur einmal täglich, ein fester Cooldown würde daher
+        # nie greifen. Sortierung: nie Fehlgeschlagene zuerst, danach die am
+        # längsten zurückliegenden Fehlschläge (faire Rotation statt Starvation).
+        last_failure = (
+            db.query(func.max(AuditLog.created_at))
+            .filter(
+                AuditLog.action == "gdpr_scheduled_deletion_failed",
+                AuditLog.user_id == User.id,
+            )
+            .correlate(User)
+            .scalar_subquery()
+        )
         due_users = (
             db.query(User)
             .filter(
@@ -64,8 +83,17 @@ def process_scheduled_deletions() -> dict:
                 User.scheduled_deletion_date.isnot(None),
                 User.scheduled_deletion_date <= now,
             )
+            .order_by(
+                last_failure.asc().nulls_first(),
+                User.scheduled_deletion_date,
+                User.id,
+            )
+            .limit(SWEEP_BATCH_LIMIT + 1)
             .all()
         )
+        # Ein Datensatz mehr geholt, nur um "es bleibt Rest" zu erkennen.
+        has_more = len(due_users) > SWEEP_BATCH_LIMIT
+        due_users = due_users[:SWEEP_BATCH_LIMIT]
 
         dispatched = 0
         for user in due_users:
@@ -74,8 +102,24 @@ def process_scheduled_deletions() -> dict:
 
         if dispatched:
             logger.info("GDPR-Sweep: %s fällige Löschungen dispatcht", dispatched)
+            if has_more:
+                logger.critical(
+                    "GDPR-Sweep: Rückstau, mehr als %s fällige Löschungen "
+                    "(Batch-Limit). Prüfen, ob Löschungen dauerhaft fehlschlagen.",
+                    SWEEP_BATCH_LIMIT,
+                )
+            AuditService.log_action(
+                db=db,
+                action="gdpr_sweep_dispatched",
+                resource_type=AuditService.RESOURCE_USER,
+                additional_data={
+                    "dispatched": dispatched,
+                    "batch_limit": SWEEP_BATCH_LIMIT,
+                    "more_pending": has_more,
+                },
+            )
 
-        return {"dispatched": dispatched}
+        return {"dispatched": dispatched, "more_pending": has_more}
     except Exception:
         # Ausdrücklich mit critical loggen statt den Fehler nur via
         # Celery-FAILURE-State/Observability propagieren zu lassen: in
@@ -153,6 +197,16 @@ def execute_gdpr_deletion(self, user_id: int) -> dict:
             exc,
             exc_info=True,
         )
+        if isinstance(exc, ZitadelError):
+            # Dauerhafter Zitadel-Fehler (Konfiguration, Secret, Berechtigung):
+            # betrifft in der Regel ALLE Löschungen, nicht nur diesen User.
+            # Eigene kritische Zeile, damit es nicht im Strom einzelner
+            # Fehlerzeilen untergeht (vgl. fehlende Fly-Secrets TF-776/TF-796).
+            logger.critical(
+                "GDPR-Löschung: dauerhafter Zitadel-Fehler. Konfiguration und "
+                "Fly-Secrets (ZITADEL_*) auf examcraft-celery prüfen: %s",
+                exc,
+            )
         db.rollback()
         # "Letzter Versuch" bedeutet zweierlei: entweder Celery hat die
         # konfigurierten Retries ausgeschöpft (transiente Fehler, siehe

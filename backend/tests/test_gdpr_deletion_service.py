@@ -15,6 +15,7 @@ from models.document import Document
 from models.exam import Exam
 from models.question_generation_job import QuestionGenerationJob
 from models.question_review import QuestionReview
+from services import zitadel_user_service
 from services.gdpr_deletion_service import delete_user_and_gdpr_data
 
 
@@ -308,7 +309,11 @@ def test_delete_user_and_gdpr_data_writes_audit_entry_with_given_action(test_db)
         test_db, user, action="account_deleted_scheduled"
     )
 
-    assert result == {"user_id": user_id, "email": "action@gdpr-del-svc-action.ch"}
+    assert result == {
+        "user_id": user_id,
+        "email": "action@gdpr-del-svc-action.ch",
+        "zitadel": "no_sub",
+    }
 
     logs = (
         test_db.query(AuditLog)
@@ -342,3 +347,167 @@ def test_delete_user_and_gdpr_data_aborts_when_audit_log_write_fails(test_db):
             )
 
     assert test_db.get(User, user_id) is not None
+
+
+def test_delete_user_deletes_zitadel_user_before_local_delete(test_db):
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-ok")
+    user = _make_user(test_db, institution, "ok@gdpr-del-svc-zit-ok.ch")
+    user.zitadel_sub = "sub-zit-ok"
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user", return_value=True
+    ) as zitadel:
+        result = delete_user_and_gdpr_data(
+            test_db, user, action="account_deleted_immediately"
+        )
+
+    zitadel.assert_called_once_with("sub-zit-ok")
+    assert result["zitadel"] == "deleted"
+    assert test_db.get(User, user_id) is None
+
+
+def test_delete_user_treats_absent_zitadel_user_as_success(test_db):
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-gone")
+    user = _make_user(test_db, institution, "gone@gdpr-del-svc-zit-gone.ch")
+    user.zitadel_sub = "sub-zit-gone"
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user", return_value=False
+    ):
+        result = delete_user_and_gdpr_data(
+            test_db, user, action="account_deleted_immediately"
+        )
+
+    assert result["zitadel"] == "already_absent"
+    assert test_db.get(User, user_id) is None
+
+
+def test_delete_user_skips_zitadel_without_sub(test_db):
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-nosub")
+    user = _make_user(test_db, institution, "nosub@gdpr-del-svc-zit-nosub.ch")
+    user_id = user.id
+
+    with patch("services.gdpr_deletion_service.delete_zitadel_user") as zitadel:
+        result = delete_user_and_gdpr_data(
+            test_db, user, action="account_deleted_immediately"
+        )
+
+    zitadel.assert_not_called()
+    assert result["zitadel"] == "no_sub"
+    assert test_db.get(User, user_id) is None
+
+
+@pytest.mark.parametrize("error_cls", ["ZitadelError", "ZitadelTransientError"])
+def test_zitadel_failure_prevents_local_deletion(test_db, error_cls):
+    institution = _make_institution(test_db, f"gdpr-del-svc-zit-{error_cls.lower()}")
+    user = _make_user(
+        test_db, institution, f"x@gdpr-del-svc-zit-{error_cls.lower()}.ch"
+    )
+    user.zitadel_sub = "sub-zit-fail"
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user",
+        side_effect=getattr(zitadel_user_service, error_cls)("boom"),
+    ):
+        with pytest.raises(getattr(zitadel_user_service, error_cls)):
+            delete_user_and_gdpr_data(
+                test_db, user, action="account_deleted_immediately"
+            )
+
+    assert test_db.get(User, user_id) is not None
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "account_deleted_immediately")
+        .count()
+        == 0
+    )
+
+
+def test_local_failure_after_zitadel_delete_marks_user_for_sweep(test_db):
+    """Zitadel gelöscht, lokal gescheitert: User wird für den Sweep fällig."""
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-partial")
+    user = _make_user(test_db, institution, "p@gdpr-del-svc-zit-partial.ch")
+    user.zitadel_sub = "sub-partial"
+    test_db.commit()
+    user_id = user.id
+
+    with (
+        patch("services.gdpr_deletion_service.delete_zitadel_user", return_value=True),
+        patch.object(
+            test_db, "delete", side_effect=IntegrityError("x", {}, Exception())
+        ),
+    ):
+        with pytest.raises(IntegrityError):
+            delete_user_and_gdpr_data(
+                test_db, user, action="account_deleted_immediately"
+            )
+
+    refreshed = test_db.get(User, user_id)
+    assert refreshed is not None
+    assert refreshed.deletion_requested_at is not None
+    assert refreshed.scheduled_deletion_date is not None
+
+
+def test_second_run_after_partial_failure_reports_already_absent(test_db):
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-retry")
+    user = _make_user(test_db, institution, "r@gdpr-del-svc-zit-retry.ch")
+    user.zitadel_sub = "sub-retry"
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user", return_value=False
+    ):
+        result = delete_user_and_gdpr_data(
+            test_db, user, action="account_deleted_scheduled"
+        )
+
+    assert result["zitadel"] == "already_absent"
+    assert test_db.get(User, user_id) is None
+
+
+def test_immediate_deletion_marks_user_due_before_zitadel_call(test_db):
+    """Auch wenn Zitadel-Antwort/Prozess verloren geht: User ist für den Sweep fällig."""
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-premark")
+    user = _make_user(test_db, institution, "m@gdpr-del-svc-zit-premark.ch")
+    user.zitadel_sub = "sub-premark"
+    test_db.commit()
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user",
+        side_effect=zitadel_user_service.ZitadelTransientError("timeout"),
+    ):
+        with pytest.raises(zitadel_user_service.ZitadelTransientError):
+            delete_user_and_gdpr_data(
+                test_db, user, action="account_deleted_immediately"
+            )
+
+    refreshed = test_db.get(User, user_id)
+    assert refreshed.deletion_requested_at is not None
+    assert refreshed.scheduled_deletion_date is not None
+
+
+def test_existing_deletion_request_timestamps_are_not_overwritten(test_db):
+    from datetime import datetime, timedelta, timezone
+
+    institution = _make_institution(test_db, "gdpr-del-svc-zit-keepts")
+    user = _make_user(test_db, institution, "k@gdpr-del-svc-zit-keepts.ch")
+    user.zitadel_sub = "sub-keepts"
+    requested = datetime.now(timezone.utc) - timedelta(days=31)
+    user.deletion_requested_at = requested
+    user.scheduled_deletion_date = requested + timedelta(days=30)
+    test_db.commit()
+    user_id = user.id
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user",
+        side_effect=zitadel_user_service.ZitadelError("403"),
+    ):
+        with pytest.raises(zitadel_user_service.ZitadelError):
+            delete_user_and_gdpr_data(test_db, user, action="account_deleted_scheduled")
+
+    refreshed = test_db.get(User, user_id)
+    assert refreshed.deletion_requested_at == requested
