@@ -25,7 +25,6 @@ function failWith(body: unknown, status = 500): void {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  localStorage.setItem('examcraft_access_token', 'test-token');
 });
 
 describe('RBACService — Fallback-Codes je Endpunkt', () => {

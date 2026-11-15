@@ -7,7 +7,6 @@
  * submissions_grade_export_blocked_pending_review.
  */
 
-import { ACCESS_TOKEN_KEY } from '../api/tokenRefreshLock';
 import { ApiError, statusToKind } from './submissionsService';
 import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 
@@ -15,9 +14,10 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export type ExportFormat = 'csv' | 'moodle_csv' | 'pdf';
 
+// Die Anmeldung läuft über das httpOnly-Session-Cookie (EXAMCRAFT-126);
+// fetch() sendet es per Interceptor mit, Header braucht es nicht.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 export class GradeExportService {

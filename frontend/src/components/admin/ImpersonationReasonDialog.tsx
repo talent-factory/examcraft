@@ -1,14 +1,17 @@
 /**
  * Impersonation Reason Dialog Component (TF-743)
- * Confirms the target user and collects the mandatory reason and the
- * admin's own step-up password (TF-758) before
+ * Confirms the target user and collects the mandatory reason before
  * POST /api/admin/users/{id}/impersonate is called.
+ *
+ * EXAMCRAFT-126: The step-up (TF-758) is no longer a password field here. The
+ * backend demands a fresh IdP login (`auth_reauth_required`, 403); the dialog
+ * then sends the admin through `/api/v1/auth/login?reauth=true`.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
-import { translateError } from '../../errors';
+import { isAppError, translateError } from '../../errors';
 import { useAuth } from '../../contexts/AuthContext';
 
 const REASON_MIN_LENGTH = 3;
@@ -28,15 +31,12 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
   onSuccess,
 }) => {
   const { t } = useTranslation();
-  const { startImpersonation } = useAuth();
+  const { startImpersonation, login } = useAuth();
   const [target, setTarget] = useState<UserDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState('');
-  // TF-758: step-up re-authentication -- the admin re-enters their own
-  // (current) password before the impersonation token is minted.
-  const [adminPassword, setAdminPassword] = useState('');
 
   const loadTarget = useCallback(async () => {
     if (!userId) return;
@@ -61,7 +61,6 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       // must not show the previous reason or a stale target.
       setTarget(null);
       setReason('');
-      setAdminPassword('');
       setError(null);
     }
   }, [isOpen, userId, loadTarget]);
@@ -76,29 +75,24 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       return;
     }
 
-    if (!adminPassword) {
-      setError(t('admin.impersonation.passwordRequired'));
-      return;
-    }
-
     try {
       setSaving(true);
       setError(null);
 
-      const response = await AdminService.impersonateUser(userId, trimmedReason, adminPassword);
-      await startImpersonation({
-        accessToken: response.access_token,
-        expiresIn: response.expires_in,
-      });
+      const response = await AdminService.impersonateUser(userId, trimmedReason);
+      await startImpersonation({ expiresIn: response.expires_in });
 
       onSuccess();
       onClose();
     } catch (err) {
+      if (isAppError(err) && err.code === 'auth_reauth_required') {
+        // Step-up: the IdP login is older than the backend accepts. The page
+        // is left for the IdP and returns to the app root, so the reason is
+        // entered again afterwards.
+        login({ reauth: true });
+        return;
+      }
       setError(translateError(err, t, 'admin.impersonation.dialogError'));
-      // TF-758 review fix: don't leave the (possibly wrong) password sitting
-      // in state/DOM after a failed attempt -- the admin re-enters it either
-      // way, and this keeps its lifetime in memory as short as possible.
-      setAdminPassword('');
     } finally {
       setSaving(false);
     }
@@ -168,29 +162,6 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
                         />
                       </div>
 
-                      <div>
-                        <label htmlFor="impersonation-admin-password" className="block text-sm font-medium text-gray-700 mb-1">
-                          {t('admin.impersonation.dialogPasswordLabel')}
-                        </label>
-                        <input
-                          id="impersonation-admin-password"
-                          name="admin_password"
-                          type="password"
-                          // TF-758 review fix: this is a step-up re-auth, not a
-                          // login form -- "current-password" would let a saved
-                          // browser/password-manager entry autofill it, which
-                          // defeats the "left-open device" half of the threat
-                          // model this field exists for (no fresh knowledge of
-                          // the credential is actually proven). "off" is the
-                          // best-effort signal most browsers respect here.
-                          autoComplete="off"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
-                          required
-                          placeholder={t('admin.impersonation.dialogPasswordPlaceholder')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                        />
-                      </div>
                     </div>
                   )}
                 </div>

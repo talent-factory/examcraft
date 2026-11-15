@@ -17,21 +17,10 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 class RBACService {
   /**
-   * Get authentication token from localStorage
-   */
-  private getAuthToken(): string | null {
-    return localStorage.getItem('examcraft_access_token');
-  }
-
-  /**
-   * Get authorization headers
+   * Request headers. The session cookie travels with every fetch (interceptor).
    */
   private getAuthHeaders(): HeadersInit {
-    const token = this.getAuthToken();
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
-    };
+    return { 'Content-Type': 'application/json' };
   }
 
   // ============================================

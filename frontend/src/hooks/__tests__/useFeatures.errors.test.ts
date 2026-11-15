@@ -10,13 +10,11 @@ import { useFeatures } from '../useFeatures';
  */
 
 let mockUser: { id: number } | null = { id: 1 };
-let mockAccessToken: string | null = 'token-123';
 let mockIsAuthenticated = true;
 
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: mockUser,
-    accessToken: mockAccessToken,
     isAuthenticated: mockIsAuthenticated,
   }),
 }));
@@ -25,7 +23,6 @@ const originalFetch = global.fetch;
 
 beforeEach(() => {
   mockUser = { id: 1 };
-  mockAccessToken = 'token-123';
   mockIsAuthenticated = true;
   localStorage.clear();
 });

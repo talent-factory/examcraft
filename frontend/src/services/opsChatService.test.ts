@@ -1,5 +1,5 @@
 import { sendOpsChatMessage } from './opsChatService';
-import { API_BASE_URL, ACCESS_TOKEN_KEY } from './httpClient';
+import { API_BASE_URL } from './httpClient';
 
 describe('sendOpsChatMessage', () => {
   const originalFetch = global.fetch;
@@ -11,7 +11,6 @@ describe('sendOpsChatMessage', () => {
   });
 
   it('POSTs the message and history to /api/v1/ops/chat and returns the reply', async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, 'test-token');
     const mockFetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -27,7 +26,6 @@ describe('sendOpsChatMessage', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          Authorization: 'Bearer test-token',
           'Content-Type': 'application/json',
         }),
         body: JSON.stringify({ message: 'Wie viele Worker?', history }),

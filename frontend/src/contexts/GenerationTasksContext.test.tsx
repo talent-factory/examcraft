@@ -3,9 +3,9 @@ import React from 'react';
 import { GenerationTasksProvider, useGenerationTasks } from './GenerationTasksContext';
 
 // Mock the AuthContext to provide a stable token by default; overridable
-// per-test (mockUseAuth.mockReturnValue(...)) to simulate a silent token
-// refresh, which changes `accessToken` and re-runs the recovery effect.
-const mockUseAuth = jest.fn(() => ({ isAuthenticated: true, accessToken: 'test-token' }));
+// per-test (mockUseAuth.mockReturnValue(...)) to simulate a identity change
+// (impersonation start/end), which changes `user.id` and re-runs the recovery effect.
+const mockUseAuth = jest.fn(() => ({ isAuthenticated: true, user: { id: 1 } }));
 jest.mock('./AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -85,7 +85,7 @@ beforeEach(() => {
     Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
   );
   mockUseAuth.mockReset();
-  mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'test-token' });
+  mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 1 } });
 });
 
 // Helper component exposes context to tests
@@ -336,13 +336,13 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     expect(task.generatedQuestionCount).toBe(6);
   });
 
-  // Regression: the recovery effect re-runs on every accessToken change
-  // (silent token refresh), not only on mount, and used to rebuild each
+  // Regression: the recovery effect re-runs on every user/auth change
+  // (e.g. impersonation start/end), not only on mount, and used to rebuild each
   // task from scratch — carrying over `result` but dropping
   // `contextLimited`/`generatedQuestionCount`. If the second refetch then
   // fails (eg the Celery result really has expired by then), the under-fill
   // notice used to be lost for the rest of the session.
-  it('does not lose the recovered under-fill flags on a silent token refresh', async () => {
+  it('does not lose the recovered under-fill flags on an identity change', async () => {
     mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-limited')] });
     mockGetTaskResult.mockResolvedValueOnce({
       task_id: 'task-limited',
@@ -359,7 +359,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
     mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 2 } });
     rerender(
       <GenerationTasksProvider>
         <Capture />
@@ -413,7 +413,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
   // Same trap as the under-fill flags above: the rebuild on a silent token
   // refresh must not drop the error code when the refetch then fails.
-  it('does not lose the recovered error code on a silent token refresh (TF-967)', async () => {
+  it('does not lose the recovered error code on an identity change (TF-967)', async () => {
     mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-failed', 'FAILURE')] });
     mockGetTaskResult.mockResolvedValueOnce({
       task_id: 'task-failed',
@@ -430,7 +430,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
     mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 2 } });
     rerender(
       <GenerationTasksProvider>
         <Capture />

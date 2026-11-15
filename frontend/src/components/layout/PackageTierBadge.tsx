@@ -98,20 +98,9 @@ export const PackageTierBadge: React.FC = () => {
   const detectPackageTier = async () => {
     try {
       // Get authenticated user's institution tier from backend
-      const token = localStorage.getItem('examcraft_access_token');
-
-      if (!token) {
-        // Not authenticated - fallback to free tier
-        setTierInfo(TIER_CONFIG.free);
-        setLoading(false);
-        return;
-      }
-
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
       const response = await fetch(`${apiUrl}/api/v1/rbac/tiers/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include',
       });
 
       if (response.ok) {

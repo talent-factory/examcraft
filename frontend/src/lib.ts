@@ -34,12 +34,7 @@ export * from './components/layout';
 export * from './components/admin';
 
 // Auth Components - exported with Component suffix to avoid type conflicts
-export { LoginForm as LoginFormComponent } from './components/auth/LoginForm';
-export { RegisterForm as RegisterFormComponent } from './components/auth/RegisterForm';
-export { PasswordResetRequest as PasswordResetRequestComponent } from './components/auth/PasswordResetRequest';
-export { PasswordResetConfirm as PasswordResetConfirmComponent } from './components/auth/PasswordResetConfirm';
-export { OAuthCallback as OAuthCallbackComponent } from './components/auth/OAuthCallback';
-export { AuthPage as AuthPageComponent } from './components/auth/AuthPage';
+export { LoginPage as LoginPageComponent } from './components/auth/LoginPage';
 
 // Individual component exports
 export { default as DocumentUpload } from './components/DocumentUpload';
@@ -71,13 +66,7 @@ export { useActivityHeartbeat } from './hooks/useActivityHeartbeat';
 // API Client
 // ============================================================================
 
-export {
-  apiClient,
-  setTokenRefreshCallback,
-  setLogoutCallback,
-  setAdoptStoredTokensCallback,
-} from './api/apiClient';
-export { ACCESS_TOKEN_KEY } from './api/tokenRefreshLock';
+export { apiClient, setLogoutCallback } from './api/apiClient';
 
 // ============================================================================
 // Utils

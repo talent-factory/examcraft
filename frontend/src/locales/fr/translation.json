@@ -415,100 +415,25 @@
   "auth": {
     "login": {
       "title": "Bon retour",
-      "subtitle": "Connecte-toi à ton compte",
-      "email": "Adresse e-mail",
-      "emailPlaceholder": "toi@example.com",
-      "password": "Mot de passe",
-      "rememberMe": "Se souvenir de moi",
-      "forgotPassword": "Mot de passe oublié ?",
-      "signingIn": "Connexion en cours...",
-      "signIn": "Se connecter",
-      "orContinueWith": "Ou continuer avec",
-      "noAccount": "Tu n'as pas de compte ?",
-      "signUp": "S'inscrire",
-      "emailAndPasswordRequired": "Saisis ton e-mail et ton mot de passe"
-    },
-    "register": {
-      "title": "Créer un compte",
-      "firstName": "Prénom",
-      "firstNamePlaceholder": "Jean",
-      "lastName": "Nom de famille",
-      "lastNamePlaceholder": "Dupont",
-      "email": "E-mail",
-      "emailPlaceholder": "ton.email@example.com",
-      "institutionCode": "Code d'institution (Optionnel)",
-      "institutionCodeHint": "Entre ton code d'institution si tu en as un",
-      "institutionCodePlaceholder": "nom-de-l-institution",
-      "password": "Mot de passe",
-      "passwordReqTitle": "Le mot de passe doit contenir :",
-      "passwordReqMinLength": "8+ caractères",
-      "passwordReqUppercase": "Majuscule (A–Z)",
-      "passwordReqLowercase": "Minuscule (a–z)",
-      "passwordReqNumber": "Chiffre (0–9)",
-      "confirmPassword": "Confirmer le mot de passe",
-      "creatingAccount": "Création du compte...",
-      "createAccount": "Créer un compte",
-      "hasAccount": "Tu as déjà un compte ?",
-      "loginHere": "Connecte-toi ici"
+      "subtitle": "Vous vous connectez avec votre compte Talent Factory.",
+      "signIn": "Se connecter"
     },
     "authPage": {
       "tagline": "Génération de questions d'examen par IA",
-      "backToLogin": "← Retour à la connexion",
       "terms": "Conditions d'utilisation",
       "privacy": "Politique de confidentialité",
       "imprint": "Mentions légales"
     },
-    "verification": {
-      "bannerTitle": "Vérification de l'e-mail requise",
-      "bannerText": "Vérifie ton adresse e-mail pour accéder à toutes les fonctionnalités. Consulte ta boîte de réception pour le lien de vérification.",
-      "resendButton": "Renvoyer l'e-mail de vérification",
-      "sending": "Envoi en cours...",
-      "emailSent": "E-mail envoyé !",
-      "successMessage": "E-mail de vérification envoyé ! Vérifie ta boîte de réception."
-    },
-    "oauth": {
-      "processing": "Traitement du rappel OAuth...",
-      "errorTitle": "Erreur d'authentification",
-      "returnToLogin": "Retour à la connexion",
-      "noCodeError": "Aucun code d'autorisation reçu",
-      "missingTokens": "Jetons d'authentification manquants"
-    },
-    "resetRequest": {
-      "title": "Réinitialiser le mot de passe",
-      "subtitle": "Entre ton adresse e-mail et nous t'enverrons un lien pour réinitialiser ton mot de passe.",
-      "email": "Adresse e-mail",
-      "emailPlaceholder": "ton.email@example.com",
-      "sending": "Envoi en cours...",
-      "sendResetLink": "Envoyer le lien",
-      "cancel": "Annuler",
-      "checkEmail": "Vérifie ton e-mail",
-      "sentTo": "Nous avons envoyé un lien de réinitialisation à <strong>{{email}}</strong>. Vérifie ta boîte de réception et suis les instructions.",
-      "redirecting": "Redirection en cours...",
-      "enterEmail": "Saisis ton adresse e-mail",
-      "invalidEmail": "Saisis une adresse e-mail valide"
-    },
-    "resetConfirm": {
-      "title": "Définir un nouveau mot de passe",
-      "subtitle": "Saisis ton nouveau mot de passe ci-dessous.",
-      "newPassword": "Nouveau mot de passe",
-      "passwordHint": "Minimum 8 caractères",
-      "confirmPassword": "Confirmer le nouveau mot de passe",
-      "resetting": "Réinitialisation...",
-      "resetPassword": "Réinitialiser le mot de passe",
-      "cancel": "Annuler",
-      "successTitle": "Mot de passe réinitialisé avec succès",
-      "successMessage": "Ton mot de passe a été réinitialisé avec succès. Tu peux maintenant te connecter avec ton nouveau mot de passe.",
-      "redirectingToLogin": "Redirection vers la connexion..."
-    },
-    "validation": {
-      "required": "Remplis tous les champs obligatoires",
-      "passwordMismatch": "Les mots de passe ne correspondent pas",
-      "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
-      "passwordUppercase": "Le mot de passe doit contenir au moins une lettre majuscule",
-      "passwordLowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
-      "passwordNumber": "Le mot de passe doit contenir au moins un chiffre",
-      "invalidEmail": "Saisis une adresse e-mail valide",
-      "fillAllFields": "Remplis tous les champs"
+    "loginError": {
+      "login_failed": "La connexion a échoué. Veuillez réessayer.",
+      "login_expired": "La connexion a pris trop de temps ou a été lancée dans un autre onglet. Veuillez réessayer.",
+      "login_cancelled": "La connexion a été annulée.",
+      "idp_unavailable": "Le service de connexion est actuellement indisponible. Veuillez réessayer plus tard.",
+      "email_conflict": "Cette adresse e-mail appartient déjà à un autre compte ExamCraft. Veuillez contacter le support.",
+      "user_limit": "Votre institution a atteint le nombre maximal d'utilisateurs. Veuillez contacter votre administrateur.",
+      "claims_missing": "Votre compte ne fournit pas toutes les informations requises (par ex. une adresse e-mail vérifiée). Veuillez les compléter dans votre compte et réessayer.",
+      "account_inactive": "Votre compte n'est pas actif. Veuillez contacter votre administrateur.",
+      "reauth_failed": "La nouvelle connexion n'a pas abouti. Veuillez réessayer."
     }
   },
   "footer": {
@@ -936,28 +861,6 @@
       "processing": "Traitement...",
       "subscribe": "S'abonner",
       "subscriptionError": "Impossible de démarrer le processus d'abonnement. Réessaie."
-    },
-    "registrationSuccess": {
-      "title": "Inscription réussie ! 🎉",
-      "subtitle": "Bienvenue sur ExamCraft AI ! Nous avons envoyé un e-mail de vérification à :",
-      "checkInbox": "Vérifie ta boîte de réception et clique sur le lien de vérification pour activer ton compte. Le lien expirera dans 24 heures.",
-      "didntReceive": "Tu n'as pas reçu l'e-mail ?",
-      "continueToDashboard": "Continuer vers le tableau de bord",
-      "limitedAccess": "Tu peux toujours accéder au tableau de bord, mais certaines fonctionnalités peuvent être limitées tant que tu n'as pas vérifié ton e-mail."
-    },
-    "verifyEmail": {
-      "verifying": "Vérification de ton e-mail...",
-      "pleaseWait": "Patiente pendant que nous vérifions ton adresse e-mail.",
-      "success": "E-mail vérifié ! 🎉",
-      "welcomeUser": "Bienvenue, {{name}} ! Ton e-mail a été vérifié avec succès.",
-      "fullAccess": "Tu peux maintenant accéder à toutes les fonctionnalités d'ExamCraft AI.",
-      "goToDashboard": "Aller au tableau de bord",
-      "failed": "Échec de la vérification",
-      "linkExpired": "Le lien de vérification a peut-être expiré ou est invalide.",
-      "backToLogin": "Retour à la connexion",
-      "noToken": "Lien de vérification invalide. Aucun jeton fourni.",
-      "verificationFailed": "Échec de la vérification",
-      "verifyEmailError": "Impossible de vérifier l'e-mail. Réessaie."
     },
     "paymentSuccess": {
       "title": "Paiement réussi !",
@@ -1451,15 +1354,12 @@
       "dialogTargetLabel": "Tu te connectes en tant que :",
       "dialogReasonLabel": "Motif (obligatoire)",
       "dialogReasonPlaceholder": "p. ex. reproduire le ticket de support TICKET-123",
-      "dialogPasswordLabel": "Ton mot de passe (confirmation)",
-      "dialogPasswordPlaceholder": "Ton mot de passe actuel",
       "dialogConfirm": "Se connecter",
       "dialogStarting": "Démarrage...",
       "dialogCancel": "Annuler",
       "dialogLoadFailed": "Impossible de charger l'utilisateur",
       "dialogError": "Échec de la connexion en tant qu'utilisateur",
       "reasonTooShort": "Indique au moins {{min}} caractères comme motif",
-      "passwordRequired": "Confirme ton mot de passe",
       "bannerLabel": "Connecté en tant que :",
       "bannerTimeRemaining": "Temps restant : {{time}}",
       "bannerReturnButton": "Retour à mon compte",
@@ -2763,8 +2663,7 @@
       "title": "Mon profil",
       "subtitle": "Gère les paramètres et préférences de ton compte",
       "tabProfile": "Profil",
-      "tabEdit": "Modifier le profil",
-      "tabPassword": "Changer le mot de passe"
+      "tabEdit": "Modifier le profil"
     },
     "profileView": {
       "noUserData": "Aucune donnée utilisateur disponible",
@@ -2802,37 +2701,6 @@
       "cancel": "Annuler",
       "saving": "Enregistrement...",
       "saveChanges": "Enregistrer les modifications"
-    },
-    "passwordChange": {
-      "headerSet": "Définir un mot de passe",
-      "headerChange": "Changer le mot de passe",
-      "oauthInfo": "Tu es actuellement connecté via {{provider}}. Définis un mot de passe pour activer la connexion par e-mail/mot de passe.",
-      "validationFillAll": "Remplis tous les champs",
-      "validationMismatch": "Les nouveaux mots de passe ne correspondent pas",
-      "validationMinLength": "Le nouveau mot de passe doit contenir au moins 8 caractères",
-      "validationSamePassword": "Le nouveau mot de passe doit être différent du mot de passe actuel",
-      "validationUppercase": "Le nouveau mot de passe doit contenir au moins une lettre majuscule",
-      "validationLowercase": "Le nouveau mot de passe doit contenir au moins une lettre minuscule",
-      "validationNumber": "Le nouveau mot de passe doit contenir au moins un chiffre",
-      "successSetTitle": "Mot de passe défini avec succès",
-      "successChangeTitle": "Mot de passe changé avec succès",
-      "successSetMessage": "Ton mot de passe a été défini. Tu peux maintenant te connecter avec ton e-mail et ton mot de passe.",
-      "successChangeMessage": "Ton mot de passe a été mis à jour. Tu peux maintenant utiliser ton nouveau mot de passe pour te connecter.",
-      "currentPassword": "Mot de passe actuel *",
-      "newPassword": "Nouveau mot de passe *",
-      "passwordHint": "Minimum 8 caractères",
-      "confirmPassword": "Confirmer le nouveau mot de passe *",
-      "showPasswords": "Afficher les mots de passe",
-      "securityTipsTitle": "Conseils de sécurité pour le mot de passe",
-      "tip1": "Utiliser au moins 8 caractères",
-      "tip2": "Mélanger majuscules et minuscules",
-      "tip3": "Inclure des chiffres et des caractères spéciaux",
-      "tip4": "Éviter les mots et motifs courants",
-      "cancel": "Annuler",
-      "setting": "Définition...",
-      "changing": "Modification...",
-      "setPassword": "Définir le mot de passe",
-      "changePassword": "Changer le mot de passe"
     },
     "permissions": {
       "create_documents": "Créer des documents",
@@ -3107,7 +2975,6 @@
         "selectOrCreateSession": "Sélectionne une session ou crées-en une nouvelle."
       },
       "chat": {
-        "sessionExpired": "Session expirée. Reconnecte-toi.",
         "errorSending": "Erreur lors de l'envoi du message",
         "errorGenerating": "Erreur lors de la génération du template",
         "generateTemplate": "Générer le template",
@@ -3214,10 +3081,6 @@
     }
   },
   "errors": {
-    "oauth": {
-      "providerError": "La connexion auprès du fournisseur a échoué.",
-      "callbackFailed": "La connexion n'a pas pu être finalisée."
-    },
     "activity_list_failed": "Impossible de charger les activités.",
     "admin_cannot_deactivate_self": "Tu ne peux pas désactiver ton propre compte",
     "admin_cannot_remove_last_role": "Impossible de supprimer le dernier rôle",
@@ -3765,7 +3628,8 @@
     "wizard_sessions_load_failed": "Impossible de charger les sessions",
     "wizard_template_already_saved": "Le modèle a déjà été enregistré.",
     "wizard_template_not_generated": "Aucun modèle n'a encore été généré.",
-    "wizard_user_not_found": "Utilisateur introuvable."
+    "wizard_user_not_found": "Utilisateur introuvable.",
+    "auth_reauth_required": "Vous devez vous reconnecter pour cette action."
   },
   "help": {
     "title": "Aide",

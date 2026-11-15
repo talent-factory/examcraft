@@ -18,7 +18,7 @@ jest.mock('../../../utils/errorReporting', () => ({
 }));
 
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ accessToken: 'token', hasRole: () => false }),
+  useAuth: () => ({ isAuthenticated: true, hasRole: () => false }),
 }));
 
 const mocked = helpService as jest.Mocked<typeof helpService>;
@@ -50,7 +50,7 @@ beforeEach(() => {
     completed: true,
   } as any);
   mocked.getContextHint.mockImplementation(
-    async (_token: string, route: string) => HINTS[route] ?? NO_HINT
+    async (route: string) => HINTS[route] ?? NO_HINT
   );
 });
 

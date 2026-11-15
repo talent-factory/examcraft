@@ -105,6 +105,7 @@ export const AUTH_ERROR_CODES = [
   'auth_permission_required',
   'auth_profile_load_failed',
   'auth_profile_update_failed',
+  'auth_reauth_required',
   'auth_registration_failed',
   'auth_service_unavailable',
   'auth_token_invalid',

@@ -34,7 +34,10 @@ export const GuestRoute: React.FC<GuestRouteProps> = ({
   }
 
   // Redirect to dashboard if already authenticated
-  if (isAuthenticated) {
+  // A login error redirect (`/login?error=…`, e.g. a failed step-up) must reach
+  // the login page even while an older session is still valid (EXAMCRAFT-126).
+  const hasLoginError = new URLSearchParams(location.search).has('error');
+  if (isAuthenticated && !hasLoginError) {
     // Check if there's a redirect location from previous navigation
     const from = (location.state as any)?.from?.pathname || redirectTo;
     return <Navigate to={from} replace />;

@@ -94,14 +94,12 @@ export class DocumentService {
   // doing so causes double-refresh races and forces a hard page reload.
 
   /**
-   * Get auth headers with token
+   * Get request headers (the session cookie is sent by the fetch interceptor)
    */
   private static getAuthHeaders(additionalHeaders: HeadersInit = {}): HeadersInit {
-    const token = localStorage.getItem('examcraft_access_token');
     return {
       'Content-Type': 'application/json',
       ...additionalHeaders,
-      ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
 
@@ -127,12 +125,8 @@ export class DocumentService {
 
     // For FormData, we must NOT set Content-Type header
     // The browser will set it automatically with the correct multipart/form-data boundary
-    const token = localStorage.getItem('examcraft_access_token');
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-
     const response = await fetch(`${API_BASE_URL}/api/v1/documents/upload`, {
       method: 'POST',
-      headers,
       body: formData,
     });
 

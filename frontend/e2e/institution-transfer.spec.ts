@@ -8,25 +8,16 @@
  * To run: just e2e -- institution-transfer.spec.ts
  */
 import { test, expect } from '@playwright/test';
+import { testLoginApi } from './fixtures/auth';
 
 const SUPERADMIN_EMAIL =
   process.env.E2E_SUPERADMIN_EMAIL ?? 'admin@talent-factory.ch';
-const SUPERADMIN_PASSWORD =
-  process.env.E2E_SUPERADMIN_PASSWORD ?? 'admin12345'; // pragma: allowlist secret
 
 test.describe('SuperAdmin Institution-Transfer', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
-    await page.fill(
-      '#email, input[name="email"], input[type="email"]',
-      SUPERADMIN_EMAIL,
-    );
-    await page.fill(
-      '#password, input[name="password"], input[type="password"]',
-      SUPERADMIN_PASSWORD,
-    );
-    await page.click('button[type="submit"]');
+    // EXAMCRAFT-126: session cookie via the E2E-only test login (no password form).
+    await testLoginApi(page.request, SUPERADMIN_EMAIL);
+    await page.goto('/dashboard');
     await page.waitForURL(/dashboard|admin|home/, { timeout: 15_000 });
   });
 

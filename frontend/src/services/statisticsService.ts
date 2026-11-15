@@ -3,7 +3,6 @@
  * and `/api/v1/submissions/{id}/stats` (TF-335 Spec 8).
  */
 
-import { ACCESS_TOKEN_KEY } from '../api/tokenRefreshLock';
 import { ApiError } from './submissionsService';
 import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 import {
@@ -14,9 +13,10 @@ import {
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+// Die Anmeldung läuft über das httpOnly-Session-Cookie (EXAMCRAFT-126);
+// fetch() sendet es per Interceptor mit, Header braucht es nicht.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {

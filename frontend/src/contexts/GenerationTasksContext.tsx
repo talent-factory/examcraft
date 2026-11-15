@@ -63,7 +63,11 @@ const rememberDismissedTaskId = (taskId: string): void => {
 };
 
 export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // The identity behind the session cookie: it changes on an impersonation
+  // start/end, where the open sockets (authenticated at their handshake) and
+  // the recovered task list belong to the previous identity.
+  const userId = user?.id ?? null;
   const [tasks, setTasks] = useState<Record<string, GenerationTaskState>>({});
   // TF-608: lets the recovery effect below read the *current* task state
   // (in particular an already-fetched `result`) without depending on `tasks`
@@ -118,19 +122,17 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   }, []);
 
   // Connect WebSocket for a task
-  const connectWebSocket = useCallback((taskId: string, token: string, retryCount = 0) => {
+  const connectWebSocket = useCallback((taskId: string, retryCount = 0) => {
     if (wsRef.current[taskId]) {
       wsRef.current[taskId].close();
     }
 
     const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     const wsBase = apiBaseUrl.replace(/^http/, 'ws');
+    // The session cookie authenticates the handshake (EXAMCRAFT-126): the
+    // socket must target the same origin as the API, nothing is sent after open.
     const ws = new WebSocket(`${wsBase}/ws/tasks/${taskId}`);
     wsRef.current[taskId] = ws;
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ token }));
-    };
 
     ws.onmessage = (event) => {
       let data: TaskStatusMessage;
@@ -194,7 +196,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     };
 
     ws.onclose = (event) => {
-      delete wsRef.current[taskId];
+      // A newer socket for the same task may already own the slot.
+      if (wsRef.current[taskId] === ws) delete wsRef.current[taskId];
 
       // Sticky-terminal guard: if the task already reached a terminal state
       // (set sync inside the `ws.onmessage` handler before the `setTasks`
@@ -207,7 +210,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
       if (event.code !== 1000 && event.code !== 1001 && retryCount < WS_RECONNECT_MAX_RETRIES) {
         const delay = WS_RECONNECT_BASE_DELAY_MS * Math.pow(2, retryCount);
-        setTimeout(() => connectWebSocket(taskId, token, retryCount + 1), delay);
+        setTimeout(() => connectWebSocket(taskId, retryCount + 1), delay);
       } else if (retryCount >= WS_RECONNECT_MAX_RETRIES) {
         setTasks((prev) => ({
           ...prev,
@@ -224,7 +227,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Recovery: fetch recoverable tasks on mount when authenticated
   useEffect(() => {
-    if (!isAuthenticated || !accessToken) return;
+    if (!isAuthenticated) return;
 
     const recover = async () => {
       try {
@@ -245,8 +248,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           if (dismissed.has(task.task_id)) continue;
 
           // TF-608 fix: this effect runs not only on mount but again on
-          // every `accessToken` change (silent token refresh, see the
-          // dependency array below) — mid-session, not only after a reload.
+          // every `isAuthenticated`/user change (see the dependency array below)
+          // — mid-session, not only after a reload.
           // Without `tasksRef`, a `result` already loaded via WebSocket or a
           // previous recovery pass would get overwritten here with `null`
           // and would stay unreachable until the (possibly failing) refetch
@@ -265,7 +268,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             createdAt: task.created_at,
             result: existingResult,
             // TF-736: carried over alongside `result` for the same reason —
-            // a silent token refresh must not wipe out an under-fill notice
+            // a repeated recovery pass must not wipe out an under-fill notice
             // that a previous recovery pass already fetched from the job row.
             generatedQuestionCount: existingTask?.generatedQuestionCount ?? null,
             contextLimited: existingTask?.contextLimited ?? false,
@@ -288,7 +291,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
               terminalTaskIds.push(task.task_id);
             }
           } else {
-            connectWebSocket(task.task_id, accessToken);
+            connectWebSocket(task.task_id);
           }
         }
 
@@ -342,10 +345,15 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     recover();
 
     return () => {
-      Object.values(wsRef.current).forEach((ws) => ws.close());
+      // Detach onclose first: a stale socket of the previous identity must not
+      // schedule a reconnect after a logout or an impersonation switch.
+      Object.values(wsRef.current).forEach((ws) => {
+        ws.onclose = null;
+        ws.close(1000);
+      });
       wsRef.current = {};
     };
-  }, [isAuthenticated, accessToken, connectWebSocket]);
+  }, [isAuthenticated, userId, connectWebSocket]);
 
   const startGeneration = useCallback(async (request: RAGExamRequest): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
@@ -368,12 +376,10 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       },
     }));
 
-    if (accessToken) {
-      connectWebSocket(task_id, accessToken);
-    }
+    connectWebSocket(task_id);
 
     return task_id;
-  }, [accessToken, connectWebSocket]);
+  }, [connectWebSocket]);
 
   const retryTask = useCallback(async (taskId: string): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
@@ -405,12 +411,10 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       return next;
     });
 
-    if (accessToken) {
-      connectWebSocket(newTaskId, accessToken);
-    }
+    connectWebSocket(newTaskId);
 
     return newTaskId;
-  }, [accessToken, connectWebSocket]);
+  }, [connectWebSocket]);
 
   const dismissTask = useCallback((taskId: string) => {
     rememberDismissedTaskId(taskId);

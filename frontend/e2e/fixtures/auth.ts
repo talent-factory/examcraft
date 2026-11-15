@@ -5,11 +5,12 @@
  * Must match credentials in backend/scripts/setup_e2e_test_data.py
  */
 
-import { test as base, expect, Page, BrowserContext, Browser } from '@playwright/test';
+import { test as base, expect, Page, BrowserContext, Browser, APIRequestContext } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// E2E Test credentials - must match setup_e2e_test_data.py
+// E2E Test users - must match setup_e2e_test_data.py. Login is by e-mail via
+// the test login; `password` is unused and only kept for the seed script.
 export const E2E_TEST_USER = {
   email: 'e2e-test@example.com',
   password: 'E2ETestPassword123',  // pragma: allowlist secret
@@ -69,24 +70,27 @@ async function ensureAuthDir() {
   }
 }
 
+const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
+
 /**
- * Login helper function
+ * Log in through the E2E-only `POST /api/v1/auth/test-login` (EXAMCRAFT-126).
+ * The backend exposes it only with `E2E_TEST_LOGIN=true` outside production;
+ * the session cookie lands in the cookie jar of `request`.
  */
-export async function loginUser(page: Page, email: string, password: string): Promise<void> {
-  await page.goto('/login');
+export async function testLoginApi(request: APIRequestContext, email: string): Promise<void> {
+  const res = await request.post(`${API_URL}/api/v1/auth/test-login`, { data: { email } });
+  expect(res.status(), `test-login failed for ${email}: ${res.status()}`).toBe(204);
+}
 
-  // Wait for login form to be ready
-  await expect(page.locator('form')).toBeVisible({ timeout: 10000 });
-
-  // Fill in credentials (using id selectors as the form uses id, not name)
-  await page.fill('#email, input[name="email"], input[type="email"]', email);
-  await page.fill('#password, input[name="password"], input[type="password"]', password);
-
-  // Submit form
-  await page.click('button[type="submit"]');
-
-  // Wait for redirect to dashboard or main page
-  await expect(page).toHaveURL(/\/(dashboard|document-chat|home|$)/, { timeout: 15000 });
+/**
+ * Login helper function. There is no password form any more (the real login
+ * runs through Zitadel); the browser context gets the session cookie from the
+ * test login. `_password` stays for the existing call sites.
+ */
+export async function loginUser(page: Page, email: string, _password?: string): Promise<void> {
+  await testLoginApi(page.request, email);
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
 }
 
 /**

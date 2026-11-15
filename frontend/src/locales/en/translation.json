@@ -415,100 +415,25 @@
   "auth": {
     "login": {
       "title": "Welcome back",
-      "subtitle": "Sign in to your account",
-      "email": "Email address",
-      "emailPlaceholder": "you@example.com",
-      "password": "Password",
-      "rememberMe": "Remember me",
-      "forgotPassword": "Forgot password?",
-      "signingIn": "Signing in...",
-      "signIn": "Sign in",
-      "orContinueWith": "Or continue with",
-      "noAccount": "Don't have an account?",
-      "signUp": "Sign up",
-      "emailAndPasswordRequired": "Please enter both email and password"
-    },
-    "register": {
-      "title": "Create Account",
-      "firstName": "First Name",
-      "firstNamePlaceholder": "John",
-      "lastName": "Last Name",
-      "lastNamePlaceholder": "Doe",
-      "email": "Email",
-      "emailPlaceholder": "your.email@example.com",
-      "institutionCode": "Institution Code (Optional)",
-      "institutionCodeHint": "Enter your institution code if you have one",
-      "institutionCodePlaceholder": "university-name",
-      "password": "Password",
-      "passwordReqTitle": "Password must contain:",
-      "passwordReqMinLength": "8+ characters",
-      "passwordReqUppercase": "Uppercase letter (A–Z)",
-      "passwordReqLowercase": "Lowercase letter (a–z)",
-      "passwordReqNumber": "Number (0–9)",
-      "confirmPassword": "Confirm Password",
-      "creatingAccount": "Creating account...",
-      "createAccount": "Create Account",
-      "hasAccount": "Already have an account?",
-      "loginHere": "Login here"
+      "subtitle": "You sign in with your Talent Factory account.",
+      "signIn": "Sign in"
     },
     "authPage": {
       "tagline": "AI-Powered Exam Question Generation",
-      "backToLogin": "← Back to Login",
       "terms": "Terms of Service",
       "privacy": "Privacy Policy",
       "imprint": "Imprint"
     },
-    "verification": {
-      "bannerTitle": "Email Verification Required",
-      "bannerText": "Please verify your email address to access all features. Check your inbox for the verification link.",
-      "resendButton": "Resend Verification Email",
-      "sending": "Sending...",
-      "emailSent": "Email Sent!",
-      "successMessage": "Verification email sent! Please check your inbox."
-    },
-    "oauth": {
-      "processing": "Processing OAuth callback...",
-      "errorTitle": "Authentication Error",
-      "returnToLogin": "Return to login",
-      "noCodeError": "No authorization code received",
-      "missingTokens": "Missing authentication tokens"
-    },
-    "resetRequest": {
-      "title": "Reset Password",
-      "subtitle": "Enter your email address and we'll send you a link to reset your password.",
-      "email": "Email Address",
-      "emailPlaceholder": "your.email@example.com",
-      "sending": "Sending...",
-      "sendResetLink": "Send Reset Link",
-      "cancel": "Cancel",
-      "checkEmail": "Check Your Email",
-      "sentTo": "We've sent a password reset link to <strong>{{email}}</strong>. Please check your inbox and follow the instructions.",
-      "redirecting": "Redirecting you back...",
-      "enterEmail": "Please enter your email address",
-      "invalidEmail": "Please enter a valid email address"
-    },
-    "resetConfirm": {
-      "title": "Set New Password",
-      "subtitle": "Please enter your new password below.",
-      "newPassword": "New Password",
-      "passwordHint": "Minimum 8 characters",
-      "confirmPassword": "Confirm New Password",
-      "resetting": "Resetting...",
-      "resetPassword": "Reset Password",
-      "cancel": "Cancel",
-      "successTitle": "Password Reset Successful",
-      "successMessage": "Your password has been successfully reset. You can now login with your new password.",
-      "redirectingToLogin": "Redirecting to login..."
-    },
-    "validation": {
-      "required": "Please fill in all required fields",
-      "passwordMismatch": "Passwords do not match",
-      "passwordMinLength": "Password must be at least 8 characters long",
-      "passwordUppercase": "Password must contain at least one uppercase letter",
-      "passwordLowercase": "Password must contain at least one lowercase letter",
-      "passwordNumber": "Password must contain at least one number",
-      "invalidEmail": "Please enter a valid email address",
-      "fillAllFields": "Please fill in all fields"
+    "loginError": {
+      "login_failed": "Sign-in failed. Please try again.",
+      "login_expired": "Sign-in took too long or was started in another tab. Please try again.",
+      "login_cancelled": "Sign-in was cancelled.",
+      "idp_unavailable": "The sign-in service is currently unavailable. Please try again later.",
+      "email_conflict": "This email address already belongs to a different ExamCraft account. Please contact support.",
+      "user_limit": "Your institution has reached its maximum number of users. Please contact your administrator.",
+      "claims_missing": "Your account does not provide all required details (for example a verified email address). Please complete it in your account and try again.",
+      "account_inactive": "Your account is not active. Please contact your administrator.",
+      "reauth_failed": "Signing in again was not successful. Please try again."
     }
   },
   "footer": {
@@ -936,28 +861,6 @@
       "processing": "Processing...",
       "subscribe": "Subscribe",
       "subscriptionError": "Could not start the subscription process. Please try again."
-    },
-    "registrationSuccess": {
-      "title": "Registration Successful! 🎉",
-      "subtitle": "Welcome to ExamCraft AI! We've sent a verification email to:",
-      "checkInbox": "Please check your inbox and click the verification link to activate your account. The link will expire in 24 hours.",
-      "didntReceive": "Didn't receive the email?",
-      "continueToDashboard": "Continue to Dashboard",
-      "limitedAccess": "You can still access the dashboard, but some features may be limited until you verify your email."
-    },
-    "verifyEmail": {
-      "verifying": "Verifying your email...",
-      "pleaseWait": "Please wait while we verify your email address.",
-      "success": "Email Verified! 🎉",
-      "welcomeUser": "Welcome, {{name}}! Your email has been successfully verified.",
-      "fullAccess": "You can now access all features of ExamCraft AI.",
-      "goToDashboard": "Go to Dashboard",
-      "failed": "Verification Failed",
-      "linkExpired": "The verification link may have expired or is invalid.",
-      "backToLogin": "Back to Login",
-      "noToken": "Invalid verification link. No token provided.",
-      "verificationFailed": "Verification failed",
-      "verifyEmailError": "Failed to verify email. Please try again."
     },
     "paymentSuccess": {
       "title": "Payment Successful!",
@@ -1451,15 +1354,12 @@
       "dialogTargetLabel": "You are signing in as:",
       "dialogReasonLabel": "Reason (required)",
       "dialogReasonPlaceholder": "e.g. reproducing support ticket TICKET-123",
-      "dialogPasswordLabel": "Your password (confirmation)",
-      "dialogPasswordPlaceholder": "Your current password",
       "dialogConfirm": "Sign in",
       "dialogStarting": "Starting...",
       "dialogCancel": "Cancel",
       "dialogLoadFailed": "Failed to load user",
       "dialogError": "Failed to sign in as user",
       "reasonTooShort": "Please provide at least {{min}} characters as a reason",
-      "passwordRequired": "Please confirm your password",
       "bannerLabel": "Signed in as:",
       "bannerTimeRemaining": "Remaining: {{time}}",
       "bannerReturnButton": "Back to my account",
@@ -2763,8 +2663,7 @@
       "title": "My Profile",
       "subtitle": "Manage your account settings and preferences",
       "tabProfile": "Profile",
-      "tabEdit": "Edit Profile",
-      "tabPassword": "Change Password"
+      "tabEdit": "Edit Profile"
     },
     "profileView": {
       "noUserData": "No user data available",
@@ -2802,37 +2701,6 @@
       "cancel": "Cancel",
       "saving": "Saving...",
       "saveChanges": "Save Changes"
-    },
-    "passwordChange": {
-      "headerSet": "Set Password",
-      "headerChange": "Change Password",
-      "oauthInfo": "You're currently logged in via {{provider}}. Set a password to enable email/password login.",
-      "validationFillAll": "Please fill in all fields",
-      "validationMismatch": "New passwords do not match",
-      "validationMinLength": "New password must be at least 8 characters long",
-      "validationSamePassword": "New password must be different from current password",
-      "validationUppercase": "New password must contain at least one uppercase letter",
-      "validationLowercase": "New password must contain at least one lowercase letter",
-      "validationNumber": "New password must contain at least one number",
-      "successSetTitle": "Password Set Successfully",
-      "successChangeTitle": "Password Changed Successfully",
-      "successSetMessage": "Your password has been set. You can now login with your email and password.",
-      "successChangeMessage": "Your password has been updated. You can now use your new password to login.",
-      "currentPassword": "Current Password *",
-      "newPassword": "New Password *",
-      "passwordHint": "Minimum 8 characters",
-      "confirmPassword": "Confirm New Password *",
-      "showPasswords": "Show passwords",
-      "securityTipsTitle": "Password Security Tips",
-      "tip1": "Use at least 8 characters",
-      "tip2": "Mix uppercase and lowercase letters",
-      "tip3": "Include numbers and special characters",
-      "tip4": "Avoid common words and patterns",
-      "cancel": "Cancel",
-      "setting": "Setting...",
-      "changing": "Changing...",
-      "setPassword": "Set Password",
-      "changePassword": "Change Password"
     },
     "permissions": {
       "create_documents": "Create documents",
@@ -3107,7 +2975,6 @@
         "selectOrCreateSession": "Select a session or create a new one."
       },
       "chat": {
-        "sessionExpired": "Session expired. Please log in again.",
         "errorSending": "Error sending message",
         "errorGenerating": "Error generating template",
         "generateTemplate": "Generate Template",
@@ -3214,10 +3081,6 @@
     }
   },
   "errors": {
-    "oauth": {
-      "providerError": "Sign-in with the provider failed.",
-      "callbackFailed": "The sign-in could not be completed."
-    },
     "activity_list_failed": "Activities could not be loaded.",
     "admin_cannot_deactivate_self": "You cannot deactivate your own account",
     "admin_cannot_remove_last_role": "Cannot remove the last role",
@@ -3765,7 +3628,8 @@
     "wizard_sessions_load_failed": "Failed to load the sessions",
     "wizard_template_already_saved": "The template has already been saved.",
     "wizard_template_not_generated": "No template has been generated yet.",
-    "wizard_user_not_found": "User not found."
+    "wizard_user_not_found": "User not found.",
+    "auth_reauth_required": "You need to sign in again for this action."
   },
   "help": {
     "title": "Help",

@@ -415,100 +415,25 @@
   "auth": {
     "login": {
       "title": "Bentornato",
-      "subtitle": "Accedi al tuo account",
-      "email": "Indirizzo e-mail",
-      "emailPlaceholder": "tu@example.com",
-      "password": "Password",
-      "rememberMe": "Ricordami",
-      "forgotPassword": "Password dimenticata?",
-      "signingIn": "Accesso in corso...",
-      "signIn": "Accedi",
-      "orContinueWith": "Oppure continua con",
-      "noAccount": "Non hai un account?",
-      "signUp": "Registrati",
-      "emailAndPasswordRequired": "Inserisci sia l'e-mail che la password"
-    },
-    "register": {
-      "title": "Crea account",
-      "firstName": "Nome",
-      "firstNamePlaceholder": "Mario",
-      "lastName": "Cognome",
-      "lastNamePlaceholder": "Rossi",
-      "email": "E-mail",
-      "emailPlaceholder": "tua.email@example.com",
-      "institutionCode": "Codice istituzione (Opzionale)",
-      "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
-      "institutionCodePlaceholder": "nome-istituzione",
-      "password": "Password",
-      "passwordReqTitle": "La password deve contenere:",
-      "passwordReqMinLength": "8+ caratteri",
-      "passwordReqUppercase": "Maiuscola (A–Z)",
-      "passwordReqLowercase": "Minuscola (a–z)",
-      "passwordReqNumber": "Numero (0–9)",
-      "confirmPassword": "Conferma password",
-      "creatingAccount": "Creazione account...",
-      "createAccount": "Crea account",
-      "hasAccount": "Hai già un account?",
-      "loginHere": "Accedi qui"
+      "subtitle": "Accedi con il tuo account Talent Factory.",
+      "signIn": "Accedi"
     },
     "authPage": {
       "tagline": "Generazione di domande d'esame con IA",
-      "backToLogin": "← Torna al login",
       "terms": "Termini di servizio",
       "privacy": "Informativa sulla privacy",
       "imprint": "Informazioni legali"
     },
-    "verification": {
-      "bannerTitle": "Verifica e-mail richiesta",
-      "bannerText": "Verifica il tuo indirizzo e-mail per accedere a tutte le funzionalità. Controlla la tua casella di posta per il link di verifica.",
-      "resendButton": "Invia di nuovo l'e-mail di verifica",
-      "sending": "Invio in corso...",
-      "emailSent": "E-mail inviata!",
-      "successMessage": "E-mail di verifica inviata! Controlla la tua casella di posta."
-    },
-    "oauth": {
-      "processing": "Elaborazione callback OAuth...",
-      "errorTitle": "Errore di autenticazione",
-      "returnToLogin": "Torna al login",
-      "noCodeError": "Nessun codice di autorizzazione ricevuto",
-      "missingTokens": "Token di autenticazione mancanti"
-    },
-    "resetRequest": {
-      "title": "Reimposta password",
-      "subtitle": "Inserisci il tuo indirizzo e-mail e ti invieremo un link per reimpostare la password.",
-      "email": "Indirizzo e-mail",
-      "emailPlaceholder": "tua.email@example.com",
-      "sending": "Invio in corso...",
-      "sendResetLink": "Invia link",
-      "cancel": "Annulla",
-      "checkEmail": "Controlla la tua e-mail",
-      "sentTo": "Abbiamo inviato un link per reimpostare la password a <strong>{{email}}</strong>. Controlla la tua casella di posta e segui le istruzioni.",
-      "redirecting": "Reindirizzamento in corso...",
-      "enterEmail": "Inserisci il tuo indirizzo e-mail",
-      "invalidEmail": "Inserisci un indirizzo e-mail valido"
-    },
-    "resetConfirm": {
-      "title": "Imposta nuova password",
-      "subtitle": "Inserisci la tua nuova password qui sotto.",
-      "newPassword": "Nuova password",
-      "passwordHint": "Minimo 8 caratteri",
-      "confirmPassword": "Conferma nuova password",
-      "resetting": "Reimpostazione...",
-      "resetPassword": "Reimposta password",
-      "cancel": "Annulla",
-      "successTitle": "Password reimpostata con successo",
-      "successMessage": "La tua password è stata reimpostata con successo. Ora puoi accedere con la tua nuova password.",
-      "redirectingToLogin": "Reindirizzamento al login..."
-    },
-    "validation": {
-      "required": "Compila tutti i campi obbligatori",
-      "passwordMismatch": "Le password non corrispondono",
-      "passwordMinLength": "La password deve contenere almeno 8 caratteri",
-      "passwordUppercase": "La password deve contenere almeno una lettera maiuscola",
-      "passwordLowercase": "La password deve contenere almeno una lettera minuscola",
-      "passwordNumber": "La password deve contenere almeno un numero",
-      "invalidEmail": "Inserisci un indirizzo e-mail valido",
-      "fillAllFields": "Compila tutti i campi"
+    "loginError": {
+      "login_failed": "Accesso non riuscito. Riprova.",
+      "login_expired": "L'accesso ha richiesto troppo tempo o è stato avviato in un'altra scheda. Riprova.",
+      "login_cancelled": "L'accesso è stato annullato.",
+      "idp_unavailable": "Il servizio di accesso non è al momento raggiungibile. Riprova più tardi.",
+      "email_conflict": "Questo indirizzo e-mail appartiene già a un altro account ExamCraft. Contatta il supporto.",
+      "user_limit": "La tua istituzione ha raggiunto il numero massimo di utenti. Contatta il tuo amministratore.",
+      "claims_missing": "Il tuo account non fornisce tutti i dati necessari (ad es. un indirizzo e-mail verificato). Completali nell'account e riprova.",
+      "account_inactive": "Il tuo account non è attivo. Contatta il tuo amministratore.",
+      "reauth_failed": "Il nuovo accesso non è riuscito. Riprova."
     }
   },
   "footer": {
@@ -936,28 +861,6 @@
       "processing": "Elaborazione...",
       "subscribe": "Abbonati",
       "subscriptionError": "Impossibile avviare il processo di abbonamento. Riprova."
-    },
-    "registrationSuccess": {
-      "title": "Registrazione completata! 🎉",
-      "subtitle": "Benvenuto su ExamCraft AI! Abbiamo inviato un'e-mail di verifica a:",
-      "checkInbox": "Controlla la tua casella di posta e clicca sul link di verifica per attivare il tuo account. Il link scadrà tra 24 ore.",
-      "didntReceive": "Non hai ricevuto l'e-mail?",
-      "continueToDashboard": "Continua al dashboard",
-      "limitedAccess": "Puoi comunque accedere al dashboard, ma alcune funzionalità potrebbero essere limitate fino alla verifica della tua e-mail."
-    },
-    "verifyEmail": {
-      "verifying": "Verifica dell'e-mail in corso...",
-      "pleaseWait": "Attendi mentre verifichiamo il tuo indirizzo e-mail.",
-      "success": "E-mail verificata! 🎉",
-      "welcomeUser": "Benvenuto, {{name}}! La tua e-mail è stata verificata con successo.",
-      "fullAccess": "Ora puoi accedere a tutte le funzionalità di ExamCraft AI.",
-      "goToDashboard": "Vai al dashboard",
-      "failed": "Verifica fallita",
-      "linkExpired": "Il link di verifica potrebbe essere scaduto o non valido.",
-      "backToLogin": "Torna al login",
-      "noToken": "Link di verifica non valido. Nessun token fornito.",
-      "verificationFailed": "Verifica fallita",
-      "verifyEmailError": "Impossibile verificare l'e-mail. Riprova."
     },
     "paymentSuccess": {
       "title": "Pagamento riuscito!",
@@ -1451,15 +1354,12 @@
       "dialogTargetLabel": "Stai accedendo come:",
       "dialogReasonLabel": "Motivo (obbligatorio)",
       "dialogReasonPlaceholder": "es. riprodurre il ticket di supporto TICKET-123",
-      "dialogPasswordLabel": "La tua password (conferma)",
-      "dialogPasswordPlaceholder": "La tua password attuale",
       "dialogConfirm": "Accedi",
       "dialogStarting": "Avvio in corso...",
       "dialogCancel": "Annulla",
       "dialogLoadFailed": "Impossibile caricare l'utente",
       "dialogError": "Accesso come utente non riuscito",
       "reasonTooShort": "Inserisci almeno {{min}} caratteri come motivo",
-      "passwordRequired": "Conferma la tua password",
       "bannerLabel": "Connesso come:",
       "bannerTimeRemaining": "Tempo rimanente: {{time}}",
       "bannerReturnButton": "Torna al mio account",
@@ -2763,8 +2663,7 @@
       "title": "Il mio profilo",
       "subtitle": "Gestisci le impostazioni e le preferenze del tuo account",
       "tabProfile": "Profilo",
-      "tabEdit": "Modifica profilo",
-      "tabPassword": "Cambia password"
+      "tabEdit": "Modifica profilo"
     },
     "profileView": {
       "noUserData": "Nessun dato utente disponibile",
@@ -2802,37 +2701,6 @@
       "cancel": "Annulla",
       "saving": "Salvataggio...",
       "saveChanges": "Salva modifiche"
-    },
-    "passwordChange": {
-      "headerSet": "Imposta password",
-      "headerChange": "Cambia password",
-      "oauthInfo": "Sei attualmente connesso tramite {{provider}}. Imposta una password per abilitare l'accesso con e-mail/password.",
-      "validationFillAll": "Compila tutti i campi",
-      "validationMismatch": "Le nuove password non corrispondono",
-      "validationMinLength": "La nuova password deve contenere almeno 8 caratteri",
-      "validationSamePassword": "La nuova password deve essere diversa dalla password attuale",
-      "validationUppercase": "La nuova password deve contenere almeno una lettera maiuscola",
-      "validationLowercase": "La nuova password deve contenere almeno una lettera minuscola",
-      "validationNumber": "La nuova password deve contenere almeno un numero",
-      "successSetTitle": "Password impostata con successo",
-      "successChangeTitle": "Password cambiata con successo",
-      "successSetMessage": "La tua password è stata impostata. Ora puoi accedere con la tua e-mail e password.",
-      "successChangeMessage": "La tua password è stata aggiornata. Ora puoi utilizzare la tua nuova password per accedere.",
-      "currentPassword": "Password attuale *",
-      "newPassword": "Nuova password *",
-      "passwordHint": "Minimo 8 caratteri",
-      "confirmPassword": "Conferma nuova password *",
-      "showPasswords": "Mostra password",
-      "securityTipsTitle": "Consigli per la sicurezza della password",
-      "tip1": "Usa almeno 8 caratteri",
-      "tip2": "Mescola lettere maiuscole e minuscole",
-      "tip3": "Includi numeri e caratteri speciali",
-      "tip4": "Evita parole e schemi comuni",
-      "cancel": "Annulla",
-      "setting": "Impostazione...",
-      "changing": "Modifica...",
-      "setPassword": "Imposta password",
-      "changePassword": "Cambia password"
     },
     "permissions": {
       "create_documents": "Creare documenti",
@@ -3107,7 +2975,6 @@
         "selectOrCreateSession": "Seleziona una sessione o creane una nuova."
       },
       "chat": {
-        "sessionExpired": "Sessione scaduta. Accedi nuovamente.",
         "errorSending": "Errore nell'invio del messaggio",
         "errorGenerating": "Errore nella generazione del template",
         "generateTemplate": "Genera template",
@@ -3214,10 +3081,6 @@
     }
   },
   "errors": {
-    "oauth": {
-      "providerError": "L'accesso presso il provider non è riuscito.",
-      "callbackFailed": "Non è stato possibile completare l'accesso."
-    },
     "activity_list_failed": "Impossibile caricare le attività.",
     "admin_cannot_deactivate_self": "Non puoi disattivare il tuo stesso account",
     "admin_cannot_remove_last_role": "Impossibile rimuovere l'ultimo ruolo",
@@ -3765,7 +3628,8 @@
     "wizard_sessions_load_failed": "Impossibile caricare le sessioni",
     "wizard_template_already_saved": "Il modello è già stato salvato.",
     "wizard_template_not_generated": "Non è ancora stato generato alcun modello.",
-    "wizard_user_not_found": "Utente non trovato."
+    "wizard_user_not_found": "Utente non trovato.",
+    "auth_reauth_required": "Per questa azione devi accedere di nuovo."
   },
   "help": {
     "title": "Aiuto",

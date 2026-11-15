@@ -6,7 +6,6 @@
  * conventions of GradeExportService.
  */
 
-import { ACCESS_TOKEN_KEY } from '../api/tokenRefreshLock';
 import { ApiError, statusToKind } from './submissionsService';
 import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 
@@ -28,9 +27,10 @@ export interface PushJob {
   error_log: unknown[] | null;
 }
 
+// Die Anmeldung läuft über das httpOnly-Session-Cookie (EXAMCRAFT-126);
+// fetch() sendet es per Interceptor mit, Header braucht es nicht.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 async function parseJob(response: Response, action: string): Promise<PushJob> {

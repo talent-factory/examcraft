@@ -30,7 +30,7 @@ const HelpContextHint: React.FC<HelpContextHintProps> = ({
   onDismissPermanently,
 }) => {
   const { t } = useTranslation();
-  const { accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const [dismissError, setDismissError] = useState<string | null>(null);
 
@@ -46,10 +46,10 @@ const HelpContextHint: React.FC<HelpContextHintProps> = ({
   const hintText = t(hint.i18n_key, 'Tipp verfügbar');
 
   const handleDismissPermanently = async () => {
-    if (accessToken && hint.hint_id) {
+    if (isAuthenticated && hint.hint_id) {
       setDismissError(null);
       try {
-        await helpService.dismissHint(accessToken, hint.hint_id);
+        await helpService.dismissHint(hint.hint_id);
       } catch (err) {
         // Left displayed rather than dismissed client-side-only: a dismiss
         // that never reached the server would otherwise reappear at the next

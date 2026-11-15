@@ -269,10 +269,8 @@ export function allowlistFor(findings: Finding[]): string[] {
  *   *names*, not descriptions. They are proper nouns that appear untranslated
  *   in invoices, in the RBAC tier column and in the backend's own enums.
  *   InstitutionCreateDialog's tier `<select>` shows the same four names.
- * - `ExamCraft AI` is the product name (AuthPage, NavigationBar, the legal page
- *   header); `Google` and `Microsoft` label the OAuth buttons with the
- *   providers' own brand names. Proper nouns, identical in every language.
- * - `••••••••` is the password-field placeholder: a mask glyph, not text.
+ * - `ExamCraft AI` is the product name (LoginPage, NavigationBar, the legal page
+ *   header). A proper noun, identical in every language.
  * - `PDF` is the invoice download link, a file-format name that reads the same
  *   in de/en/fr/it.
  * - `support@talent-factory.ch` appears on both the imprint and privacy pages;
@@ -289,12 +287,7 @@ export const PERMANENT_EXCEPTIONS: string[] = [
   'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Free',
   'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Professional',
   'core/frontend/src/components/admin/InstitutionCreateDialog.tsx::jsx-text::Starter',
-  'core/frontend/src/components/auth/AuthPage.tsx::jsx-text::ExamCraft AI',
-  'core/frontend/src/components/auth/LoginForm.tsx::jsx-text::Google',
-  'core/frontend/src/components/auth/LoginForm.tsx::jsx-text::Microsoft',
-  'core/frontend/src/components/auth/LoginForm.tsx::placeholder::••••••••',
-  'core/frontend/src/components/auth/PasswordResetConfirm.tsx::placeholder::••••••••',
-  'core/frontend/src/components/auth/RegisterForm.tsx::placeholder::••••••••',
+  'core/frontend/src/components/auth/LoginPage.tsx::jsx-text::ExamCraft AI',
   'core/frontend/src/components/layout/NavigationBar.tsx::jsx-text::ExamCraft AI',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::CHF 0',
   'core/frontend/src/pages/BillingPage.tsx::jsx-text::CHF 49',

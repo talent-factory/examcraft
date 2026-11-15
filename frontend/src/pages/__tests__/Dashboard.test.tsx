@@ -44,10 +44,6 @@ jest.mock('../../components/cards/QuickActionCard', () => ({
 jest.mock('../../components/cards/StatsCard', () => ({
   StatsCard: ({ label }: { label: string }) => <div>{label}</div>,
 }));
-jest.mock('../../components/auth/EmailVerificationBanner', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 const mockStats = fetchDashboardStats as jest.MockedFunction<
   typeof fetchDashboardStats

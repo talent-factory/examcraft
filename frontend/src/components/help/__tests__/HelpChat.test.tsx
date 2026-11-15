@@ -11,7 +11,7 @@ import { AppError } from '../../../errors';
 window.HTMLElement.prototype.scrollIntoView = jest.fn();
 
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ accessToken: 'test-token' }),
+  useAuth: () => ({ isAuthenticated: true }),
 }));
 
 jest.mock('../../../services/HelpService', () => ({

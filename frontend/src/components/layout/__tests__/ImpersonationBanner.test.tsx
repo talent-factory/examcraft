@@ -43,10 +43,9 @@ describe('ImpersonationBanner', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows the target user and a countdown to the effective fallback deadline while impersonating', () => {
-    // Session hard-caps at 5 min, but the proactive timer (REFRESH_LEAD_MS)
-    // falls back to the admin 2 min before that — the countdown must reflect
-    // the real ~3 min remaining, not the full 5.
+  it('shows the target user and a countdown to the hard cap while impersonating', () => {
+    // The impersonation ends at the hard cap (5 min here); the countdown
+    // counts down to exactly that.
     mockAuthState = {
       isImpersonating: true,
       impersonationExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
@@ -60,7 +59,7 @@ describe('ImpersonationBanner', () => {
     expect(screen.getByText(/max@example\.com/)).toBeInTheDocument();
     // Exact-substring assertions here are inherently flaky at second
     // boundaries; accept the one-second window around the real deadline.
-    expect(screen.getByTestId('impersonation-banner-countdown')).toHaveTextContent(/(2:59|3:00)$/);
+    expect(screen.getByTestId('impersonation-banner-countdown')).toHaveTextContent(/(4:59|5:00)$/);
   });
 
   it('ends impersonation and navigates to the dashboard on "back to my account"', async () => {
@@ -79,34 +78,24 @@ describe('ImpersonationBanner', () => {
     expect(screen.queryByTestId('impersonation-banner-server-end-failed')).not.toBeInTheDocument();
   });
 
-  it('still navigates, but surfaces a notice, when the server-side end call failed (endImpersonation reports backendEndFailed)', async () => {
+  it('keeps the banner, shows a notice and does not navigate when the server-side end call failed', async () => {
     mockAuthState = {
       isImpersonating: true,
       impersonationExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
       user: { first_name: 'Max', last_name: 'Muster', email: 'max@example.com' },
     };
-    // The real endImpersonation() always restores locally (isImpersonating
-    // flips to false) regardless of whether the backend call succeeded;
-    // mirror that side effect here since useAuth is mocked.
-    mockEndImpersonation.mockImplementation(async () => {
-      mockAuthState = { isImpersonating: false, impersonationExpiresAt: null, user: null };
-      return { backendEndFailed: true };
-    });
+    // The cookie is still valid server-side, so the real endImpersonation()
+    // keeps isImpersonating true and only reports the failure.
+    mockEndImpersonation.mockResolvedValue({ backendEndFailed: true });
 
     render(<ImpersonationBanner />);
 
     fireEvent.click(screen.getByRole('button'));
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/dashboard'));
-    expect(mockEndImpersonation).toHaveBeenCalled();
-
-    // The local restore (and navigation) happens regardless — this notice
-    // is purely informational, not a blocker. It must stay visible after
-    // navigate() since a support engineer chasing a stuck impersonation
-    // session needs a starting point beyond a browser console nobody was
-    // watching.
     await waitFor(() => {
-      expect(screen.getByTestId('impersonation-banner-server-end-failed')).toBeInTheDocument();
+      expect(screen.getByTestId('impersonation-banner-end-failed')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('impersonation-banner')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

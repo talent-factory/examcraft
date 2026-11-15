@@ -19,7 +19,7 @@ frontend/e2e/
 ├── fixtures/
 │   └── auth.ts              # Authentication helpers & fixtures
 ├── smoke.spec.ts            # Smoke tests (no auth required, fast)
-├── auth.spec.ts             # Authentication E2E tests (Login, Logout, OAuth)
+├── auth.spec.ts             # Authentication E2E tests (Login-Seite, Test-Login, Logout, Session)
 ├── api-connectivity.spec.ts # API connectivity tests (URL fix verification)
 ├── README.md                # Diese Datei
 └── .auth/                   # Stored auth state (gitignored)
@@ -89,7 +89,7 @@ python scripts/setup_e2e_test_data.py
 ```
 
 Die Tests verwenden:
-- E2E Test-User: `e2e-test@examcraft.test` / `E2ETestPassword123!`
+- E2E Test-User: `e2e-test@example.com`; Anmeldung über den Test-Login `POST /api/v1/auth/test-login` (Backend mit `E2E_TEST_LOGIN=true`, nur in Dev-Umgebungen), kein Passwort-Formular mehr
 - Test-Institution: E2E Test Institution (Professional Tier)
 - Test-Dokument: e2e-test-document.pdf
 
@@ -113,7 +113,7 @@ npx playwright install
 
 ### ✅ Authentication (`auth.spec.ts`)
 
-- **Login Flow** - Email/Password authentication
+- **Login Flow** - Test-Login (OIDC-Flow selbst ist nicht automatisierbar)
 - **OAuth Buttons** - Google & Microsoft visibility
 - **Logout** - Session termination
 - **Session Persistence** - Stays logged in after reload

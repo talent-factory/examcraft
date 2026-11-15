@@ -32,7 +32,7 @@ function recordAcknowledgedHint(hintId: number): void {
 }
 
 export function useHelpContext() {
-  const { accessToken, hasRole } = useAuth();
+  const { isAuthenticated, hasRole } = useAuth();
   const location = useLocation();
 
   const [helpStatus, setHelpStatus] = useState<HelpStatus | null>(null);
@@ -51,9 +51,9 @@ export function useHelpContext() {
   }, []);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!isAuthenticated) return;
     helpService
-      .getOnboardingStatus(accessToken)
+      .getOnboardingStatus()
       .then(setOnboardingStatus)
       // Reported, not only logged: a status read that keeps failing means new
       // users are never offered the tour, and nothing else would say so —
@@ -64,7 +64,7 @@ export function useHelpContext() {
         setOnboardingStatus(null);
       })
       .finally(() => setLoading(false));
-  }, [accessToken]);
+  }, [isAuthenticated]);
 
   /**
    * One resolved hint per route, for this mount.
@@ -103,7 +103,7 @@ export function useHelpContext() {
   }, []);
 
   useEffect(() => {
-    if (!accessToken || !route) return;
+    if (!isAuthenticated || !route) return;
 
     const cached = hintByRouteRef.current.get(route);
     if (cached) {
@@ -118,7 +118,7 @@ export function useHelpContext() {
     // hint via the catch below. `cancelled` makes both cases no-ops.
     let cancelled = false;
     helpService
-      .getContextHint(accessToken, route)
+      .getContextHint(route)
       .then((hint) => {
         if (cancelled) return;
         hintByRouteRef.current.set(route, hint);
@@ -133,7 +133,7 @@ export function useHelpContext() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, route, applyHint]);
+  }, [isAuthenticated, route, applyHint]);
 
   /**
    * "Verstanden": hide this hint for the rest of the tab.
@@ -161,40 +161,39 @@ export function useHelpContext() {
   // here matches the visibility skipAndAdvance already gives an unreachable step.
   const completeStep = useCallback(
     async (step: number) => {
-      if (!accessToken) return;
+      if (!isAuthenticated) return;
       try {
-        const updated = await helpService.completeOnboardingStep(accessToken, step);
+        const updated = await helpService.completeOnboardingStep(step);
         setOnboardingStatus(updated);
       } catch (err) {
         console.warn('Failed to complete onboarding step:', err);
         reportHandledError(err, { feature: 'onboarding', action: 'completeStep', step });
       }
     },
-    [accessToken]
+    [isAuthenticated]
   );
 
   const skipStep = useCallback(
     async (step: number) => {
-      if (!accessToken) return;
+      if (!isAuthenticated) return;
       try {
-        const updated = await helpService.skipOnboardingStep(accessToken, step);
+        const updated = await helpService.skipOnboardingStep(step);
         setOnboardingStatus(updated);
       } catch (err) {
         console.warn('Failed to skip onboarding step:', err);
         reportHandledError(err, { feature: 'onboarding', action: 'skipStep', step });
       }
     },
-    [accessToken]
+    [isAuthenticated]
   );
 
   // TF-625: deep-dive tracks write into their own progress space and must
   // neither advance nor complete the core tour.
   const updateTrackStep = useCallback(
     async (trackId: string, step: number, totalSteps: number, skipped = false) => {
-      if (!accessToken) return;
+      if (!isAuthenticated) return;
       try {
         const updated = await helpService.updateTrackStep(
-          accessToken,
           trackId,
           step,
           totalSteps,
@@ -206,7 +205,7 @@ export function useHelpContext() {
         reportHandledError(err, { feature: 'onboarding', action: 'updateTrackStep', trackId, step });
       }
     },
-    [accessToken]
+    [isAuthenticated]
   );
 
   return {

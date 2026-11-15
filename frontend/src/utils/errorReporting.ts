@@ -21,7 +21,7 @@
  * Der Endpoint ist BEWUSST unauthentifiziert erreichbar (muss auch fuer
  * nicht eingeloggte User funktionieren, z. B. Fehler auf der Login-Seite) —
  * deshalb kein `httpClient.postJson()`: das haengt einen
- * `Authorization`-Header an, loest bei 401 einen Token-Refresh/Force-Logout
+ * Session-Header an, loest bei 401 einen Force-Logout
  * aus und wirft bei einer Non-2xx-Antwort. Ein Report-Fehlschlag darf die
  * App nie beeintraechtigen (ADR-012): `reportError` wirft nie, bleibt aber
  * ueber `console.error`/`console.warn` sichtbar statt lautlos zu

@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const ACCESS_TOKEN_KEY = 'examcraft_access_token';
 
 export interface CheckoutSession {
     session_id: string;
@@ -55,14 +54,8 @@ export interface CustomerPortalSession {
     url: string;
 }
 
-const getAuthHeaders = () => {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    return {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    };
-};
+// Session-Cookie statt Bearer-Token (EXAMCRAFT-126).
+const getAuthHeaders = () => ({ withCredentials: true });
 
 export const paymentService = {
     createCheckoutSession: async (priceId: string): Promise<CheckoutSession> => {

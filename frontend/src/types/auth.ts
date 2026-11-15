@@ -132,47 +132,6 @@ export interface AuditLog {
 // API Request/Response Types
 // ============================================================================
 
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  first_name: string;
-  last_name: string;
-  institution_slug?: string;
-}
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
-
-export interface RefreshTokenRequest {
-  refresh_token: string;
-}
-
-export interface SetPasswordRequest {
-  password: string;
-}
-
-export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
-}
-
-export interface PasswordResetRequest {
-  email: string;
-}
-
-export interface PasswordResetConfirm {
-  token: string;
-  new_password: string;
-}
-
 export interface UpdateProfileRequest {
   first_name?: string;
   last_name?: string;
@@ -204,8 +163,6 @@ export interface UserResponse {
 
 export interface AuthState {
   user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -216,44 +173,31 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
-  loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAccessToken: () => Promise<void>;
+  /**
+   * Leitet das ganze Fenster auf den Login-Flow des Backends
+   * (`/api/v1/auth/login`, OIDC gegen tessera/Zitadel). `reauth` erzwingt eine
+   * frische Anmeldung beim IdP (Step-up, z. B. vor einer Impersonation).
+   */
+  login: (options?: { reauth?: boolean }) => void;
+  /** Resolves with `backendEndFailed` when an impersonation could not be ended (the user stays signed in as the target). */
+  logout: () => Promise<{ backendEndFailed: boolean } | void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
-  setPassword: (password: string) => Promise<void>;
-  changePassword: (data: ChangePasswordRequest) => Promise<void>;
   clearError: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;
   /**
-   * Swap the active session over to an impersonation token minted by
-   * `POST /api/admin/users/{id}/impersonate` (TF-743). Stashes the current
-   * (admin) session so `endImpersonation` can restore it.
+   * Übernimmt eine soeben gestartete Impersonation (`POST
+   * /api/admin/users/{id}/impersonate` hat das Impersonation-Cookie gesetzt):
+   * lädt das Profil des Ziel-Benutzers neu und merkt sich die Laufzeit.
    */
-  startImpersonation: (payload: { accessToken: string; expiresIn: number }) => Promise<void>;
+  startImpersonation: (payload: { expiresIn: number }) => Promise<void>;
   /**
-   * Restore the admin session stashed by `startImpersonation`. Safe to call
-   * even if impersonation already ended (e.g. via the automatic TF-741
-   * expiry fallback) — it then does nothing. `backendEndFailed` reports
-   * whether the server-side `POST /api/admin/impersonate/end` call failed;
-   * the local restore always succeeds regardless.
+   * Beendet die Impersonation (`POST /api/admin/impersonate/end`) und lädt das
+   * Profil des Admins neu. Ist keine Impersonation aktiv, passiert nichts.
+   * `backendEndFailed` meldet, ob der Server-Aufruf fehlschlug; lokal fällt die
+   * Anzeige in jedem Fall auf den Admin zurück.
    */
   endImpersonation: () => Promise<{ backendEndFailed: boolean }>;
-}
-
-// ============================================================================
-// OAuth Types
-// ============================================================================
-
-export interface OAuthLoginResponse {
-  authorization_url: string;
-}
-
-export interface OAuthCallbackParams {
-  code: string;
-  state: string;
 }
 
 // ============================================================================

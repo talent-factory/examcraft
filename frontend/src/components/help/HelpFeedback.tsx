@@ -15,7 +15,7 @@ interface HelpFeedbackProps {
 
 const HelpFeedback: React.FC<HelpFeedbackProps> = ({ question, answer, confidence, route }) => {
   const { t } = useTranslation();
-  const { accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [submitted, setSubmitted] = useState<'up' | 'down' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,11 +24,11 @@ const HelpFeedback: React.FC<HelpFeedbackProps> = ({ question, answer, confidenc
   // before TF-996 the rejection went unhandled and the rating was lost while
   // the widget said thanks.
   const handleFeedback = async (rating: 'up' | 'down') => {
-    if (!accessToken || submitted) return;
+    if (!isAuthenticated || submitted) return;
     setSubmitted(rating);
     setError(null);
     try {
-      await helpService.submitFeedback(accessToken, { question, answer, confidence, rating, route });
+      await helpService.submitFeedback({ question, answer, confidence, rating, route });
     } catch (err) {
       console.warn('Failed to submit help feedback:', err);
       setSubmitted(null);

@@ -50,7 +50,7 @@ const STATUS_COLORS: Record<string, 'default' | 'warning' | 'success'> = {
 
 const HelpFeedbackQueue: React.FC = () => {
   const { t } = useTranslation();
-  const { accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [tabIndex, setTabIndex] = useState(0);
 
   const [items, setItems] = useState<FeedbackItem[]>([]);
@@ -65,15 +65,13 @@ const HelpFeedbackQueue: React.FC = () => {
   const [editAnswerEn, setEditAnswerEn] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const headers = { Authorization: `Bearer ${accessToken}` };
-
   const fetchQueue = async () => {
-    if (!accessToken) return;
+    if (!isAuthenticated) return;
     setError(null);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback-queue?${params}`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback-queue?${params}`);
       if (!res.ok) {
         console.error('[HelpFeedbackQueue] Failed to load feedback:', res.status);
         setError(t('admin.helpFeedbackQueue.errorLoadFeedback'));
@@ -86,10 +84,10 @@ const HelpFeedbackQueue: React.FC = () => {
   };
 
   const fetchClusters = async () => {
-    if (!accessToken) return;
+    if (!isAuthenticated) return;
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters`);
       if (!res.ok) {
         console.error('[HelpFeedbackQueue] Failed to load clusters:', res.status);
         setError(t('admin.helpFeedbackQueue.errorLoadClusters'));
@@ -101,10 +99,10 @@ const HelpFeedbackQueue: React.FC = () => {
   };
 
   const fetchCandidates = async () => {
-    if (!accessToken) return;
+    if (!isAuthenticated) return;
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates`, { headers });
+      const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates`);
       if (!res.ok) {
         console.error('[HelpFeedbackQueue] Failed to load FAQ candidates:', res.status);
         setError(t('admin.helpFeedbackQueue.errorLoadCandidates'));
@@ -120,13 +118,13 @@ const HelpFeedbackQueue: React.FC = () => {
     if (tabIndex === 1) fetchCandidates();
     if (tabIndex === 2) fetchClusters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, tabIndex, statusFilter]);
+  }, [isAuthenticated, tabIndex, statusFilter]);
 
   const updateStatus = async (id: number, newStatus: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/feedback/${id}`, {
         method: 'PUT',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) {
@@ -143,7 +141,7 @@ const HelpFeedbackQueue: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/approve`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer_de: answerDe || null, answer_en: answerEn || null }),
       });
       if (!res.ok) {
@@ -161,7 +159,6 @@ const HelpFeedbackQueue: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/faq-candidates/${id}/reject`, {
         method: 'POST',
-        headers: { ...headers },
       });
       if (!res.ok) {
         console.error('[HelpFeedbackQueue] Failed to reject FAQ:', res.status);
@@ -177,7 +174,6 @@ const HelpFeedbackQueue: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/help/admin/clusters/${clusterId}/mark-docs-gap`, {
         method: 'POST',
-        headers: { ...headers },
       });
       if (!res.ok) {
         console.error('[HelpFeedbackQueue] Failed to mark docs gap:', res.status);

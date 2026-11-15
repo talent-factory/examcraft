@@ -25,11 +25,7 @@ export interface DashboardActivityResponse {
 }
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('examcraft_access_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return { 'Content-Type': 'application/json' };
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStatsResponse> {

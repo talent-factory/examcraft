@@ -134,11 +134,7 @@ export async function ensureOk(
 }
 
 function authHeaders(extra: HeadersInit = {}): HeadersInit {
-  const token = localStorage.getItem('examcraft_access_token');
-  return {
-    ...extra,
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+  return { ...extra };
 }
 
 export async function safeFetch(

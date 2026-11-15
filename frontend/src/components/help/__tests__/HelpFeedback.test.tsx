@@ -12,7 +12,7 @@ jest.mock('../../../services/HelpService', () => ({
 }));
 
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ accessToken: 'test-token' }),
+  useAuth: () => ({ isAuthenticated: true }),
 }));
 
 const mockedSubmitFeedback = helpService.submitFeedback as jest.Mock;
@@ -41,7 +41,7 @@ describe('HelpFeedback', () => {
     fireEvent.click(thumbsUp());
 
     expect(await screen.findByText('Danke für dein Feedback!')).toBeInTheDocument();
-    expect(mockedSubmitFeedback).toHaveBeenCalledWith('test-token', {
+    expect(mockedSubmitFeedback).toHaveBeenCalledWith({
       question: 'Wie exportiere ich?',
       answer: 'So.',
       confidence: 0.9,

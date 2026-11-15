@@ -5,5 +5,4 @@
 
 export { ProfileView } from './ProfileView';
 export { ProfileEdit } from './ProfileEdit';
-export { PasswordChange } from './PasswordChange';
 export { ProfilePage } from './ProfilePage';

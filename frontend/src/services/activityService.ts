@@ -66,8 +66,7 @@ async function ensureOk(response: Response): Promise<Response> {
 }
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('examcraft_access_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 async function safeFetch(
