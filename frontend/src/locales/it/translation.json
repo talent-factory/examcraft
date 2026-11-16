@@ -430,6 +430,7 @@
       "login_cancelled": "L'accesso è stato annullato.",
       "idp_unavailable": "Il servizio di accesso non è al momento raggiungibile. Riprova più tardi.",
       "email_conflict": "Questo indirizzo e-mail appartiene già a un altro account ExamCraft. Contatta il supporto.",
+      "account_not_migrated": "Il tuo account non è ancora stato trasferito al nuovo accesso. Contatta il supporto.",
       "user_limit": "La tua istituzione ha raggiunto il numero massimo di utenti. Contatta il tuo amministratore.",
       "claims_missing": "Il tuo account non fornisce tutti i dati necessari (ad es. un indirizzo e-mail verificato). Completali nell'account e riprova.",
       "account_inactive": "Il tuo account non è attivo. Contatta il tuo amministratore.",

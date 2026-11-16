@@ -29,7 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 class EmailConflictError(Exception):
-    """The e-mail belongs to a user with another (or no) Zitadel ``sub``."""
+    """The e-mail belongs to a user with another Zitadel ``sub``."""
+
+
+class AccountNotMigratedError(Exception):
+    """The e-mail belongs to a local user without a Zitadel ``sub`` yet.
+
+    The account exists but has not been imported into Zitadel (EXAMCRAFT-130).
+    Never linked by e-mail, the user has to wait for the import or ask support.
+    """
 
 
 class MissingClaimError(Exception):
@@ -129,7 +137,10 @@ def get_or_provision_user(db: Session, claims: Dict[str, Any]) -> tuple[User, bo
 
     Raises:
         MissingClaimError: ``sub`` or ``email`` missing.
-        EmailConflictError: unknown ``sub`` but the e-mail is already taken.
+        EmailConflictError: unknown ``sub`` but the e-mail belongs to a user
+            with another ``sub``.
+        AccountNotMigratedError: unknown ``sub`` but the e-mail belongs to a
+            user that has no ``sub`` yet (not migrated).
         UserLimitReachedError: the institution's user limit is reached.
         ProvisioningError: roles are not seeded.
     """
@@ -144,8 +155,11 @@ def get_or_provision_user(db: Session, claims: Dict[str, Any]) -> tuple[User, bo
 
     if not email:
         raise MissingClaimError("email")
-    if db.query(User).filter(func.lower(User.email) == email).first() is not None:
-        raise EmailConflictError(email)
+    existing = db.query(User).filter(func.lower(User.email) == email).first()
+    if existing is not None:
+        if not existing.zitadel_sub:
+            raise AccountNotMigratedError(sub)
+        raise EmailConflictError(sub)
 
     first, last = _names(claims, email)
     verified = claims.get("email_verified") is True
@@ -187,7 +201,7 @@ def get_or_provision_user(db: Session, claims: Dict[str, Any]) -> tuple[User, bo
         if existing is not None:
             logger.info("JIT: paralleler Login, User existiert bereits (sub=%s).", sub)
             return existing, False
-        raise EmailConflictError(email)
+        raise EmailConflictError(sub)
 
     db.refresh(user)
     logger.info("JIT-provisioned user_id=%s sub=%s", user.id, sub)

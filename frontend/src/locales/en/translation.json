@@ -430,6 +430,7 @@
       "login_cancelled": "Sign-in was cancelled.",
       "idp_unavailable": "The sign-in service is currently unavailable. Please try again later.",
       "email_conflict": "This email address already belongs to a different ExamCraft account. Please contact support.",
+      "account_not_migrated": "Your account has not yet been transferred to the new login. Please contact support.",
       "user_limit": "Your institution has reached its maximum number of users. Please contact your administrator.",
       "claims_missing": "Your account does not provide all required details (for example a verified email address). Please complete it in your account and try again.",
       "account_inactive": "Your account is not active. Please contact your administrator.",

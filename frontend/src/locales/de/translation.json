@@ -430,6 +430,7 @@
       "login_cancelled": "Die Anmeldung wurde abgebrochen.",
       "idp_unavailable": "Der Anmeldedienst ist zurzeit nicht erreichbar. Bitte versuche es später erneut.",
       "email_conflict": "Diese E-Mail-Adresse gehört bereits zu einem anderen ExamCraft-Konto. Bitte wende dich an den Support.",
+      "account_not_migrated": "Dein Konto ist noch nicht auf den neuen Login übertragen. Bitte wende dich an den Support.",
       "user_limit": "Die Institution hat die maximale Anzahl Benutzer erreicht. Bitte wende dich an deine Administratorin oder deinen Administrator.",
       "claims_missing": "Dein Konto liefert nicht alle nötigen Angaben (z. B. eine bestätigte E-Mail-Adresse). Bitte ergänze sie im Konto und versuche es erneut.",
       "account_inactive": "Dein Konto ist nicht aktiv. Bitte wende dich an deine Administratorin oder deinen Administrator.",

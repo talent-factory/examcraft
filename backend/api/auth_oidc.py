@@ -45,6 +45,7 @@ from services.audit_service import AuditService
 from services.translation_service import get_request_locale
 from services.auth_service import AuthService
 from services.user_provisioning import (
+    AccountNotMigratedError,
     EmailConflictError,
     MissingClaimError,
     ProvisioningError,
@@ -234,6 +235,12 @@ def callback(
 
     try:
         user, _created = get_or_provision_user(db, claims)
+    except AccountNotMigratedError:
+        logger.warning(
+            "OIDC-Login: Konto ist noch nicht migriert, kein zitadel_sub (sub=%s).",
+            claims.get("sub"),
+        )
+        return _error_redirect("account_not_migrated")
     except EmailConflictError:
         logger.warning(
             "OIDC-Login: E-Mail gehört zu einem anderen Benutzer (sub=%s).",

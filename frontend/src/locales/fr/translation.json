@@ -430,6 +430,7 @@
       "login_cancelled": "La connexion a été annulée.",
       "idp_unavailable": "Le service de connexion est actuellement indisponible. Veuillez réessayer plus tard.",
       "email_conflict": "Cette adresse e-mail appartient déjà à un autre compte ExamCraft. Veuillez contacter le support.",
+      "account_not_migrated": "Votre compte n'a pas encore été transféré vers la nouvelle connexion. Veuillez contacter le support.",
       "user_limit": "Votre institution a atteint le nombre maximal d'utilisateurs. Veuillez contacter votre administrateur.",
       "claims_missing": "Votre compte ne fournit pas toutes les informations requises (par ex. une adresse e-mail vérifiée). Veuillez les compléter dans votre compte et réessayer.",
       "account_inactive": "Votre compte n'est pas actif. Veuillez contacter votre administrateur.",

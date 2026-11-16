@@ -3,10 +3,12 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import func
 
 from models.auth import AuthSession, Institution, Role, User, UserRole, UserStatus
 from services import session_service
 from services.user_provisioning import (
+    AccountNotMigratedError,
     EmailConflictError,
     MissingClaimError,
     UserLimitReachedError,
@@ -205,6 +207,34 @@ class TestProvisioning:
         get_or_provision_user(test_db, _claims())
         with pytest.raises(EmailConflictError):
             get_or_provision_user(test_db, _claims(sub="other-sub"))
+
+    def test_email_of_unmigrated_user_is_not_linked(self, test_db, seeded):
+        user, _ = get_or_provision_user(test_db, _claims())
+        user.zitadel_sub = None
+        test_db.commit()
+        with pytest.raises(AccountNotMigratedError) as exc_info:
+            get_or_provision_user(test_db, _claims(sub="other-sub"))
+        # Only the sub may appear in the error (it ends up in logs), never the e-mail.
+        assert "other-sub" in str(exc_info.value)
+        assert _claims()["email"] not in str(exc_info.value)
+        test_db.refresh(user)
+        assert user.zitadel_sub is None
+
+    def test_unmigrated_user_is_found_case_insensitively(self, test_db, seeded):
+        user, _ = get_or_provision_user(test_db, _claims())
+        user.zitadel_sub = None
+        user.email = user.email.upper()
+        test_db.commit()
+        with pytest.raises(AccountNotMigratedError):
+            get_or_provision_user(test_db, _claims(sub="other-sub"))
+        # No second account for the same address (the CI database is shared,
+        # so count by e-mail, not globally).
+        assert (
+            test_db.query(User)
+            .filter(func.lower(User.email) == _claims()["email"])
+            .count()
+            == 1
+        )
 
     def test_missing_claims(self, test_db, seeded):
         with pytest.raises(MissingClaimError):

@@ -275,11 +275,31 @@ class TestCallback:
         assert resp.headers["location"].endswith("/login?error=login_cancelled")
 
     @respx.mock
+    def test_unmigrated_account_redirects(self, client, db, signing_key):
+        # EXAMCRAFT-142: local user without zitadel_sub (not yet imported).
+        inst = db.query(Institution).filter_by(slug="schule-oidc").one()
+        db.add(
+            User(
+                email="dup@schule.example",
+                first_name="D",
+                last_name="D",
+                institution_id=inst.id,
+                status=UserStatus.ACTIVE.value,
+            )
+        )
+        db.commit()
+        state, nonce, _ = _start_unmocked(client)
+        _mock_idp(signing_key, "sub-dup", "dup@schule.example", nonce)
+        resp = client.get(f"/api/v1/auth/callback?state={state}&code=abc")
+        assert resp.headers["location"].endswith("/login?error=account_not_migrated")
+
+    @respx.mock
     def test_email_conflict_redirects(self, client, db, signing_key):
         inst = db.query(Institution).filter_by(slug="schule-oidc").one()
         db.add(
             User(
                 email="dup@schule.example",
+                zitadel_sub="sub-owner",
                 first_name="D",
                 last_name="D",
                 institution_id=inst.id,

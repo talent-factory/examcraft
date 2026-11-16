@@ -40,6 +40,7 @@ describe('LoginPage', () => {
     'login_cancelled',
     'idp_unavailable',
     'email_conflict',
+    'account_not_migrated',
     'user_limit',
     'claims_missing',
     'account_inactive',
