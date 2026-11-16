@@ -15,10 +15,16 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 class AuthService {
   /**
    * URL, die den Login-Flow startet (Weiterleitung des ganzen Fensters).
-   * `reauth` erzwingt eine frische Anmeldung beim IdP (Step-up).
+   * `reauth` erzwingt eine frische Anmeldung beim IdP (Step-up), `returnTo`
+   * is the relative in-app path the callback redirects to afterwards.
    */
-  getLoginUrl(options: { reauth?: boolean } = {}): string {
-    return `${API_BASE_URL}/api/v1/auth/login${options.reauth ? '?reauth=true' : ''}`;
+  getLoginUrl(options: { reauth?: boolean; returnTo?: string } = {}): string {
+    const params = new URLSearchParams();
+    if (options.reauth) params.set('reauth', 'true');
+    // The backend re-validates `return_to` (relative in-app paths only).
+    if (options.returnTo) params.set('return_to', options.returnTo);
+    const query = params.toString();
+    return `${API_BASE_URL}/api/v1/auth/login${query ? `?${query}` : ''}`;
   }
 
   /**

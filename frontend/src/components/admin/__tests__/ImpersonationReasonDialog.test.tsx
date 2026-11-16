@@ -10,9 +10,10 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ImpersonationReasonDialog } from '../ImpersonationReasonDialog';
+import { ImpersonationReasonDialog, takePendingImpersonation } from '../ImpersonationReasonDialog';
 import AdminService from '../../../services/AdminService';
 import { AppError } from '../../../errors';
+import { clearAllSessionSnapshots } from '../../../utils/sessionSnapshot';
 
 // The global react-i18next mock (setupTests.ts) recreates `t` on every call
 // to useTranslation(), which is fine for most components but breaks this
@@ -65,7 +66,11 @@ jest.mock('../../../services/AdminService', () => ({
 const mockStartImpersonation = jest.fn();
 const mockLogin = jest.fn();
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ startImpersonation: mockStartImpersonation, login: mockLogin }),
+  useAuth: () => ({
+    user: { id: 1 },
+    startImpersonation: mockStartImpersonation,
+    login: mockLogin,
+  }),
 }));
 
 const mockedAdminService = AdminService as jest.Mocked<typeof AdminService>;
@@ -86,6 +91,7 @@ const targetUser = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  sessionStorage.clear();
   mockedAdminService.getUser.mockResolvedValue(targetUser as any);
   mockedAdminService.impersonateUser.mockResolvedValue({
     expires_in: 1800,
@@ -182,10 +188,58 @@ describe('ImpersonationReasonDialog', () => {
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith({ reauth: true }));
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith({ reauth: true, returnTo: '/admin' }),
+    );
+    expect(takePendingImpersonation(1)).toEqual({ userId: 7, reason: 'valid reason text' });
     expect(mockStartImpersonation).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('prefills the reason restored after the step-up round trip', async () => {
+    renderDialog({ initialReason: 'restored reason' });
+    await screen.findByText(/Max Muster/);
+
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('restored reason');
+  });
+
+  it('does not overwrite a typed reason on re-render and drops the prefill after close', async () => {
+    const { rerender, onClose, onSuccess } = renderDialog({ initialReason: 'restored reason' });
+    await screen.findByText(/Max Muster/);
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'typed afterwards' } });
+
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={true}
+        initialReason="restored reason"
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('typed afterwards');
+
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={false}
+        initialReason=""
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={true}
+        initialReason=""
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    await screen.findByText(/Max Muster/);
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('');
   });
 
   it('shows an error and stays open when AdminService.impersonateUser fails', async () => {
@@ -286,5 +340,46 @@ describe('ImpersonationReasonDialog', () => {
     fireEvent.click(screen.getByTestId('impersonation-dialog-backdrop'));
 
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('takePendingImpersonation (EXAMCRAFT-144)', () => {
+  const KEY = 'examcraft.snapshot.pending-impersonation';
+  const store = (data: object) =>
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ version: 1, savedAt: new Date().toISOString(), data }),
+    );
+
+  beforeEach(() => sessionStorage.clear());
+
+  it('returns the pending request once and removes it', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toEqual({ userId: 7, reason: 'abc' });
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('discards a request saved by a different admin', () => {
+    store({ userId: 7, reason: 'abc', adminId: 2, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('is wiped together with the other session snapshots on logout', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() });
+    clearAllSessionSnapshots();
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('ignores a stale request', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() - 11 * 60 * 1000 });
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('ignores malformed content', () => {
+    sessionStorage.setItem(KEY, '{not json');
+    expect(takePendingImpersonation(1)).toBeNull();
+    store({ userId: '7', reason: 1, adminId: 1, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toBeNull();
   });
 });

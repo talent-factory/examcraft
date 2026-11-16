@@ -205,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Start the login: the backend runs the OIDC flow and sets the cookie, then
    * redirects back to the app.
    */
-  const login = useCallback((options: { reauth?: boolean } = {}) => {
+  const login = useCallback((options: { reauth?: boolean; returnTo?: string } = {}) => {
     window.location.assign(AuthService.getLoginUrl(options));
   }, []);
 

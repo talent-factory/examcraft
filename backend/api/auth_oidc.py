@@ -22,6 +22,7 @@ Guard rails:
 
 import logging
 import secrets
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from base64 import urlsafe_b64encode
 from hashlib import sha256
@@ -59,7 +60,16 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 # Long enough for the redirect round trip to Zitadel incl. a social login.
 _FLOW_COOKIE_MAX_AGE_SECONDS = 600
-_FLOW_COOKIES = ("oidc_state", "oidc_verifier", "oidc_nonce", "oidc_reauth")
+_FLOW_COOKIES = (
+    "oidc_state",
+    "oidc_verifier",
+    "oidc_nonce",
+    "oidc_reauth",
+    "oidc_return_to",
+)
+# Post-login return targets: only these in-app areas (open-redirect allowlist).
+_RETURN_TO_ALLOWED_PREFIXES = ("/admin",)
+_RETURN_TO_MAX_LENGTH = 512
 # A forced re-authentication must show an auth_time at most this old.
 _REAUTH_AUTH_TIME_TOLERANCE_SECONDS = 120
 
@@ -113,6 +123,34 @@ def _auth_time(claims: dict) -> Optional[datetime]:
     return datetime.fromtimestamp(value, tz=timezone.utc)
 
 
+def safe_return_to(value: Optional[str]) -> Optional[str]:
+    """Return ``value`` if it is a safe in-app path, else ``None``.
+
+    Only a single-slash relative path below an allowlisted prefix passes. No
+    scheme, host, fragment, ``//``, backslash, non-ASCII or control character,
+    dot segment or ``%`` in the path; at most 512 characters. A query string
+    is kept as-is.
+    """
+    if not value or len(value) > _RETURN_TO_MAX_LENGTH or not value.isascii():
+        return None
+    if not value.startswith("/") or value.startswith("//") or "\\" in value:
+        return None
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc or parsed.fragment:
+        return None
+    path = parsed.path
+    if any(seg in ("..", ".") for seg in path.split("/")) or "%" in path:
+        return None
+    if not any(
+        path == prefix or path.startswith(prefix + "/")
+        for prefix in _RETURN_TO_ALLOWED_PREFIXES
+    ):
+        return None
+    return value
+
+
 def set_session_cookie(response: Response, token: str, max_age_seconds: int) -> None:
     response.set_cookie(
         session_service.SESSION_COOKIE_NAME,
@@ -126,11 +164,13 @@ def set_session_cookie(response: Response, token: str, max_age_seconds: int) -> 
 
 
 @router.get("/login")
-def login(reauth: bool = False) -> Response:
+def login(reauth: bool = False, return_to: Optional[str] = None) -> Response:
     """Start the authorization-code flow (PKCE) against tessera/Zitadel.
 
     ``reauth=true`` forces a fresh authentication (``prompt=login``), used
-    before sensitive actions such as starting an impersonation.
+    before sensitive actions such as starting an impersonation. ``return_to``
+    is a relative in-app path (allowlist, see ``safe_return_to``) the callback
+    redirects to; an unsafe value is ignored (redirect to ``/``).
     """
     state = secrets.token_urlsafe(16)
     nonce = secrets.token_urlsafe(16)
@@ -146,11 +186,17 @@ def login(reauth: bool = False) -> Response:
     if not reauth:
         # A leftover marker of an abandoned reauth must not harden a normal login.
         response.delete_cookie("oidc_reauth", path="/")
+    safe_target = safe_return_to(return_to)
+    if return_to and safe_target is None:
+        logger.info("OIDC-Login: return_to abgewiesen (%.100r).", return_to)
+    if safe_target is None:
+        response.delete_cookie("oidc_return_to", path="/")
     for name, value in (
         ("oidc_state", state),
         ("oidc_verifier", verifier),
         ("oidc_nonce", nonce),
         *((("oidc_reauth", "1"),) if reauth else ()),
+        *((("oidc_return_to", safe_target),) if safe_target else ()),
     ):
         response.set_cookie(
             name,
@@ -278,7 +324,14 @@ def callback(
 
     # The redirect target is resolved before the session exists, so a
     # configuration problem can never leave a session without a cookie.
-    target = f"{_frontend_base()}/"
+    # The cookie is re-validated: it is client-controlled between the two requests.
+    raw_return_to = request.cookies.get("oidc_return_to")
+    return_to = safe_return_to(raw_return_to)
+    if raw_return_to and return_to is None:
+        logger.warning(
+            "OIDC-Callback: return_to-Cookie abgewiesen (%.100r).", raw_return_to
+        )
+    target = f"{_frontend_base()}{return_to or '/'}"
 
     # record_login once per new session, then create the session (one commit).
     try:

@@ -42,20 +42,32 @@ jest.mock('../UserList', () => ({
 jest.mock('../UserEditDialog', () => ({ UserEditDialog: () => null }));
 jest.mock('../RoleAssignmentDialog', () => ({ RoleAssignmentDialog: () => null }));
 jest.mock('../OrgUnitAssignmentDialog', () => ({ OrgUnitAssignmentDialog: () => null }));
+const mockTakePending = jest.fn();
 jest.mock('../ImpersonationReasonDialog', () => ({
+  takePendingImpersonation: (adminId: number) => mockTakePending(adminId),
   ImpersonationReasonDialog: ({
     isOpen,
     onSuccess,
+    userId,
+    initialReason,
   }: {
     isOpen: boolean;
     onSuccess: () => void;
+    userId: number | null;
+    initialReason?: string;
   }) =>
-    isOpen ? <button onClick={onSuccess}>trigger-impersonation-started</button> : null,
+    isOpen ? (
+      <button onClick={onSuccess}>
+        trigger-impersonation-started
+        <span data-testid="dialog-props">{`${userId}|${initialReason}`}</span>
+      </button>
+    ) : null,
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockHasPermission = jest.fn().mockReturnValue(true);
+  mockTakePending.mockReturnValue(null);
 });
 
 describe('UserManagementPage — impersonation orchestration (TF-743)', () => {
@@ -87,5 +99,40 @@ describe('UserManagementPage — impersonation orchestration (TF-743)', () => {
     fireEvent.click(screen.getByText('trigger-impersonation-started'));
 
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('reopens the dialog prefilled after the step-up round trip (EXAMCRAFT-144)', () => {
+    mockTakePending.mockReturnValue({ userId: 7, reason: 'restored reason' });
+    render(<UserManagementPage />);
+
+    expect(mockTakePending).toHaveBeenCalledWith(1);
+    expect(screen.getByTestId('dialog-props')).toHaveTextContent('7|restored reason');
+  });
+
+  it('keeps the dialog closed when the pending request belongs to another admin', () => {
+    mockTakePending.mockReturnValue(null);
+    render(<UserManagementPage />);
+
+    expect(screen.queryByText('trigger-impersonation-started')).not.toBeInTheDocument();
+  });
+
+  it('starts a fresh dialog without the restored reason for the next target', () => {
+    mockTakePending.mockReturnValue({ userId: 7, reason: 'restored reason' });
+    render(<UserManagementPage />);
+    expect(screen.getByTestId('dialog-props')).toHaveTextContent('7|restored reason');
+
+    fireEvent.click(screen.getByText('trigger-impersonate'));
+
+    expect(screen.getByTestId('dialog-props')).toHaveTextContent('7|');
+    expect(screen.getByTestId('dialog-props')).not.toHaveTextContent('restored');
+  });
+
+  it('does not restore a pending request without users:impersonate', () => {
+    mockHasPermission.mockReturnValue(false);
+    mockTakePending.mockReturnValue({ userId: 7, reason: 'restored reason' });
+    render(<UserManagementPage />);
+
+    expect(screen.queryByText('trigger-impersonation-started')).not.toBeInTheDocument();
+    expect(mockTakePending).not.toHaveBeenCalled();
   });
 });

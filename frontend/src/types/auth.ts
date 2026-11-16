@@ -177,8 +177,10 @@ export interface AuthContextType extends AuthState {
    * Leitet das ganze Fenster auf den Login-Flow des Backends
    * (`/api/v1/auth/login`, OIDC gegen tessera/Zitadel). `reauth` erzwingt eine
    * frische Anmeldung beim IdP (Step-up, z. B. vor einer Impersonation).
+   * `returnTo`: relative in-app path (e.g. `/admin`) to return to afterwards; the
+   * backend only accepts allowlisted paths.
    */
-  login: (options?: { reauth?: boolean }) => void;
+  login: (options?: { reauth?: boolean; returnTo?: string }) => void;
   /** Resolves with `backendEndFailed` when an impersonation could not be ended (the user stays signed in as the target). */
   logout: () => Promise<{ backendEndFailed: boolean } | void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;

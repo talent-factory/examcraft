@@ -553,6 +553,173 @@ class TestReauth:
         assert not session_service.is_recent_login(row)
 
 
+class TestReturnTo:
+    """Step-up return target (EXAMCRAFT-144): allowlisted relative paths only."""
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "/admin/users",
+            "/admin",
+            "/admin/users?tab=all",
+        ],
+    )
+    def test_accepts_allowlisted_paths(self, value):
+        from api import auth_oidc
+
+        assert auth_oidc.safe_return_to(value) == value
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            None,
+            "",
+            "https://evil.example/admin",
+            "//evil.example/admin",
+            "/\\evil.example",
+            "/admin/../etc",
+            "/admin/%2e%2e/x",
+            "/administrator",
+            "/dashboard",
+            "admin/users",
+            "/admin/users#frag",
+            "/admin/users\r\nSet-Cookie: x=1",
+            "javascript:alert(1)",
+            "/admin/" + "a" * 600,
+        ],
+    )
+    def test_rejects_unsafe_values(self, value):
+        from api import auth_oidc
+
+        assert auth_oidc.safe_return_to(value) is None
+
+    @respx.mock
+    def test_callback_redirects_to_return_to(self, client, signing_key):
+        _mock_idp(signing_key, "sub-rt", "rt@schule.example", "n")
+        resp = client.get(
+            "/api/v1/auth/login?reauth=true&return_to=/admin/users%3Ftab%3Dall"
+        )
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        _mock_idp(
+            signing_key,
+            "sub-rt",
+            "rt@schule.example",
+            nonce,
+            extra={"auth_time": int(time.time())},
+        )
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert cb.headers["location"] == "http://frontend.example/admin/users?tab=all"
+
+    @respx.mock
+    def test_unsafe_return_to_falls_back_to_root(self, client, signing_key):
+        _mock_idp(signing_key, "sub-rt2", "rt2@schule.example", "n")
+        resp = client.get(
+            "/api/v1/auth/login?reauth=true&return_to=https://evil.example/"
+        )
+        assert not any(
+            c.startswith("oidc_return_to=") and "Max-Age=0" not in c
+            for c in resp.headers.get_list("set-cookie")
+        )
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        _mock_idp(
+            signing_key,
+            "sub-rt2",
+            "rt2@schule.example",
+            nonce,
+            extra={"auth_time": int(time.time())},
+        )
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert cb.headers["location"] == "http://frontend.example/"
+
+    @respx.mock
+    def test_tampered_cookie_is_revalidated_in_callback(self, client, signing_key):
+        _mock_idp(signing_key, "sub-rt3", "rt3@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?reauth=true&return_to=/admin")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        client.cookies.delete("oidc_return_to")
+        client.cookies.set("oidc_return_to", "https://evil.example/")
+        _mock_idp(
+            signing_key,
+            "sub-rt3",
+            "rt3@schule.example",
+            nonce,
+            extra={"auth_time": int(time.time())},
+        )
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert cb.headers["location"] == "http://frontend.example/"
+
+    @respx.mock
+    def test_stale_reauth_still_rejected_with_return_to(self, client, signing_key):
+        _mock_idp(signing_key, "sub-rt4", "rt4@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?reauth=true&return_to=/admin")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        _mock_idp(
+            signing_key,
+            "sub-rt4",
+            "rt4@schule.example",
+            nonce,
+            extra={"auth_time": int(time.time()) - 3600},
+        )
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert cb.headers["location"].endswith("/login?error=reauth_failed")
+
+    @respx.mock
+    def test_stale_return_to_cookie_is_cleared_by_a_plain_login(
+        self, client, signing_key
+    ):
+        _mock_idp(signing_key, "sub-rt5", "rt5@schule.example", "n")
+        client.get("/api/v1/auth/login?reauth=true&return_to=/admin")
+        assert client.cookies.get("oidc_return_to", "").strip('"') == "/admin"
+        resp = client.get("/api/v1/auth/login")
+        cleared = [
+            c
+            for c in resp.headers.get_list("set-cookie")
+            if c.startswith("oidc_return_to=")
+        ]
+        assert cleared and "Max-Age=0" in cleared[0]
+
+    @respx.mock
+    def test_plain_login_with_return_to_redirects_there(self, client, signing_key):
+        _mock_idp(signing_key, "sub-rt6", "rt6@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?return_to=/admin")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        _mock_idp(signing_key, "sub-rt6", "rt6@schule.example", nonce)
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert cb.headers["location"] == "http://frontend.example/admin"
+        deleted = [
+            c
+            for c in cb.headers.get_list("set-cookie")
+            if c.startswith("oidc_return_to=") and "Max-Age=0" in c
+        ]
+        assert deleted
+
+    @respx.mock
+    def test_return_to_cookie_is_cleared_after_a_failed_callback(
+        self, client, signing_key
+    ):
+        _mock_idp(signing_key, "sub-rt7", "rt7@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?reauth=true&return_to=/admin")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        nonce = client.cookies.get("oidc_nonce")
+        _mock_idp(
+            signing_key,
+            "sub-rt7",
+            "rt7@schule.example",
+            nonce,
+            extra={"auth_time": int(time.time()) - 3600},
+        )
+        cb = client.get(f"/api/v1/auth/callback?state={q['state'][0]}&code=abc")
+        assert any(
+            c.startswith("oidc_return_to=") and "Max-Age=0" in c
+            for c in cb.headers.get_list("set-cookie")
+        )
+
+
 class TestRetention:
     @respx.mock
     def test_login_purges_expired_sessions(self, client, db, signing_key):
@@ -1018,7 +1185,13 @@ class TestSecureCookies:
             for c in resp.headers.get_list("set-cookie")
             if "Max-Age=0" in c
         }
-        assert {"oidc_state", "oidc_verifier", "oidc_nonce", "oidc_reauth"} <= deleted
+        assert {
+            "oidc_state",
+            "oidc_verifier",
+            "oidc_nonce",
+            "oidc_reauth",
+            "oidc_return_to",
+        } <= deleted
         # replaying the callback with the (now cleared) cookie jar is expired
         replay = client.get(f"/api/v1/auth/callback?state={state}&code=abc")
         assert replay.headers["location"].endswith("/login?error=login_expired")

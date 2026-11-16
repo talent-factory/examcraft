@@ -5,7 +5,8 @@
  *
  * EXAMCRAFT-126: The step-up (TF-758) is no longer a password field here. The
  * backend demands a fresh IdP login (`auth_reauth_required`, 403); the dialog
- * then sends the admin through `/api/v1/auth/login?reauth=true`.
+ * then sends the admin through `/api/v1/auth/login?reauth=true&return_to=/admin`
+ * and, on return, reopens prefilled from the saved request (EXAMCRAFT-144).
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -13,12 +14,75 @@ import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
 import { isAppError, translateError } from '../../errors';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  clearSessionSnapshot,
+  readSessionSnapshot,
+  writeSessionSnapshot,
+} from '../../utils/sessionSnapshot';
 
 const REASON_MIN_LENGTH = 3;
 const REASON_MAX_LENGTH = 500;
 
+// EXAMCRAFT-144: the step-up leaves the app for the IdP, so the pending request
+// (target user + reason, never a password or token) is kept as a session
+// snapshot (TF-608: wiped on logout) and the dialog reopens prefilled on
+// return. It is bound to the saving admin, because a step-up can end in a
+// different account (`prompt=login`), and one click confirms.
+const PENDING_SNAPSHOT_KEY = 'pending-impersonation';
+const PENDING_SNAPSHOT_VERSION = 1;
+const STEP_UP_RETURN_TO = '/admin';
+const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
+
+export interface PendingImpersonation {
+  userId: number;
+  reason: string;
+}
+
+interface StoredPendingImpersonation extends PendingImpersonation {
+  adminId: number;
+  savedAt: number;
+}
+
+function savePendingImpersonation(pending: PendingImpersonation, adminId: number): void {
+  // A failed write is not fatal: after the step-up the dialog stays closed and
+  // the admin re-selects the user and re-enters the reason.
+  const saved = writeSessionSnapshot<StoredPendingImpersonation>(
+    PENDING_SNAPSHOT_KEY,
+    PENDING_SNAPSHOT_VERSION,
+    { ...pending, adminId, savedAt: Date.now() },
+  );
+  if (!saved) {
+    console.warn('[ImpersonationReasonDialog] Pending impersonation could not be saved.');
+  }
+}
+
+/**
+ * Read and remove the pending request. Null when absent, stale, malformed or
+ * saved by a different admin than `adminId`.
+ */
+export function takePendingImpersonation(adminId: number): PendingImpersonation | null {
+  const data = readSessionSnapshot<StoredPendingImpersonation>(
+    PENDING_SNAPSHOT_KEY,
+    PENDING_SNAPSHOT_VERSION,
+  );
+  if (!data) return null;
+  clearSessionSnapshot(PENDING_SNAPSHOT_KEY);
+  if (
+    Number.isInteger(data.userId) &&
+    typeof data.reason === 'string' &&
+    data.adminId === adminId &&
+    typeof data.savedAt === 'number' &&
+    Date.now() - data.savedAt <= PENDING_MAX_AGE_MS
+  ) {
+    return { userId: data.userId, reason: data.reason };
+  }
+  return null;
+}
+
 interface ImpersonationReasonDialogProps {
   userId: number | null;
+  /** Reason restored after a step-up round trip. */
+  initialReason?: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -26,12 +90,13 @@ interface ImpersonationReasonDialogProps {
 
 export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps> = ({
   userId,
+  initialReason = '',
   isOpen,
   onClose,
   onSuccess,
 }) => {
   const { t } = useTranslation();
-  const { startImpersonation, login } = useAuth();
+  const { user, startImpersonation, login } = useAuth();
   const [target, setTarget] = useState<UserDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -65,6 +130,12 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
     }
   }, [isOpen, userId, loadTarget]);
 
+  // Separate from the load effect: a new `loadTarget` identity (language
+  // change) must not overwrite a reason the admin already typed.
+  useEffect(() => {
+    if (isOpen && userId) setReason(initialReason);
+  }, [isOpen, userId, initialReason]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
@@ -86,10 +157,14 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       onClose();
     } catch (err) {
       if (isAppError(err) && err.code === 'auth_reauth_required') {
-        // Step-up: the IdP login is older than the backend accepts. The page
-        // is left for the IdP and returns to the app root, so the reason is
-        // entered again afterwards.
-        login({ reauth: true });
+        // Step-up: the IdP login is older than the backend accepts. Keep the
+        // request and return to the admin panel, where the dialog reopens.
+        if (user) {
+          savePendingImpersonation({ userId, reason: trimmedReason }, user.id);
+        } else {
+          console.warn('[ImpersonationReasonDialog] No current user, step-up without resume.');
+        }
+        login({ reauth: true, returnTo: STEP_UP_RETURN_TO });
         return;
       }
       setError(translateError(err, t, 'admin.impersonation.dialogError'));
