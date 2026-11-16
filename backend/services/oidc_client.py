@@ -101,6 +101,9 @@ def _jwks(jwks_uri: str) -> dict:
     return _jwks_cached(jwks_uri, _bucket())
 
 
+_REQUIRED_DISCOVERY_KEYS = ("authorization_endpoint", "token_endpoint", "jwks_uri")
+
+
 @lru_cache(maxsize=4)
 def _discovery_cached(issuer_url: str, _bucket_id: int) -> dict:
     resp = httpx.get(
@@ -113,6 +116,13 @@ def _discovery_cached(issuer_url: str, _bucket_id: int) -> dict:
         raise httpx.DecodingError("Discovery lieferte kein JSON") from exc
     if not isinstance(disco, dict):
         raise httpx.DecodingError("Discovery ist kein JSON-Objekt")
+    missing = [
+        key
+        for key in _REQUIRED_DISCOVERY_KEYS
+        if not (isinstance(disco.get(key), str) and disco[key])
+    ]
+    if missing:
+        raise httpx.DecodingError(f"Discovery ohne Pflichtfelder: {', '.join(missing)}")
     return disco
 
 
@@ -139,13 +149,27 @@ def clear_caches() -> None:
 
 
 def build_authorize_url(
-    state: str, code_challenge: str, nonce: str, force_login: bool = False
+    state: str,
+    code_challenge: str,
+    nonce: str,
+    force_login: bool = False,
+    *,
+    client_id_override: Optional[str] = None,
+    redirect_uri_override: Optional[str] = None,
 ) -> str:
-    """Authorize URL. ``force_login`` sets ``prompt=login`` (re-authentication)."""
+    """Authorize URL. ``force_login`` sets ``prompt=login`` (re-authentication).
+
+    The ``*_override`` arguments select another OIDC client of the same issuer
+    (the MCP server has its own, EXAMCRAFT-127); default is the web client.
+    """
     disco = _discovery(issuer())
     query = {
-        "client_id": client_id(),
-        "redirect_uri": redirect_uri(),
+        "client_id": client_id_override
+        if client_id_override is not None
+        else client_id(),
+        "redirect_uri": redirect_uri_override
+        if redirect_uri_override is not None
+        else redirect_uri(),
         "response_type": "code",
         "scope": " ".join(scopes()),
         "state": state,
@@ -161,17 +185,33 @@ def build_authorize_url(
     return f"{disco['authorization_endpoint']}?{urlencode(query)}"
 
 
-def exchange_code(code: str, code_verifier: str) -> dict:
+def exchange_code(
+    code: str,
+    code_verifier: str,
+    *,
+    client_id_override: Optional[str] = None,
+    client_secret_override: Optional[str] = None,
+    redirect_uri_override: Optional[str] = None,
+) -> dict:
+    """Exchange the code. The ``*_override`` arguments select another OIDC
+    client of the same issuer (MCP server); default is the web client."""
     disco = _discovery(issuer())
     resp = httpx.post(
         disco["token_endpoint"],
         data={
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": redirect_uri(),
+            "redirect_uri": redirect_uri_override
+            if redirect_uri_override is not None
+            else redirect_uri(),
             "code_verifier": code_verifier,
         },
-        auth=(client_id(), _env("OIDC_CLIENT_SECRET")),
+        auth=(
+            client_id_override if client_id_override is not None else client_id(),
+            client_secret_override
+            if client_secret_override is not None
+            else _env("OIDC_CLIENT_SECRET"),
+        ),
         timeout=HTTP_TIMEOUT_SECONDS,
     )
     if resp.status_code >= 400:
@@ -199,8 +239,11 @@ def _find_jwk(jwks: dict, kid: Optional[str]) -> Optional[dict]:
     return next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
 
 
-def validate_id_token(id_token: str, nonce: str) -> dict:
+def validate_id_token(
+    id_token: str, nonce: str, *, client_id_override: Optional[str] = None
+) -> dict:
     """Verify signature (RS256), ``aud``, ``iss``, expiry and (if given) nonce.
+    ``client_id_override`` is the expected audience of another OIDC client.
 
     Raises ``jose.exceptions.JWTError`` for an invalid token and
     ``UnknownSigningKeyError`` if the ``kid`` is unknown even after one
@@ -219,7 +262,7 @@ def validate_id_token(id_token: str, nonce: str) -> dict:
         id_token,
         jwk,
         algorithms=["RS256"],
-        audience=client_id(),
+        audience=client_id_override if client_id_override is not None else client_id(),
         issuer=issuer(),
         options={"verify_at_hash": False},
     )

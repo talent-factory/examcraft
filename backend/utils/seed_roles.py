@@ -178,6 +178,15 @@ def seed_default_roles(db: Session):
             ],
             "is_system_role": True,
         },
+        {
+            # EXAMCRAFT-127: opt-in, only a superuser may grant it (the
+            # migration ec127_mcp_use_role creates the same role on existing DBs).
+            "name": "mcp_user",
+            "display_name": "MCP-Zugang",
+            "description": "Berechtigt zur Nutzung des MCP-Servers (Ops-Tools).",
+            "permissions": ["mcp:use"],
+            "is_system_role": False,
+        },
     ]
 
     created_count = 0

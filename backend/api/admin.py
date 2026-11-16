@@ -25,7 +25,11 @@ from utils.auth_utils import (
 from services.audit_service import AuditService
 from services import oidc_client, session_service
 from services.auth_service import AuthService
-from utils.permissions import KNOWN_PERMISSIONS, parse_role_permissions
+from utils.permissions import (
+    KNOWN_PERMISSIONS,
+    parse_role_permissions,
+    role_is_superuser_grant_only,
+)
 from utils.impersonation_context import get_impersonation_context
 from errors import api_error
 
@@ -700,6 +704,21 @@ async def assign_role_to_user(
 
     if not role:
         raise api_error(status.HTTP_404_NOT_FOUND, "admin_role_not_found", locale)
+
+    # EXAMCRAFT-127: roles carrying mcp:use are superuser-grant-only, otherwise an
+    # institution admin could give themselves the platform-wide MCP tools.
+    if not current_user.is_superuser and role_is_superuser_grant_only(role):
+        AuditService.log_grant_denied(
+            db,
+            user_id=current_user.id,
+            role_id=role.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=user.id,
+            request=http_request,
+        )
+        raise api_error(
+            status.HTTP_403_FORBIDDEN, "admin_insufficient_permissions", locale
+        )
 
     # Check if user already has this role
     if role in user.roles:

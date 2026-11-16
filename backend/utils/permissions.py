@@ -116,6 +116,14 @@ _KNOWN_PERMISSIONS: dict[str, PermissionMeta] = {
         "label": "ILIAS-Export/Import verwenden",
         "category": "Integration",
     },
+    # EXAMCRAFT-127: opt-in only. Replaces the ALLOWED_EMAILS whitelist of the
+    # MCP server: only users holding it can complete the MCP OAuth flow and
+    # keep a valid MCP token (checked on every request, so revoking it takes
+    # effect immediately). Superusers have it implicitly (has_permission).
+    "mcp:use": {
+        "label": "MCP-Server verwenden (Ops-Tools)",
+        "category": "Integration",
+    },
     # TF-906: opt-in only, same reasoning as users:impersonate/ilias:use above
     # -- Portfolio-Assessment is a new pilot capability, no institution gets
     # it by default.
@@ -161,6 +169,7 @@ OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset(
     {
         "users:impersonate",
         "ilias:use",
+        "mcp:use",
         "portfolio_templates:manage",
         "portfolio_templates:read",
         "portfolio_templates:read_all",
@@ -168,6 +177,21 @@ OPT_IN_ONLY_PERMISSIONS: frozenset[str] = frozenset(
         "portfolio_assessments:read",
     }
 )
+
+# Permissions that only a superuser may *grant* (via a role assignment or an
+# OrgUnit's granted role). mcp:use opens the MCP server, including its
+# platform-wide Fly.io/ops tools; an institution admin, who may otherwise assign
+# any existing role in their institution, must not be able to hand it to
+# themselves (EXAMCRAFT-127).
+SUPERUSER_GRANT_ONLY_PERMISSIONS: frozenset[str] = frozenset({"mcp:use"})
+
+
+def role_is_superuser_grant_only(role: Any) -> bool:
+    """True if ``role`` carries a permission only superusers may grant."""
+    return bool(
+        SUPERUSER_GRANT_ONLY_PERMISSIONS & set(parse_role_permissions(role.permissions))
+    )
+
 
 # Fail fast at import time if an opt-in permission is ever added here
 # without a matching KNOWN_PERMISSIONS entry (silent otherwise: set

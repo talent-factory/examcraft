@@ -6,11 +6,13 @@ roles created via POST /api/admin/roles are correctly returned by GET /api/admin
 with their permissions properly parsed from Postgres array literal format.
 """
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from models.auth import User, Role, Institution, UserStatus
+from models.auth import AuditLog, User, Role, Institution, UserStatus
 from utils.auth_utils import get_current_user, get_current_superuser
 from utils.permissions import parse_role_permissions as _parse_role_permissions
 from database import get_db
@@ -938,3 +940,104 @@ def test_delete_role_still_requires_superuser_for_institution_admin(
     response = client_institution_admin.delete(f"/api/admin/roles/{role.id}")
     assert response.status_code == 403
     assert test_db.query(Role).filter(Role.id == role.id).first() is not None
+
+
+class TestMcpUseGrantIsSuperuserOnly:
+    """EXAMCRAFT-127: mcp:use opens platform-wide ops tools; an institution
+    admin must not be able to grant it (to themselves) via an existing role."""
+
+    @pytest.fixture
+    def mcp_role(self, test_db):
+        role = Role(
+            name="mcp_user_test",
+            display_name="MCP",
+            permissions='["mcp:use"]',
+        )
+        test_db.add(role)
+        test_db.commit()
+        test_db.refresh(role)
+        return role
+
+    @pytest.fixture
+    def institution_admin(self, test_db):
+        inst = _make_institution(test_db, "mcp-grant-inst")
+        admin_role = Role(
+            name="admin", display_name="Admin", permissions='["manage_users"]'
+        )
+        user = User(
+            email="instadmin@example.com",
+            password_hash="x",
+            first_name="Inst",
+            last_name="Admin",
+            institution_id=inst.id,
+            status=UserStatus.ACTIVE.value,
+            is_superuser=False,
+        )
+        existing = test_db.query(Role).filter(Role.name == "admin").first()
+        user.roles.append(existing or admin_role)
+        test_db.add(user)
+        test_db.commit()
+        test_db.refresh(user)
+        return user
+
+    def test_institution_admin_cannot_assign_mcp_role(
+        self, test_db, institution_admin, mcp_role
+    ):
+        app.dependency_overrides[get_db] = lambda: test_db
+        app.dependency_overrides[get_current_user] = lambda: institution_admin
+        try:
+            response = TestClient(app).post(
+                f"/api/admin/users/{institution_admin.id}/roles",
+                json={"role_id": mcp_role.id},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 403
+        test_db.refresh(institution_admin)
+        assert mcp_role not in institution_admin.roles
+        entry = (
+            test_db.query(AuditLog)
+            .filter(
+                AuditLog.user_id == institution_admin.id,
+                AuditLog.action == "permission_denied",
+            )
+            .one()
+        )
+        assert entry.status == "failure"
+        assert "grant_superuser_only_role" in json.dumps(entry.additional_data)
+
+    def test_superuser_can_assign_mcp_role(
+        self, test_db, institution_admin, mcp_role, superuser
+    ):
+        app.dependency_overrides[get_db] = lambda: test_db
+        app.dependency_overrides[get_current_user] = lambda: superuser
+        try:
+            response = TestClient(app).post(
+                f"/api/admin/users/{institution_admin.id}/roles",
+                json={"role_id": mcp_role.id},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert response.status_code == 200
+
+    def test_helper_flags_only_mcp_use(self, mcp_role):
+        from utils.permissions import role_is_superuser_grant_only
+
+        other = Role(name="x", display_name="x", permissions='["documents:read"]')
+        assert role_is_superuser_grant_only(mcp_role) is True
+        assert role_is_superuser_grant_only(other) is False
+
+    def test_helper_flags_role_with_mixed_permissions(self):
+        from utils.permissions import (
+            KNOWN_PERMISSIONS,
+            SUPERUSER_GRANT_ONLY_PERMISSIONS,
+            role_is_superuser_grant_only,
+        )
+
+        mixed = Role(
+            name="mixed", display_name="m", permissions='["documents:read","mcp:use"]'
+        )
+        assert role_is_superuser_grant_only(mixed) is True
+        assert SUPERUSER_GRANT_ONLY_PERMISSIONS <= set(KNOWN_PERMISSIONS)

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -27,6 +28,7 @@ from services.org_unit_service import (
     validate_sibling_name_unique,
 )
 from utils.auth_utils import get_current_active_user, require_permission
+from utils.permissions import role_is_superuser_grant_only
 from errors import api_error
 from services.translation_service import DEFAULT_LOCALE, get_request_locale
 
@@ -140,7 +142,12 @@ def _is_admin_role(user: User) -> bool:
 
 
 def _load_role_for_institution(
-    *, db: Session, role_id: int, current_user: User, locale: str = DEFAULT_LOCALE
+    *,
+    db: Session,
+    role_id: int,
+    current_user: User,
+    locale: str = DEFAULT_LOCALE,
+    http_request: Optional[Request] = None,
 ) -> Role:
     """Load a Role by id; 403 if the caller may not grant it, 404 if unknown.
 
@@ -164,6 +171,16 @@ def _load_role_for_institution(
     role = db.query(Role).filter(Role.id == role_id).one_or_none()
     if role is None:
         raise api_error(404, "org_units_role_not_found", locale)
+    # EXAMCRAFT-127: same gate as the direct assignment (api/admin.py).
+    if not current_user.is_superuser and role_is_superuser_grant_only(role):
+        AuditService.log_grant_denied(
+            db,
+            user_id=current_user.id,
+            role_id=role.id,
+            resource_type=AuditService.RESOURCE_ORG_UNIT,
+            request=http_request,
+        )
+        raise api_error(403, "org_units_grant_role_admin_only", locale)
     return role
 
 
@@ -251,7 +268,11 @@ async def create_org_unit_endpoint(
         )
     if body.role_id is not None:
         _load_role_for_institution(
-            db=db, role_id=body.role_id, current_user=current_user, locale=locale
+            db=db,
+            role_id=body.role_id,
+            current_user=current_user,
+            locale=locale,
+            http_request=http_request,
         )
     try:
         org_unit = create_org_unit(
@@ -296,9 +317,6 @@ async def update_org_unit_endpoint(
         db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
 
-    if body.name is not None:
-        org_unit.name = body.name
-
     fields_set = body.model_fields_set
 
     # Granted Role (TF-637). Staged on the ORM object here, not committed
@@ -311,11 +329,20 @@ async def update_org_unit_endpoint(
     if "role_id" in fields_set:
         if body.role_id is not None:
             _load_role_for_institution(
-                db=db, role_id=body.role_id, current_user=current_user, locale=locale
+                db=db,
+                role_id=body.role_id,
+                current_user=current_user,
+                locale=locale,
+                http_request=http_request,
             )
         if body.role_id != old_role_id:
             org_unit.role_id = body.role_id
             role_id_changed = True
+
+    # Staged only after the role gate: a denied grant writes an audit row,
+    # which commits -- a rename sent in the same request must not slip in.
+    if body.name is not None:
+        org_unit.name = body.name
 
     if (
         body.move_to_root
@@ -424,6 +451,22 @@ async def assign_member_endpoint(
     org_unit = _load_org_unit_for_user(
         db=db, user=current_user, org_unit_id=org_unit_id, locale=locale
     )
+    # EXAMCRAFT-127: membership in a unit whose granted role carries a
+    # superuser-grant-only permission (mcp:use) is a grant of that permission.
+    if (
+        org_unit.role is not None
+        and not current_user.is_superuser
+        and role_is_superuser_grant_only(org_unit.role)
+    ):
+        AuditService.log_grant_denied(
+            db,
+            user_id=current_user.id,
+            role_id=org_unit.role.id,
+            resource_type=AuditService.RESOURCE_ORG_UNIT,
+            resource_id=org_unit.id,
+            request=http_request,
+        )
+        raise api_error(403, "org_units_grant_role_admin_only", locale)
     target_user = (
         db.query(User)
         .filter(
