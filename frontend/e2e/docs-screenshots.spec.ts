@@ -6,17 +6,18 @@
  * try to run it headless without a seeded stack and hang/fail).
  *
  * Run: cd core/frontend && CAPTURE_DOCS=1 npx playwright test docs-screenshots --headed --timeout=300000
- * Prerequisites: just dev-full && just seed && just seed-test-data
+ * Prerequisites: just dev-full && just seed && just seed-test-data,
+ *   Backend mit E2E_TEST_LOGIN=true (Login läuft über den Test-Login, nicht über ein Passwort-Formular)
  */
 
 import { test, chromium } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
+import { loginUser } from './fixtures/auth';
 
 const BASE_URL = 'http://localhost:3000';
 const SCREENSHOTS_BASE = path.resolve(__dirname, '../../docs-site/docs/screenshots');
 const ADMIN_EMAIL = 'admin@talent-factory.ch';
-const ADMIN_PASSWORD = 'admin123'; // pragma: allowlist secret
 
 function sc(folder: string, name: string): string {
   return path.join(SCREENSHOTS_BASE, folder, name);
@@ -85,6 +86,7 @@ test('capture documentation screenshots', async () => {
   );
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
+    baseURL: BASE_URL, // loginUser navigiert relativ (/dashboard)
     viewport: { width: 1920, height: 1080 },
     locale: 'de-CH',
     colorScheme: 'light',
@@ -107,12 +109,7 @@ test('capture documentation screenshots', async () => {
 async function capture(page: any): Promise<void> {
   // ── Login ──────────────────────────────────────────────────────────────────
   console.log('→ Login');
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1000);
-  await page.fill('input[type="email"], #email', ADMIN_EMAIL);
-  await page.fill('input[type="password"], #password', ADMIN_PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/\/(dashboard|$)/, { timeout: 20000 });
+  await loginUser(page, ADMIN_EMAIL);
   await page.waitForTimeout(2000);
 
   // Dismiss onboarding tour so it never overlaps screenshots
