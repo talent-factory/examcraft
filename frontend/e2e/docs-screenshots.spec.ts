@@ -8,6 +8,8 @@
  * Run: cd core/frontend && CAPTURE_DOCS=1 npx playwright test docs-screenshots --headed --timeout=300000
  * Prerequisites: just dev-full && just seed && just seed-test-data,
  *   Backend with E2E_TEST_LOGIN=true (login uses the test login, not a password form)
+ *   and RATE_LIMIT_ENABLED=false: the run exceeds the default IP limit (60 requests/minute),
+ *   /api/auth/me then answers 429 and the app falls back to the login page.
  */
 
 import { test, chromium } from '@playwright/test';
@@ -27,8 +29,21 @@ function sc(folder: string, name: string): string {
 // run surfaces a non-zero summary instead of silently shipping wrong screenshots.
 const suspectShots: string[] = [];
 
+// Present on every page of the logged-in layout (NavigationBar). Missing means the
+// session was lost and the screenshot would show the login page.
+const LOGGED_IN_ANCHOR = '[data-testid="user-menu"]';
+
 async function snap(page: any, filePath: string, anchor?: string): Promise<void> {
   const rel = path.relative(SCREENSHOTS_BASE, filePath);
+  const loggedIn = await page
+    .locator(LOGGED_IN_ANCHOR)
+    .first()
+    .isVisible({ timeout: 1500 })
+    .catch(() => false);
+  if (!loggedIn) {
+    suspectShots.push(rel);
+    console.warn(`  ⚠️  Session verloren (${LOGGED_IN_ANCHOR} fehlt) — Screenshot zeigt vermutlich die Login-Seite: ${rel}`);
+  }
   if (anchor) {
     const visible = await page
       .locator(anchor)
