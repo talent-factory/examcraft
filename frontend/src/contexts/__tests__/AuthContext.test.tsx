@@ -95,6 +95,15 @@ describe('AuthContext – Session aus dem Cookie', () => {
     await mount();
     expect(latest.isAuthenticated).toBe(false);
     expect(latest.error).toBeNull();
+    expect(latest.notice).toBeNull();
+  });
+
+  it('meldet einen 500er beim Start als nicht prüfbare Sitzung', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockRejectedValue(new AppError('auth_profile_load_failed', 'x', 500));
+    await mount();
+    expect(latest.notice).toBe('session_unavailable');
+    spy.mockRestore();
   });
 
   it('beendet den Ladezustand auch bei einem Netzwerkfehler', async () => {
@@ -102,6 +111,7 @@ describe('AuthContext – Session aus dem Cookie', () => {
     mockAuth.getProfile.mockRejectedValue(new Error('Failed to fetch'));
     await mount();
     expect(latest.isAuthenticated).toBe(false);
+    expect(latest.notice).toBe('session_unavailable');
     spy.mockRestore();
   });
 
@@ -148,6 +158,33 @@ describe('AuthContext – checkSession (EXAMCRAFT-136)', () => {
     });
     expect(ok).toBe(false);
     expect(latest.isAuthenticated).toBe(false);
+    expect(latest.notice).toBe('session_expired');
+  });
+
+  it('der 401-Callback des apiClient setzt «Sitzung abgelaufen» nur bei aktiver Sitzung', async () => {
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    const callback = (setLogoutCallback as jest.Mock).mock.calls.at(-1)[0];
+    await act(async () => {
+      await callback();
+    });
+    expect(latest.isAuthenticated).toBe(false);
+    expect(latest.notice).toBe('session_expired');
+    // Ein verspätetes 401 darf den Hinweis nicht löschen.
+    await act(async () => {
+      await callback();
+    });
+    expect(latest.notice).toBe('session_expired');
+  });
+
+  it('der 401-Callback tut ohne Sitzung nichts', async () => {
+    mockAuth.getProfile.mockRejectedValue(new AppError('auth_token_invalid', 'x', 401));
+    await mount();
+    const callback = (setLogoutCallback as jest.Mock).mock.calls.at(-1)[0];
+    await act(async () => {
+      await callback();
+    });
+    expect(latest.notice).toBeNull();
   });
 
   it('wertet einen 500er nicht als Session-Verlust', async () => {
@@ -245,6 +282,27 @@ describe('AuthContext – login/logout', () => {
     spy.mockRestore();
   });
 
+  it('logout() meldet einen fehlgeschlagenen Server-Logout als Hinweis', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValue(admin as never);
+    mockAuth.logout.mockRejectedValue(new Error('offline'));
+    await mount();
+    await act(async () => {
+      await latest.logout();
+    });
+    expect(latest.notice).toBe('logout_failed');
+    spy.mockRestore();
+  });
+
+  it('ein erfolgreicher logout() hinterlässt keinen Hinweis', async () => {
+    mockAuth.getProfile.mockResolvedValue(admin as never);
+    await mount();
+    await act(async () => {
+      await latest.logout();
+    });
+    expect(latest.notice).toBeNull();
+  });
+
   it('ignoriert fremde storage-Keys', async () => {
     mockAuth.getProfile.mockResolvedValue(admin as never);
     await mount();
@@ -284,6 +342,22 @@ describe('AuthContext – login/logout', () => {
     expect(latest.isImpersonating).toBe(false);
   });
 
+  it('meldet «Sitzung abgelaufen», wenn der Impersonation-Sync aus einem anderen Tab ein 401 trifft', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    localStorage.setItem('examcraft_impersonation_expires_at', new Date(Date.now() + 60_000).toISOString());
+    mockAuth.getProfile.mockRejectedValueOnce(new AppError('auth_token_invalid', 'x', 401));
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'examcraft_impersonation_expires_at', newValue: '1' }),
+      );
+    });
+    await waitFor(() => expect(latest.notice).toBe('session_expired'));
+    expect(latest.isAuthenticated).toBe(false);
+    spy.mockRestore();
+  });
+
   it('folgt einem Logout aus einem anderen Tab', async () => {
     mockAuth.getProfile.mockResolvedValue(admin as never);
     await mount();
@@ -291,6 +365,8 @@ describe('AuthContext – login/logout', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'examcraft_logout_broadcast', newValue: '1' }));
     });
     expect(latest.isAuthenticated).toBe(false);
+    // Der Benutzer hat sich selbst abgemeldet: kein Hinweis.
+    expect(latest.notice).toBeNull();
   });
 });
 
@@ -351,6 +427,42 @@ describe('AuthContext – Impersonation', () => {
     expect(latest.isImpersonating).toBe(false);
     expect(latest.user).toEqual(admin);
     expect(localStorage.getItem('examcraft_impersonation_expires_at')).toBeNull();
+  });
+
+  it('endImpersonation() meldet «Sitzung abgelaufen», wenn die Admin-Sitzung verloren ist', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockResolvedValueOnce(target as never);
+    await act(async () => {
+      await latest.startImpersonation({ expiresIn: 1800 });
+    });
+    mockAuth.getProfile.mockRejectedValueOnce(new AppError('auth_token_invalid', 'x', 401));
+    await act(async () => {
+      await latest.endImpersonation();
+    });
+    expect(latest.isAuthenticated).toBe(false);
+    expect(latest.isImpersonating).toBe(false);
+    expect(latest.notice).toBe('session_expired');
+    expect(localStorage.getItem('examcraft_impersonation_expires_at')).toBeNull();
+    spy.mockRestore();
+  });
+
+  it('endImpersonation() behauptet bei einem Serverfehler keinen Ablauf der Sitzung', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockResolvedValueOnce(target as never);
+    await act(async () => {
+      await latest.startImpersonation({ expiresIn: 1800 });
+    });
+    mockAuth.getProfile.mockRejectedValueOnce(new AppError('auth_profile_load_failed', 'x', 500));
+    await act(async () => {
+      await latest.endImpersonation();
+    });
+    expect(latest.isAuthenticated).toBe(false);
+    expect(latest.notice).toBe('session_unavailable');
+    spy.mockRestore();
   });
 
   it('endImpersonation() behält die Impersonation, wenn der Server-Aufruf scheitert', async () => {

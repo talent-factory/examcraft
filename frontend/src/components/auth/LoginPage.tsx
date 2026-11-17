@@ -28,7 +28,7 @@ const LOGIN_ERROR_CODES = [
 
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
-  const { login } = useAuth();
+  const { login, notice } = useAuth();
   const [searchParams] = useSearchParams();
 
   const errorParam = searchParams.get('error');
@@ -56,6 +56,16 @@ export const LoginPage: React.FC = () => {
         <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-10">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('auth.login.title')}</h2>
           <p className="text-sm text-gray-600 mb-6">{t('auth.login.subtitle')}</p>
+
+          {notice && !errorCode && (
+            <div
+              role="status"
+              data-testid="login-notice"
+              className="mb-6 rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800"
+            >
+              {t(`auth.loginNotice.${notice}`)}
+            </div>
+          )}
 
           {errorCode && (
             <div role="alert" className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-800">

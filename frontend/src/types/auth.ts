@@ -161,11 +161,22 @@ export interface UserResponse {
 // Auth State Types
 // ============================================================================
 
+/**
+ * Why the user was sent to the login page without asking for it
+ * (EXAMCRAFT-135). `session_expired`: a request or the session check got a 401
+ * while signed in. `session_unavailable`: the session could not be checked at
+ * startup (backend or network failure, not a 401). `logout_failed`: the
+ * server-side logout failed, so the server session may still be alive.
+ */
+export type AuthNotice = 'session_expired' | 'session_unavailable' | 'logout_failed';
+
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  /** Reason for an involuntary sign-out, shown on the login page; null otherwise. */
+  notice: AuthNotice | null;
   /** True while `user` reflects an impersonated target, not the admin who started the session (TF-743). */
   isImpersonating: boolean;
   /** ISO timestamp of the impersonation token's hard TF-741 30-min cap, or null when not impersonating. */

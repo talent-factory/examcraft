@@ -436,6 +436,11 @@
       "claims_missing": "Il tuo account non fornisce tutti i dati necessari (ad es. un indirizzo e-mail verificato). Completali nell'account e riprova.",
       "account_inactive": "Il tuo account non è attivo. Contatta il tuo amministratore.",
       "reauth_failed": "Il nuovo accesso non è riuscito. Riprova."
+    },
+    "loginNotice": {
+      "session_expired": "La tua sessione è scaduta o è stata terminata. Accedi di nuovo.",
+      "session_unavailable": "Non è stato possibile verificare la tua sessione (server non raggiungibile o errore). Riprova.",
+      "logout_failed": "La disconnessione sul server non è riuscita. La tua sessione potrebbe essere ancora attiva. Se condividi questo computer, accedi di nuovo e poi disconnettiti ancora."
     }
   },
   "footer": {

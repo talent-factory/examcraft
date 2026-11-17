@@ -436,6 +436,11 @@
       "claims_missing": "Dein Konto liefert nicht alle nötigen Angaben (z. B. eine bestätigte E-Mail-Adresse). Bitte ergänze sie im Konto und versuche es erneut.",
       "account_inactive": "Dein Konto ist nicht aktiv. Bitte wende dich an deine Administratorin oder deinen Administrator.",
       "reauth_failed": "Die erneute Anmeldung war nicht erfolgreich. Bitte versuche es erneut."
+    },
+    "loginNotice": {
+      "session_expired": "Deine Sitzung ist abgelaufen oder wurde beendet. Bitte melde dich erneut an.",
+      "session_unavailable": "Deine Sitzung konnte nicht geprüft werden (Server nicht erreichbar oder Fehler). Bitte versuche es erneut.",
+      "logout_failed": "Die Abmeldung auf dem Server ist fehlgeschlagen. Deine Sitzung könnte noch aktiv sein. Wenn du den Computer mit anderen teilst, melde dich bitte erneut an und wieder ab."
     }
   },
   "footer": {

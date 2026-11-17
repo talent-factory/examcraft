@@ -436,6 +436,11 @@
       "claims_missing": "Your account does not provide all required details (for example a verified email address). Please complete it in your account and try again.",
       "account_inactive": "Your account is not active. Please contact your administrator.",
       "reauth_failed": "Signing in again was not successful. Please try again."
+    },
+    "loginNotice": {
+      "session_expired": "Your session has expired or was ended. Please sign in again.",
+      "session_unavailable": "Your session could not be checked (server unreachable or an error occurred). Please try again.",
+      "logout_failed": "Signing out on the server failed. Your session may still be active. If you share this computer, please sign in again and sign out once more."
     }
   },
   "footer": {

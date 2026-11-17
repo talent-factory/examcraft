@@ -14,6 +14,7 @@ import {
   AuthContextType,
   UserRole,
   UpdateProfileRequest,
+  AuthNotice,
 } from '../types/auth';
 import AuthService from '../services/AuthService';
 import AdminService from '../services/AdminService';
@@ -65,8 +66,21 @@ const SIGNED_OUT: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  notice: null,
   ...NOT_IMPERSONATING,
 };
+
+function signedInState(user: AuthState['user'], impersonationExpiresAt: string | null): AuthState {
+  return {
+    user,
+    isAuthenticated: true,
+    isLoading: false,
+    error: null,
+    notice: null,
+    isImpersonating: impersonationExpiresAt !== null,
+    impersonationExpiresAt,
+  };
+}
 
 function readImpersonationHint(): string | null {
   try {
@@ -123,16 +137,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Tear the session down in this tab only (state + hints). Does not call the
    * backend: used when the server already said the session is gone (401) and
-   * when another tab logged out.
+   * when another tab logged out. `notice` tells the login page why the user
+   * lands there (EXAMCRAFT-135); without one the sign-out is silent.
    */
-  const clearLocalSession = useCallback(() => {
+  const clearLocalSession = useCallback((notice: AuthNotice | null = null) => {
     cancelImpersonationTimer();
     writeImpersonationHint(null);
     // TF-608: sessionStorage survives a user switch within the same tab;
     // rationale (shared machine) in sessionSnapshot.ts.
     clearAllSessionSnapshots();
-    setState(SIGNED_OUT);
+    // Update the ref right away: the effect that mirrors the state runs only
+    // after the commit, and a late 401 must not count as an expiry meanwhile.
+    isAuthenticatedRef.current = false;
+    setState({ ...SIGNED_OUT, notice });
   }, [cancelImpersonationTimer]);
+
+  // Sets the ref in the same step as the state: the effect that mirrors the
+  // state runs only after the commit, and a 401 arriving in between must still
+  // find the session it has to end.
+  const applySignedIn = useCallback((user: AuthState['user'], impersonationExpiresAt: string | null) => {
+    isAuthenticatedRef.current = true;
+    setState(signedInState(user, impersonationExpiresAt));
+  }, []);
+
+  // A 401 on a session the user was still using means it expired or was ended
+  // elsewhere. Without a running session (public pages, the login page itself,
+  // late 401s of requests still in flight after the sign-out) there is nothing
+  // to tear down, and resetting would wipe the notice the first 401 set.
+  const endExpiredSession = useCallback(() => {
+    if (!isAuthenticatedRef.current) return;
+    clearLocalSession('session_expired');
+  }, [clearLocalSession]);
 
   /**
    * Load the profile of the session cookie and apply the preferred language.
@@ -174,24 +209,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profile = await loadProfile();
         if (cancelled) return;
         const expiresAt = readImpersonationHint();
-        setState({
-          user: profile,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-          isImpersonating: expiresAt !== null,
-          impersonationExpiresAt: expiresAt,
-        });
+        applySignedIn(profile, expiresAt);
         if (expiresAt) scheduleImpersonationEnd(expiresAt);
       } catch (error) {
-        // 401 is the normal "not signed in"; anything else is logged. Either
-        // way the app shows the login page rather than hanging on the spinner.
-        if (!(error instanceof AppError && error.status === 401)) {
+        // 401 is the normal "not signed in"; anything else is logged and
+        // reported on the login page, since the user may well have a valid
+        // session that just could not be checked (backend or network down).
+        // Either way the app shows the login page rather than hanging on the
+        // spinner.
+        const notSignedIn = error instanceof AppError && error.status === 401;
+        if (!notSignedIn) {
           console.error('[AuthContext] Failed to load session:', error);
         }
         if (!cancelled) {
           writeImpersonationHint(null);
-          setState(SIGNED_OUT);
+          setState({ ...SIGNED_OUT, notice: notSignedIn ? null : 'session_unavailable' });
         }
       }
     };
@@ -199,7 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [loadProfile, scheduleImpersonationEnd]);
+  }, [applySignedIn, loadProfile, scheduleImpersonationEnd]);
 
   /**
    * Start the login: the backend runs the OIDC flow and sets the cookie, then
@@ -221,17 +253,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return endImpersonationRef.current();
     }
 
+    let notice: AuthNotice | null = null;
     try {
       await AuthService.logout();
     } catch (error) {
+      // The local session is torn down regardless, but the server-side one
+      // may still be alive: say so instead of pretending a clean sign-out.
       console.error('[AuthContext] Logout error:', error);
+      notice = 'logout_failed';
     } finally {
       try {
         localStorage.setItem(LOGOUT_BROADCAST_KEY, String(Date.now()));
       } catch (error) {
         console.error('[AuthContext] Failed to broadcast logout:', error);
       }
-      clearLocalSession();
+      clearLocalSession(notice);
     }
   }, [clearLocalSession]);
 
@@ -253,14 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const targetUser = await loadProfile();
       writeImpersonationHint(expiresAt);
-      setState({
-        user: targetUser,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        isImpersonating: true,
-        impersonationExpiresAt: expiresAt,
-      });
+      applySignedIn(targetUser, expiresAt);
       scheduleImpersonationEnd(expiresAt);
     } catch (error) {
       // The backend session already exists; tell it the attempt is abandoned
@@ -270,7 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       throw error;
     }
-  }, [loadProfile, scheduleImpersonationEnd]);
+  }, [applySignedIn, loadProfile, scheduleImpersonationEnd]);
 
   /**
    * Public entry point for ending impersonation (banner button, hard cap,
@@ -305,20 +334,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const adminUser = await loadProfile();
-      setState({
-        user: adminUser,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-        ...NOT_IMPERSONATING,
-      });
+      applySignedIn(adminUser, null);
     } catch (error) {
       // No valid session left (e.g. the admin's own session lapsed).
       console.error('[AuthContext] Failed to reload admin profile after impersonation:', error);
-      clearLocalSession();
+      // Only a 401 means the session is gone; any other failure just means it
+      // could not be checked, and the notice must not claim an expiry.
+      clearLocalSession(
+        error instanceof AppError && error.status === 401 ? 'session_expired' : 'session_unavailable',
+      );
     }
     return { backendEndFailed };
-  }, [cancelImpersonationTimer, loadProfile, clearLocalSession]);
+  }, [applySignedIn, cancelImpersonationTimer, loadProfile, clearLocalSession]);
 
   useEffect(() => {
     endImpersonationRef.current = endImpersonation;
@@ -327,9 +354,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // The api client reaches for this on a 401 from any request: the cookie is
     // gone or expired, so only the local state is torn down.
-    setLogoutCallback(async () => clearLocalSession());
+    setLogoutCallback(async () => endExpiredSession());
     setupFetchInterceptor();
-  }, [clearLocalSession]);
+  }, [endExpiredSession]);
 
   /**
    * Follow a logout made in another tab.
@@ -344,19 +371,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadProfile()
           .then((profile) => {
             const expiresAt = readImpersonationHint();
-            setState({
-              user: profile,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-              isImpersonating: expiresAt !== null,
-              impersonationExpiresAt: expiresAt,
-            });
+            applySignedIn(profile, expiresAt);
             if (expiresAt) scheduleImpersonationEnd(expiresAt);
             else cancelImpersonationTimer();
           })
           .catch((error) => {
             console.error('[AuthContext] Failed to sync impersonation from another tab:', error);
+            // The session ended meanwhile: say so instead of keeping a stale identity.
+            if (error instanceof AppError && error.status === 401) endExpiredSession();
           });
         return;
       }
@@ -369,7 +391,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [clearLocalSession, loadProfile, scheduleImpersonationEnd, cancelImpersonationTimer]);
+  }, [applySignedIn, clearLocalSession, endExpiredSession, loadProfile, scheduleImpersonationEnd, cancelImpersonationTimer]);
 
   useEffect(() => cancelImpersonationTimer, [cancelImpersonationTimer]);
 
@@ -409,13 +431,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // `/api/auth/me` is excluded from the global 401 handling, so the
       // teardown happens here.
       if (error instanceof AppError && error.status === 401) {
-        clearLocalSession();
+        endExpiredSession();
         return false;
       }
       console.warn('[AuthContext] Session check failed, keeping the session:', error);
       return true;
     }
-  }, [clearLocalSession]);
+  }, [endExpiredSession]);
 
   /**
    * Clear error

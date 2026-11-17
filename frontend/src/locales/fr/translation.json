@@ -436,6 +436,11 @@
       "claims_missing": "Votre compte ne fournit pas toutes les informations requises (par ex. une adresse e-mail vérifiée). Veuillez les compléter dans votre compte et réessayer.",
       "account_inactive": "Votre compte n'est pas actif. Veuillez contacter votre administrateur.",
       "reauth_failed": "La nouvelle connexion n'a pas abouti. Veuillez réessayer."
+    },
+    "loginNotice": {
+      "session_expired": "Votre session a expiré ou a été terminée. Veuillez vous reconnecter.",
+      "session_unavailable": "Votre session n'a pas pu être vérifiée (serveur injoignable ou erreur). Veuillez réessayer.",
+      "logout_failed": "La déconnexion sur le serveur a échoué. Votre session est peut-être encore active. Si vous partagez cet ordinateur, reconnectez-vous puis déconnectez-vous à nouveau."
     }
   },
   "footer": {
