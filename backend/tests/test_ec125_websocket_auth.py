@@ -81,7 +81,7 @@ def test_non_active_user_is_closed(world, status):
     token, _ = session_service.create_session(world.db, user.id)
     result, fake = _authenticate(world.db, {"session_id": token})
     assert result is None
-    fake.close.assert_awaited_once_with(code=1008)
+    fake.close.assert_awaited_once_with(code=4401)
 
 
 def test_expired_session_is_closed(world):
@@ -91,13 +91,13 @@ def test_expired_session_is_closed(world):
     )
     result, fake = _authenticate(world.db, {"session_id": token})
     assert result is None
-    fake.close.assert_awaited_once_with(code=1008)
+    fake.close.assert_awaited_once_with(code=4401)
 
 
 def test_no_cookie_is_closed(world):
     result, fake = _authenticate(world.db, {})
     assert result is None
-    fake.close.assert_awaited_once_with(code=1008)
+    fake.close.assert_awaited_once_with(code=4401)
 
 
 def _impersonation(world, target_status):
@@ -131,7 +131,7 @@ def test_impersonation_cookie_alone_is_closed(world):
     _admin, _target, _admin_tok, imp_tok = _impersonation(world, "active")
     result, fake = _authenticate(world.db, {"impersonation_id": imp_tok})
     assert result is None
-    fake.close.assert_awaited_once_with(code=1008)
+    fake.close.assert_awaited_once_with(code=4401)
 
 
 def test_impersonation_token_as_login_cookie_is_closed(world):

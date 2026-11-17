@@ -5,7 +5,12 @@ import { GenerationTasksProvider, useGenerationTasks } from './GenerationTasksCo
 // Mock the AuthContext to provide a stable token by default; overridable
 // per-test (mockUseAuth.mockReturnValue(...)) to simulate a identity change
 // (impersonation start/end), which changes `user.id` and re-runs the recovery effect.
-const mockUseAuth = jest.fn(() => ({ isAuthenticated: true, user: { id: 1 } }));
+const mockCheckSession = jest.fn(() => Promise.resolve(true));
+const mockUseAuth = jest.fn(() => ({
+  isAuthenticated: true,
+  user: { id: 1 },
+  checkSession: mockCheckSession,
+}));
 jest.mock('./AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -85,7 +90,13 @@ beforeEach(() => {
     Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
   );
   mockUseAuth.mockReset();
-  mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 1 } });
+  mockCheckSession.mockReset();
+mockCheckSession.mockResolvedValue(true);
+mockUseAuth.mockReturnValue({
+  isAuthenticated: true,
+  user: { id: 1 },
+  checkSession: mockCheckSession,
+});
 });
 
 // Helper component exposes context to tests
@@ -241,11 +252,148 @@ describe('GenerationTasksProvider — sticky terminal state (TF-328)', () => {
     act(() => {
       ws.emitClose(1006);
     });
+    await waitFor(() => expect(mockCheckSession).toHaveBeenCalled());
 
     await waitFor(
       () => expect(MockWebSocket.instances.length).toBe(2),
       { timeout: 3000 },
     );
+  });
+
+  it('does not reconnect on the auth close code when the session is gone', async () => {
+    mockCheckSession.mockResolvedValue(false);
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    act(() => {
+      ws.emitClose(4401);
+    });
+
+    await waitFor(() => expect(captured!.tasks['task-1'].status).toBe('UNKNOWN'));
+    expect(mockCheckSession).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('retries after the auth close code only while the session is still valid', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(4401);
+    });
+    await waitFor(() => expect(MockWebSocket.instances.length).toBe(2), { timeout: 3000 });
+    expect(mockCheckSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not revive a socket when the provider is torn down during the session check', async () => {
+    let resolveProbe: (v: boolean) => void = () => {};
+    mockCheckSession.mockReturnValue(new Promise<boolean>((r) => (resolveProbe = r)));
+    const { unmount } = render(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    unmount();
+    await act(async () => {
+      resolveProbe(true);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not revive a task dismissed during the session check', async () => {
+    let resolveProbe: (v: boolean) => void = () => {};
+    mockCheckSession.mockReturnValue(new Promise<boolean>((r) => (resolveProbe = r)));
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    await act(async () => {
+      resolveProbe(true);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect after dismissing a task whose socket reports a code-less close', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    // The browser reports 1005 for a close without a status code.
+    act(() => {
+      ws.emitClose(1005);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+    expect(captured!.tasks['task-1']).toBeUndefined();
+  });
+
+  it('cancels a pending reconnect when the task is dismissed', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect on a policy close (1008) and keeps the session', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    // A PROGRESS buffered before the close must not flush over UNKNOWN.
+    act(() => {
+      ws.emitMessage({ task_id: 'task-1', status: 'PROGRESS', progress: 40 });
+    });
+    act(() => {
+      ws.emitClose(1008);
+    });
+    expect(captured!.tasks['task-1'].status).toBe('UNKNOWN');
+    expect(mockCheckSession).not.toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(captured!.tasks['task-1'].status).toBe('UNKNOWN');
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect after an abnormal close when the session is gone', async () => {
+    mockCheckSession.mockResolvedValue(false);
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    await waitFor(() => expect(captured!.tasks['task-1'].status).toBe('UNKNOWN'));
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('cancels a pending reconnect when the provider unmounts', async () => {
+    const { unmount } = render(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    unmount();
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
   });
 });
 

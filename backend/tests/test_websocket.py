@@ -121,6 +121,11 @@ class TestWebSocketConnection:
                 data = ws.receive_json()
                 assert data["status"] == "SUCCESS"
 
+            # The browser sends nothing after the handshake (cookie auth):
+            # the stream must start without any client message.
+            with client.websocket_connect("/ws/tasks/test-task-id") as ws:
+                assert ws.receive_json()["status"] == "SUCCESS"
+
     def test_websocket_without_session_cookie(self, ws_app):
         """No ``session_id`` cookie on the handshake → closed, never resolved
         (a token in the first message no longer authenticates)."""
@@ -128,11 +133,12 @@ class TestWebSocketConnection:
             _session_found(mock_auth, True)
 
             client = _client(ws_app, cookie=False)
-            with pytest.raises(WebSocketDisconnect):
+            with pytest.raises(WebSocketDisconnect) as exc:
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
                     ws.send_json({"token": "valid-token"})
                     ws.receive_json()
             mock_auth.resolve_effective_session.assert_not_called()
+            assert exc.value.code == 4401
 
     def test_websocket_foreign_origin_is_rejected(self, ws_app):
         """Cross-site WebSocket hijacking: a browser handshake from an origin
@@ -141,13 +147,14 @@ class TestWebSocketConnection:
             _session_found(mock_auth, True)
 
             client = _client(ws_app)
-            with pytest.raises(WebSocketDisconnect):
+            with pytest.raises(WebSocketDisconnect) as exc:
                 with client.websocket_connect(
                     "/ws/tasks/test-task-id",
                     headers={"origin": "https://evil.example"},
                 ) as ws:
                     ws.send_json({})
                     ws.receive_json()
+            assert exc.value.code == 1008
             mock_auth.resolve_effective_session.assert_not_called()
 
     def test_websocket_allowed_origin_is_accepted(self, ws_app):
@@ -170,10 +177,11 @@ class TestWebSocketConnection:
             _session_found(mock_auth, False)
 
             client = _client(ws_app)
-            with pytest.raises(WebSocketDisconnect):
+            with pytest.raises(WebSocketDisconnect) as exc:
                 with client.websocket_connect("/ws/tasks/test-task-id") as ws:
                     ws.send_json({})
                     ws.receive_json()
+            assert exc.value.code == 4401
 
     def test_websocket_revoked_token(self, ws_app, valid_token_payload, mock_user):
         """Revoked token → WebSocket is closed"""

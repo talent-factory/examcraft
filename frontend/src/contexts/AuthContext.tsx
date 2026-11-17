@@ -399,6 +399,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
+   * 401 on `/api/auth/me` ends the local session; any other outcome keeps it.
+   */
+  const checkSession = useCallback(async (): Promise<boolean> => {
+    try {
+      await AuthService.getProfile();
+      return true;
+    } catch (error) {
+      // `/api/auth/me` is excluded from the global 401 handling, so the
+      // teardown happens here.
+      if (error instanceof AppError && error.status === 401) {
+        clearLocalSession();
+        return false;
+      }
+      console.warn('[AuthContext] Session check failed, keeping the session:', error);
+      return true;
+    }
+  }, [clearLocalSession]);
+
+  /**
    * Clear error
    */
   const clearError = useCallback(() => {
@@ -451,6 +470,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     updateProfile,
+    checkSession,
     clearError,
     hasPermission,
     hasRole,

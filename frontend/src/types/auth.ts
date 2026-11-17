@@ -189,6 +189,13 @@ export interface AuthContextType extends AuthState {
   /** Resolves with `backendEndFailed` when an impersonation could not be ended (the user stays signed in as the target). */
   logout: () => Promise<{ backendEndFailed: boolean } | void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  /**
+   * Prüft die Session per `GET /api/auth/me`. Bei 401 wird die lokale Session
+   * abgebaut (die Anmeldeseite erscheint) und `false` geliefert. Jeder andere
+   * Ausgang, auch ein Netzwerkfehler, liefert `true`: die Session gilt nicht
+   * als verloren, solange der Server das nicht sagt.
+   */
+  checkSession: () => Promise<boolean>;
   clearError: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: UserRole) => boolean;

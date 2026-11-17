@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
 
+# Close codes of this endpoint (documented in docs/developer/websocket-close-codes.md).
+# 4401 = the handshake carried no valid session (cookie missing, expired,
+# revoked or user inactive). The frontend must not reconnect and checks the
+# session instead (EXAMCRAFT-136). 1008 stays for policy violations of a valid
+# session (foreign Origin, task of another user, unknown task).
+WS_CLOSE_UNAUTHENTICATED = 4401
+
 
 # Module-level singleton — only for single-instance deployment.
 # For horizontal scaling, ConnectionManager must be replaced with Redis Pub/Sub.
@@ -101,7 +108,7 @@ async def _authenticate_websocket(websocket: WebSocket) -> User | None:
     )
     if not session_token:
         logger.warning("WebSocket Auth: kein Session-Cookie")
-        await websocket.close(code=1008)
+        await websocket.close(code=WS_CLOSE_UNAUTHENTICATED)
         return None
 
     def _db_lookup() -> User | None:
@@ -135,7 +142,7 @@ async def _authenticate_websocket(websocket: WebSocket) -> User | None:
         loop = asyncio.get_running_loop()
         user = await loop.run_in_executor(None, _db_lookup)
         if not user:
-            await websocket.close(code=1008)
+            await websocket.close(code=WS_CLOSE_UNAUTHENTICATED)
             return None
         return user
     except Exception as e:
@@ -252,28 +259,15 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
     WebSocket endpoint for real-time task progress.
 
     Protocol:
-    1. Client connects
-    2. Client sends a first message (content ignored; authentication uses
-       the httpOnly session cookie of the handshake)
-    3. Server validates the session + ownership
-    4. Server streams TaskStatusMessage JSON until the terminal state
-    5. Server closes the connection after SUCCESS/FAILURE/REVOKED
+    1. Client connects (the httpOnly session cookie authenticates the
+       handshake; the client sends no message)
+    2. Server validates the session (close 4401 on failure) + ownership
+       (close 1008 on failure)
+    3. Server streams TaskStatusMessage JSON until the terminal state
+    4. Server closes the connection after SUCCESS/FAILURE/REVOKED
     """
     await manager.connect(task_id, websocket)
     try:
-        try:
-            await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
-        except asyncio.TimeoutError:
-            logger.warning(f"WebSocket Handshake-Timeout für Task {task_id}")
-            await websocket.close(code=1008)
-            return
-        except Exception as e:
-            logger.warning(
-                f"WebSocket Handshake-Fehler für Task {task_id}: {type(e).__name__}: {e}"
-            )
-            await websocket.close(code=1008)
-            return
-
         user = await _authenticate_websocket(websocket)
         if user is None:
             return

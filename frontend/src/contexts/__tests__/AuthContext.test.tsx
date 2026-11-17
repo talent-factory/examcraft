@@ -126,6 +126,57 @@ describe('AuthContext – Session aus dem Cookie', () => {
   });
 });
 
+describe('AuthContext – checkSession (EXAMCRAFT-136)', () => {
+  it('liefert true und behält die Session, solange /me antwortet', async () => {
+    mockAuth.getProfile.mockResolvedValue(admin as never);
+    await mount();
+    let ok = false;
+    await act(async () => {
+      ok = await latest.checkSession();
+    });
+    expect(ok).toBe(true);
+    expect(latest.isAuthenticated).toBe(true);
+  });
+
+  it('baut die lokale Session bei 401 ab und liefert false', async () => {
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValue(new AppError('auth_token_invalid', 'x', 401));
+    let ok = true;
+    await act(async () => {
+      ok = await latest.checkSession();
+    });
+    expect(ok).toBe(false);
+    expect(latest.isAuthenticated).toBe(false);
+  });
+
+  it('wertet einen 500er nicht als Session-Verlust', async () => {
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValue(new AppError('auth_profile_load_failed', 'x', 500));
+    let ok = false;
+    await act(async () => {
+      ok = await latest.checkSession();
+    });
+    expect(ok).toBe(true);
+    expect(latest.isAuthenticated).toBe(true);
+    spy.mockRestore();
+  });
+
+  it('wertet einen Netzwerkfehler nicht als Session-Verlust', async () => {
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValue(new Error('Failed to fetch'));
+    let ok = false;
+    await act(async () => {
+      ok = await latest.checkSession();
+    });
+    expect(ok).toBe(true);
+    expect(latest.isAuthenticated).toBe(true);
+  });
+});
+
 describe('AuthContext – login/logout', () => {
   const originalLocation = window.location;
   const assign = jest.fn();
