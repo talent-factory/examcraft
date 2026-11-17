@@ -416,7 +416,8 @@
     "login": {
       "title": "Bentornato",
       "subtitle": "Accedi con il tuo account Talent Factory.",
-      "signIn": "Accedi"
+      "signIn": "Accedi",
+      "switchAccount": "Accedi con un altro account"
     },
     "authPage": {
       "tagline": "Generazione di domande d'esame con IA",

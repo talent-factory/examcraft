@@ -416,7 +416,8 @@
     "login": {
       "title": "Willkommen zurück",
       "subtitle": "Du meldest dich mit deinem Talent-Factory-Konto an.",
-      "signIn": "Anmelden"
+      "signIn": "Anmelden",
+      "switchAccount": "Mit anderem Konto anmelden"
     },
     "authPage": {
       "tagline": "KI-gestützte Prüfungsfragengenerierung",

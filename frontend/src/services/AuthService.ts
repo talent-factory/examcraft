@@ -18,9 +18,13 @@ class AuthService {
    * `reauth` erzwingt eine frische Anmeldung beim IdP (Step-up), `returnTo`
    * is the relative in-app path the callback redirects to afterwards.
    */
-  getLoginUrl(options: { reauth?: boolean; returnTo?: string } = {}): string {
+  getLoginUrl(
+    options: { reauth?: boolean; switchAccount?: boolean; returnTo?: string } = {},
+  ): string {
     const params = new URLSearchParams();
     if (options.reauth) params.set('reauth', 'true');
+    // `switchAccount`: account chooser at the IdP (prompt=select_account).
+    if (options.switchAccount) params.set('switch_account', 'true');
     // The backend re-validates `return_to` (relative in-app paths only).
     if (options.returnTo) params.set('return_to', options.returnTo);
     const query = params.toString();

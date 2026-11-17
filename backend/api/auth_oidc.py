@@ -164,11 +164,18 @@ def set_session_cookie(response: Response, token: str, max_age_seconds: int) -> 
 
 
 @router.get("/login")
-def login(reauth: bool = False, return_to: Optional[str] = None) -> Response:
+def login(
+    reauth: bool = False,
+    switch_account: bool = False,
+    return_to: Optional[str] = None,
+) -> Response:
     """Start the authorization-code flow (PKCE) against tessera/Zitadel.
 
     ``reauth=true`` forces a fresh authentication (``prompt=login``), used
-    before sensitive actions such as starting an impersonation. ``return_to``
+    before sensitive actions such as starting an impersonation.
+    ``switch_account=true`` shows the IdP's account chooser
+    (``prompt=select_account``) so a user can sign in with another account; it
+    is not a re-authentication (``reauth`` wins if both are set). ``return_to``
     is a relative in-app path (allowlist, see ``safe_return_to``) the callback
     redirects to; an unsafe value is ignored (redirect to ``/``).
     """
@@ -177,7 +184,11 @@ def login(reauth: bool = False, return_to: Optional[str] = None) -> Response:
     verifier, challenge = _pkce_pair()
     try:
         url = oidc_client.build_authorize_url(
-            state=state, code_challenge=challenge, nonce=nonce, force_login=reauth
+            state=state,
+            code_challenge=challenge,
+            nonce=nonce,
+            force_login=reauth,
+            select_account=switch_account and not reauth,
         )
     except (httpx.HTTPError, oidc_client.OidcNotConfiguredError, KeyError):
         logger.exception("OIDC-Discovery für /login fehlgeschlagen.")

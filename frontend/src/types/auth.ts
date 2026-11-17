@@ -180,7 +180,12 @@ export interface AuthContextType extends AuthState {
    * `returnTo`: relative in-app path (e.g. `/admin`) to return to afterwards; the
    * backend only accepts allowlisted paths.
    */
-  login: (options?: { reauth?: boolean; returnTo?: string }) => void;
+  login: (options?: {
+    reauth?: boolean;
+    /** Account chooser at the IdP (`prompt=select_account`), e.g. "Sign in with another account". */
+    switchAccount?: boolean;
+    returnTo?: string;
+  }) => void;
   /** Resolves with `backendEndFailed` when an impersonation could not be ended (the user stays signed in as the target). */
   logout: () => Promise<{ backendEndFailed: boolean } | void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;

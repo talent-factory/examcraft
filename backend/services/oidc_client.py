@@ -153,11 +153,14 @@ def build_authorize_url(
     code_challenge: str,
     nonce: str,
     force_login: bool = False,
+    select_account: bool = False,
     *,
     client_id_override: Optional[str] = None,
     redirect_uri_override: Optional[str] = None,
 ) -> str:
     """Authorize URL. ``force_login`` sets ``prompt=login`` (re-authentication).
+    ``select_account`` sets ``prompt=select_account`` (account chooser, "sign in
+    with another account"); ``force_login`` takes precedence.
 
     The ``*_override`` arguments select another OIDC client of the same issuer
     (the MCP server has its own, EXAMCRAFT-127); default is the web client.
@@ -182,6 +185,8 @@ def build_authorize_url(
         # session; max_age=0 makes it put a fresh auth_time into the ID token.
         query["prompt"] = "login"
         query["max_age"] = "0"
+    elif select_account:
+        query["prompt"] = "select_account"
     return f"{disco['authorization_endpoint']}?{urlencode(query)}"
 
 

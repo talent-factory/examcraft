@@ -158,6 +158,29 @@ class TestLogin:
         assert parse_qs(urlparse(resp.headers["location"]).query)["prompt"] == ["login"]
 
     @respx.mock
+    def test_switch_account_asks_for_account_chooser(self, client, signing_key):
+        _mock_idp(signing_key, "s", "a@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?switch_account=true")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        assert q["prompt"] == ["select_account"]
+        assert "max_age" not in q
+        # Not a re-authentication: no step-up marker cookie.
+        # At most a deletion of a leftover marker, never a set one.
+        assert all(
+            "Max-Age=0" in c
+            for c in resp.headers.get_list("set-cookie")
+            if c.startswith("oidc_reauth=")
+        )
+
+    @respx.mock
+    def test_reauth_wins_over_switch_account(self, client, signing_key):
+        _mock_idp(signing_key, "s", "a@schule.example", "n")
+        resp = client.get("/api/v1/auth/login?reauth=true&switch_account=true")
+        q = parse_qs(urlparse(resp.headers["location"]).query)
+        assert q["prompt"] == ["login"]
+        assert q["max_age"] == ["0"]
+
+    @respx.mock
     def test_idp_down_redirects_to_login_error(self, client):
         respx.get(f"{ISSUER}/.well-known/openid-configuration").mock(
             return_value=httpx.Response(503)

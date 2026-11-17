@@ -11,8 +11,10 @@ jest.mock('../../services/AuthService', () => ({
   __esModule: true,
   default: {
     getLoginUrl: jest.fn(
-      (o: { reauth?: boolean } = {}) =>
-        `http://api.test/api/v1/auth/login${o.reauth ? '?reauth=true' : ''}`,
+      (o: { reauth?: boolean; switchAccount?: boolean } = {}) =>
+        `http://api.test/api/v1/auth/login${
+          o.reauth ? '?reauth=true' : o.switchAccount ? '?switch_account=true' : ''
+        }`,
     ),
     getProfile: jest.fn(),
     updateProfile: jest.fn(),
@@ -149,6 +151,13 @@ describe('AuthContext – login/logout', () => {
     await mount();
     act(() => latest.login({ reauth: true }));
     expect(assign).toHaveBeenCalledWith('http://api.test/api/v1/auth/login?reauth=true');
+  });
+
+  it('login({ switchAccount }) fordert die Kontoauswahl an', async () => {
+    mockAuth.getProfile.mockRejectedValue(new AppError('auth_token_invalid', 'x', 401));
+    await mount();
+    act(() => latest.login({ switchAccount: true }));
+    expect(assign).toHaveBeenCalledWith('http://api.test/api/v1/auth/login?switch_account=true');
   });
 
   it('logout() beendet die Server-Session und leert den Zustand', async () => {

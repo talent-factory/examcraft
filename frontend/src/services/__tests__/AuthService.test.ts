@@ -33,6 +33,12 @@ describe('AuthService (Cookie-Session, EXAMCRAFT-126)', () => {
       );
     });
 
+    it('hängt switch_account=true für die Kontoauswahl an', () => {
+      expect(authService.getLoginUrl({ switchAccount: true })).toBe(
+        'http://localhost:8000/api/v1/auth/login?switch_account=true',
+      );
+    });
+
     it('kodiert return_to für den Rücksprung nach dem Step-up', () => {
       expect(authService.getLoginUrl({ reauth: true, returnTo: '/admin' })).toBe(
         'http://localhost:8000/api/v1/auth/login?reauth=true&return_to=%2Fadmin',

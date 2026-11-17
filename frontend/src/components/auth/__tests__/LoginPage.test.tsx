@@ -27,6 +27,13 @@ describe('LoginPage', () => {
     renderAt('/login');
     fireEvent.click(screen.getByRole('button', { name: 'auth.login.signIn' }));
     expect(mockLogin).toHaveBeenCalledTimes(1);
+    expect(mockLogin).toHaveBeenCalledWith();
+  });
+
+  it('startet die Kontoauswahl über «Mit anderem Konto anmelden»', () => {
+    renderAt('/login');
+    fireEvent.click(screen.getByRole('button', { name: 'auth.login.switchAccount' }));
+    expect(mockLogin).toHaveBeenCalledWith({ switchAccount: true });
   });
 
   it('zeigt ohne error-Parameter keine Fehlermeldung', () => {

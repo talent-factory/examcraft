@@ -71,6 +71,17 @@ export const LoginPage: React.FC = () => {
           >
             {t('auth.login.signIn')}
           </button>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              data-testid="login-switch-account"
+              onClick={() => login({ switchAccount: true })}
+              className="text-sm text-blue-600 hover:text-blue-800 underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded transition-colors"
+            >
+              {t('auth.login.switchAccount')}
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 text-center text-xs text-gray-500">
