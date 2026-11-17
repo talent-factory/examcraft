@@ -7,7 +7,7 @@
  *
  * Run: cd core/frontend && CAPTURE_DOCS=1 npx playwright test docs-screenshots --headed --timeout=300000
  * Prerequisites: just dev-full && just seed && just seed-test-data,
- *   Backend mit E2E_TEST_LOGIN=true (Login läuft über den Test-Login, nicht über ein Passwort-Formular)
+ *   Backend with E2E_TEST_LOGIN=true (login uses the test login, not a password form)
  */
 
 import { test, chromium } from '@playwright/test';
@@ -86,7 +86,7 @@ test('capture documentation screenshots', async () => {
   );
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
-    baseURL: BASE_URL, // loginUser navigiert relativ (/dashboard)
+    baseURL: BASE_URL, // loginUser navigates relatively (/dashboard)
     viewport: { width: 1920, height: 1080 },
     locale: 'de-CH',
     colorScheme: 'light',
