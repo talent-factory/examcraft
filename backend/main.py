@@ -1100,6 +1100,20 @@ async def api_health_check():
     if key_scope["status"] in ("missing_aliases", "key_rejected"):
         health_status["status"] = "degraded"
 
+    # Zitadel service user for GDPR deletion (EXAMCRAFT-134). Outside
+    # production an unset config is normal. In production a broken config
+    # degrades; a transient IdP outage ("unreachable") stays neutral.
+    from services.zitadel_user_service import check_zitadel_user_delete_config
+
+    zitadel_status = await asyncio.to_thread(
+        check_zitadel_user_delete_config, use_cache=True
+    )
+    health_status["services"]["zitadel_user_delete"] = zitadel_status
+    if zitadel_status not in ("ok", "unreachable") and (
+        os.getenv("ENVIRONMENT") == "production"
+    ):
+        health_status["status"] = "degraded"
+
     # Check Document Processor
     processor_type = os.getenv("DOCUMENT_PROCESSOR_TYPE", "auto")
     try:
