@@ -4,6 +4,10 @@ Re-running this seeder is safe: existing roles get a set-merge of
 permissions (defaults are added without removing any admin-added extras
 from the live DB). Display name and description are kept in sync with
 the seed data so a renamed role label updates on next deploy.
+
+Exception: roles flagged ``skip_if_foreign`` (``mcp_user``) are left untouched
+when the seed would add a permission they do not hold yet, so the seed never grants
+such a permission to a hand-made role (EXAMCRAFT-140).
 """
 
 import json
@@ -186,6 +190,10 @@ def seed_default_roles(db: Session):
             "description": "Berechtigt zur Nutzung des MCP-Servers (Ops-Tools).",
             "permissions": ["mcp:use"],
             "is_system_role": False,
+            # EXAMCRAFT-140: Eine bestehende Rolle gleichen Namens mit anderen
+            # Rechten ist handgemacht. Der Seed darf ihr nicht still mcp:use
+            # geben, das entscheidet nur ein Superuser.
+            "skip_if_foreign": True,
         },
     ]
 
@@ -194,6 +202,18 @@ def seed_default_roles(db: Session):
 
     for role_data in roles_data:
         existing_role = db.query(Role).filter(Role.name == role_data["name"]).first()
+
+        if existing_role and role_data.get("skip_if_foreign"):
+            existing_perms = set(_parse_existing_permissions(existing_role.permissions))
+            if not set(role_data["permissions"]) <= existing_perms:
+                logger.warning(
+                    "Role %s exists with foreign permissions %s; seed leaves it "
+                    "unchanged (a superuser must grant %s explicitly)",
+                    role_data["name"],
+                    sorted(existing_perms),
+                    sorted(role_data["permissions"]),
+                )
+                continue
 
         if existing_role:
             existing_role.display_name = role_data["display_name"]

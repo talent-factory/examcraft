@@ -227,3 +227,92 @@ def test_seed_default_roles_legt_mcp_user_an(test_db):
     for name in ("admin", "dozent", "assistant", "viewer"):
         std = test_db.query(Role).filter(Role.name == name).one()
         assert role_is_superuser_grant_only(std) is False
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [
+        ('["view_questions"]', ["view_questions"]),
+        ("[]", []),
+        ("{view_questions}", ["view_questions"]),
+    ],
+)
+def test_seed_laesst_handgemachte_mcp_user_unveraendert(
+    test_db, monkeypatch, stored, expected
+):
+    """EXAMCRAFT-140: Fremde Rechte bekommen nicht still mcp:use."""
+    from utils import seed_roles
+
+    test_db.add(
+        Role(
+            name="mcp_user",
+            display_name="manuell",
+            description="von Hand",
+            permissions=stored,
+            is_system_role=False,
+        )
+    )
+    test_db.flush()
+    log = MagicMock()
+    monkeypatch.setattr(seed_roles, "logger", log)
+
+    created, updated = seed_roles.seed_default_roles(test_db)
+    test_db.expire_all()
+
+    role = _mcp_role(test_db)
+    assert parse_role_permissions(role.permissions) == expected
+    assert role.display_name == "manuell"
+    assert role.description == "von Hand"
+    assert log.warning.called
+    # Der übersprungene Datensatz zählt weder als angelegt noch als aktualisiert.
+    assert created + updated == 4
+
+
+def test_seed_aktualisiert_unveraenderte_mcp_user_im_legacy_format(
+    test_db, monkeypatch
+):
+    """Ein vom Seed früher umgeschriebenes ``{mcp:use}`` gilt nicht als fremd."""
+    from utils import seed_roles
+
+    test_db.add(
+        Role(
+            name="mcp_user",
+            display_name="alt",
+            permissions="{mcp:use}",
+            is_system_role=False,
+        )
+    )
+    test_db.flush()
+    log = MagicMock()
+    monkeypatch.setattr(seed_roles, "logger", log)
+
+    seed_roles.seed_default_roles(test_db)
+    test_db.expire_all()
+
+    assert _mcp_role(test_db).display_name == "MCP-Zugang"
+    assert not log.warning.called
+
+
+def test_seed_synchronisiert_mcp_user_mit_mcp_use_und_extras(test_db):
+    """Hat die Rolle mcp:use schon, vergibt der Seed nichts Neues: Extras bleiben."""
+    from utils.seed_roles import seed_default_roles
+
+    test_db.add(
+        Role(
+            name="mcp_user",
+            display_name="alt",
+            permissions='["mcp:use", "view_questions"]',
+            is_system_role=False,
+        )
+    )
+    test_db.flush()
+
+    seed_default_roles(test_db)
+    test_db.expire_all()
+
+    role = _mcp_role(test_db)
+    assert role.display_name == "MCP-Zugang"
+    assert set(parse_role_permissions(role.permissions)) == {
+        "mcp:use",
+        "view_questions",
+    }
