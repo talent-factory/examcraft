@@ -110,6 +110,65 @@ describe('apiClient', () => {
       expect(logout).not.toHaveBeenCalled();
     });
 
+    it('lässt 401 von /api/v1/auth/ und /api/admin/impersonate/end dem AuthContext', async () => {
+      for (const path of ['/api/v1/auth/login', '/api/admin/impersonate/end']) {
+        fetchMock.mockResolvedValueOnce({ status: 401 });
+        await window.fetch(`${apiModule.API_BASE_URL}${path}`);
+      }
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('wertet ein Request-Objekt als Input über dessen URL aus', async () => {
+      const request = new Request(`${apiModule.API_BASE_URL}/api/v1/exams`);
+      await window.fetch(request);
+      expect(fetchMock).toHaveBeenCalledWith(
+        request,
+        expect.objectContaining({ credentials: 'include' }),
+      );
+
+      fetchMock.mockResolvedValueOnce({ status: 401 });
+      await window.fetch(request);
+      expect(logout).toHaveBeenCalledTimes(1);
+
+      const excluded = new Request(`${apiModule.API_BASE_URL}/api/auth/me`);
+      fetchMock.mockResolvedValueOnce({ status: 401 });
+      await window.fetch(excluded);
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+
+    it('fasst ein Request-Objekt einer fremden URL nicht an', async () => {
+      const request = new Request('https://cdn.example.com/x.png');
+      fetchMock.mockResolvedValueOnce({ status: 401 });
+      await window.fetch(request);
+      expect(fetchMock).toHaveBeenCalledWith(request, undefined);
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('behandelt Pfade mit /ws/-Präfix als API-Aufruf', async () => {
+      await window.fetch('/ws/tasks/abc');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/ws/tasks/abc',
+        expect.objectContaining({ credentials: 'include' }),
+      );
+      fetchMock.mockResolvedValueOnce({ status: 401 });
+      await window.fetch('/ws/tasks/abc');
+      expect(logout).toHaveBeenCalledTimes(1);
+    });
+
+    it('behandelt Pfade mit /api/-Präfix ohne Host als API-Aufruf', async () => {
+      await window.fetch('/api/v1/exams');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/exams',
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+
+    it('gibt die Antwort unverändert zurück', async () => {
+      const response = { status: 200, ok: true };
+      fetchMock.mockResolvedValueOnce(response);
+      await expect(window.fetch('/api/v1/exams')).resolves.toBe(response);
+    });
+
     it('installiert sich nur einmal', async () => {
       apiModule.setupFetchInterceptor();
       fetchMock.mockResolvedValueOnce({ status: 401 });

@@ -225,6 +225,27 @@ describe('ImpersonationReasonDialog', () => {
     expect(screen.getByRole('button', { name: 'Anmelden' })).toBeEnabled();
   });
 
+  it.each([
+    ['auth_forbidden', 403],
+    ['impersonation_forbidden', 403],
+    ['auth_token_invalid', 401],
+  ])('leitet bei %s (%i) nicht auf den Login um und merkt sich nichts', async (code, status) => {
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(new AppError(code, 'nope', status));
+    const { onClose, onSuccess } = renderDialog();
+    await screen.findByText(/Max Muster/);
+
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+    await screen.findByText('Anmeldung als Nutzer fehlgeschlagen');
+    expect(mockLogin).not.toHaveBeenCalled();
+    expect(takePendingImpersonation(1)).toBeNull();
+    expect(mockStartImpersonation).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeEnabled();
+  });
+
   it('prefills the reason restored after the step-up round trip', async () => {
     renderDialog({ initialReason: 'restored reason' });
     await screen.findByText(/Max Muster/);

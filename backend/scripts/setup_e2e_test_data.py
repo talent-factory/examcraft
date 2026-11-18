@@ -42,6 +42,15 @@ E2E_TEST_USER_B = {
     "last_name": "Colleague",
 }
 
+# Superuser of the same institution — impersonation/step-up E2E (EXAMCRAFT-137).
+# A superuser passes `require_permission` without the opt-in `users:impersonate`
+# role (see utils/auth_utils.py) and may impersonate E2E_TEST_USER_B.
+E2E_TEST_ADMIN = {
+    "email": "e2e-admin@example.com",
+    "first_name": "E2E",
+    "last_name": "Admin",
+}
+
 # User in a DIFFERENT institution — proves cross-institution isolation.
 E2E_OTHER_INSTITUTION_SLUG = "e2e-test-other"
 E2E_TEST_USER_C = {
@@ -153,6 +162,35 @@ def _create_dozent_user(db, creds, institution):
     return user
 
 
+def _create_e2e_admin(db, institution):
+    """Create (or refresh) the E2E superuser in ``institution`` — idempotent."""
+    existing = db.query(User).filter(User.email == E2E_TEST_ADMIN["email"]).first()
+    if existing:
+        existing.password_hash = None
+        existing.zitadel_sub = existing.zitadel_sub or _dummy_sub(existing.email)
+        existing.institution_id = institution.id
+        existing.is_superuser = True
+        db.commit()
+        logger.info(f"   User already exists: {existing.email}")
+        return existing
+
+    admin = User(
+        email=E2E_TEST_ADMIN["email"],
+        zitadel_sub=_dummy_sub(E2E_TEST_ADMIN["email"]),
+        first_name=E2E_TEST_ADMIN["first_name"],
+        last_name=E2E_TEST_ADMIN["last_name"],
+        institution_id=institution.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=True,
+        is_email_verified=True,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    logger.info(f"   Created admin: {admin.email} (ID: {admin.id})")
+    return admin
+
+
 def setup_e2e_other_institution(db):
     """Second institution for the cross-institution visibility test."""
     existing = (
@@ -230,6 +268,7 @@ def cleanup_e2e_data(db):
         E2E_TEST_USER["email"],
         E2E_TEST_USER_B["email"],
         E2E_TEST_USER_C["email"],
+        E2E_TEST_ADMIN["email"],
     ]
     for email in emails:
         user = db.query(User).filter(User.email == email).first()
@@ -265,6 +304,7 @@ def main():
         # 2b. Setup additional users for the visibility E2E (TF-354):
         #     a same-institution colleague + a cross-institution outsider.
         _create_dozent_user(db, E2E_TEST_USER_B, institution)
+        _create_e2e_admin(db, institution)
         other_institution = setup_e2e_other_institution(db)
         _create_dozent_user(db, E2E_TEST_USER_C, other_institution)
 

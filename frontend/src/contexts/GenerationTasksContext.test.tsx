@@ -59,8 +59,11 @@ class MockWebSocket {
     this.sentMessages.push(data);
   }
 
-  close() {
+  closeCodes: Array<number | undefined> = [];
+
+  close(code?: number) {
     this.readyState = 3;
+    this.closeCodes.push(code);
   }
 
   // Test helpers
@@ -671,5 +674,130 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
       expect(captured!.getTask('task-running')?.messageCode).toBe('question_generated'),
     );
     expect(captured!.getTask('task-running')?.messageParams).toEqual({ current: 2, total: 6 });
+  });
+});
+
+describe('GenerationTasksProvider — Cookie-Session (EXAMCRAFT-137)', () => {
+  const runningTask = (taskId: string) => ({
+    task_id: taskId,
+    status: 'PROGRESS',
+    progress: 10,
+    message: null,
+    created_at: new Date().toISOString(),
+    topic: 'Heapsort',
+    question_count: 5,
+  });
+
+  it('übergibt beim Handshake kein Token und sendet nach dem Öffnen nichts', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    expect(ws.url).toMatch(/^wss?:\/\/[^?]+\/ws\/tasks\/task-1$/);
+    expect(ws.url).not.toMatch(/token|access|auth|\?/i);
+    expect(ws.sentMessages).toEqual([]);
+  });
+
+  it('schliesst die Sockets des alten Benutzers bei einem Identitätswechsel und verbindet neu', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const oldSocket = MockWebSocket.instances[0];
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: 2 },
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(oldSocket.closeCodes).toEqual([1000]));
+    // Der Handler des alten Sockets ist abgehängt: ein spätes Close plant nichts mehr.
+    expect(oldSocket.onclose).toBeNull();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2));
+    expect(MockWebSocket.instances[1]).not.toBe(oldSocket);
+  });
+
+  it('verbindet nach einem abnormalen Close mit gültiger Session neu (Positivkontrolle)', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    // Ohne diese Kontrolle bewiese der Logout-Test unten nichts: er prüft, dass
+    // der Reconnect ausbleibt, den es hier nachweislich gibt.
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2), { timeout: 3000 });
+  });
+
+  it('schliesst die Sockets nicht, wenn sich bei einem Re-Render die Identität nicht ändert', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(socket.closeCodes).toEqual([]);
+    expect(socket.onclose).not.toBeNull();
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+  });
+
+  it('verbindet nach einem Logout nicht mehr neu, auch nicht über geplante Reconnects', async () => {
+    const { rerender } = renderProvider();
+    const ws = await startTaskAndGetWs();
+    // Geplanter Reconnect (1 s), dann Logout, bevor er feuert.
+    act(() => {
+      ws.emitClose(1011);
+    });
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('schliesst offene Sockets beim Logout und holt keine Tasks mehr', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(socket.closeCodes).toEqual([1000]));
+    expect(socket.onclose).toBeNull();
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });

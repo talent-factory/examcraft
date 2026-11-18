@@ -22,8 +22,12 @@ const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
 // One API context per user: the session is a cookie (EXAMCRAFT-126), so each
 // user needs a cookie jar of their own.
+const openContexts: APIRequestContext[] = [];
+
 async function loginAs(creds: { email: string }): Promise<APIRequestContext> {
   const ctx = await pwRequest.newContext();
+  // Registered before the login: a failing test-login must not leak the context.
+  openContexts.push(ctx);
   await testLoginApi(ctx, creds.email);
   return ctx;
 }
@@ -36,6 +40,12 @@ async function listDocumentIds(request: APIRequestContext): Promise<number[]> {
 }
 
 test.describe('Document visibility privacy (TF-354)', () => {
+  // EXAMCRAFT-137: dispose() releases the cookie jars; without it the contexts
+  // (and their open connections) live until the worker exits.
+  test.afterEach(async () => {
+    await Promise.all(openContexts.splice(0).map((ctx) => ctx.dispose()));
+  });
+
   test('private upload is owner-only, sharing reveals it to the institution', async () => {
     const userA = await loginAs(E2E_TEST_USER);
     const userB = await loginAs(E2E_TEST_USER_B);

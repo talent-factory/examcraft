@@ -24,6 +24,11 @@ export const E2E_TEST_USER_B = {
   password: 'E2ETestPassword123',  // pragma: allowlist secret
 };
 
+// Superuser of the same institution: starts impersonations (EXAMCRAFT-137).
+export const E2E_TEST_ADMIN = {
+  email: 'e2e-admin@example.com',
+};
+
 // User in a DIFFERENT institution (cross-institution isolation).
 export const E2E_TEST_USER_C = {
   email: 'e2e-test-c@example.com',
