@@ -2,67 +2,36 @@
  * Error codes reachable through `AuthService` (TF-772 PR 3).
  *
  * The backend codes below are copied verbatim from `core/backend/locales/
- * t.*.json`, where `core/backend/api/auth.py` raises them — the identity rule
- * from ADR 0005: the frontend key is `errors.` + the backend's `error_code`,
- * never a renamed variant.
+ * t.*.json` — the identity rule from ADR 0005: the frontend key is `errors.` +
+ * the backend's `error_code`, never a renamed variant. They are raised by
+ * `api/auth.py`, `api/auth_oidc.py`, `api/admin.py` and
+ * `utils/auth_utils.py`.
  *
- * Registering the specific codes rather than one generic per method is the
- * point. A failed login has five distinct causes on the backend (account
- * locked, disabled, pending verification, wrong credentials, auth service
- * down) and answers each with its own localized sentence; a user who is told
- * "check your inbox" is being told something a generic "login failed" cannot
- * say. See `documents.ts` for the same argument at length.
+ * SCOPE. Only the endpoints `AuthService` actually calls are represented.
+ * `GET /api/auth/avatar/{id}` (`auth_avatar_*`) is deliberately absent: it is
+ * used as an <img> src, so its failures never become an AppError.
  *
- * SCOPE. Only the endpoints `AuthService` (plus `ResendVerificationButton`,
- * which fetches `/api/auth/resend-verification` itself) actually calls are
- * represented. `auth.py` raises four further code families that no frontend
- * request can reach, and they are deliberately absent:
+ * EXAMCRAFT-126/139: the OIDC-BFF login removed the password, verification,
+ * reset and OAuth endpoints, so their codes (and the `auth_login_failed`,
+ * `auth_token_refresh_failed` etc. fallbacks) are gone from this registry and
+ * the locales. A few legacy entries (e.g. `auth_email_taken`) stay registered
+ * because tests still use them. Login failures arrive as `/login?error=…` and
+ * are rendered by `LoginPage` from `auth.loginError.*`, not through AppError.
  *
- *   auth_oauth_state_missing / auth_oauth_state_invalid
- *                          GET /api/auth/oauth/{provider}/callback — a browser
- *                          redirect the backend answers directly, never a
- *                          fetch() from here.
- *   auth_avatar_*          GET /api/auth/avatar/{id} — used as an <img> src,
- *                          so its failures never become an AppError.
+ * FRONTEND-ONLY FALLBACKS. `auth.py` has no generic per-operation failure code,
+ * so these exist purely as the fallback of one `AuthService` method, so that a
+ * network failure, a proxy error page or a bodyless 500 still produces a
+ * sentence about what the user was trying to do:
  *
- * TF-772 PR 4 added the verify-email set. `pages/VerifyEmailPage.tsx` fetches
- * POST /api/auth/verify-email itself rather than going through `AuthService`,
- * which is why PR 3 left it out and listed it here as reported-not-migrated.
- * That endpoint raises exactly four codes — `auth_verification_token_invalid`,
- * `_used`, `_expired` and `auth_user_not_found` — and they are worth every one
- * of the four keys: "the link has already been used" and "the link has expired"
- * lead to different next steps, and a single "verification failed" would send
- * a user to support for something they could fix by requesting a new mail.
- * `auth_verification_failed` is the frontend fallback for that one endpoint.
+ *   auth_logout_failed, auth_profile_load_failed, auth_profile_update_failed
  *
- * FRONTEND-ONLY FALLBACKS. Unlike `documents.py`, `auth.py` has no generic
- * per-operation failure code — it raises only specific ones. So eleven of the
- * codes below have no backend counterpart and exist purely as the fallback for
- * one method, so that a network failure, a proxy error page or a bodyless 500
- * still produces a sentence about what the user was trying to do:
- *
- *   auth_login_failed, auth_logout_failed, auth_oauth_exchange_failed,
- *   auth_oauth_url_failed, auth_password_change_failed,
- *   auth_password_reset_request_failed, auth_password_set_failed, auth_profile_load_failed,
- *   auth_profile_update_failed, auth_token_refresh_failed,
- *   auth_verification_resend_failed
- *
- * `auth_registration_failed` is the twelfth fallback but a special case: the
- * backend locales carried a key with exactly this meaning that nothing ever
- * raised, and TF-775 deleted it as dead, together with
- * auth_insufficient_permissions, auth_logout_success, auth_session_expired,
- * auth_token_missing and auth_username_taken. The name stays as it was rather
- * than becoming `auth_register_failed`: should the backend ever raise it, the
- * identity rule holds without a rename.
- *
- * AUTH DEPENDENCIES (TF-772 PR 7). Five codes below come not from `auth.py` but
+ * AUTH DEPENDENCIES (TF-772 PR 7). Four codes below come not from `auth.py` but
  * from the FastAPI dependencies in `core/backend/utils/auth_utils.py`, which
  * every protected endpoint runs before its own body:
  *
  *   auth_permission_required     403, `require_permission(...)`, %{permission}
  *   auth_account_status_invalid  403, `get_current_user`, %{status}
  *   auth_account_not_active      403, `get_current_active_user`
- *   auth_token_revoked           401, `get_current_user`
  *   auth_token_user_not_found    401, `get_current_user`
  *
  * They became reachable once the ApiError family started carrying
@@ -77,46 +46,17 @@
  * them to the caller.
  */
 export const AUTH_ERROR_CODES = [
-  'auth_account_disabled',
   'auth_account_locked',
   'auth_account_not_active',
-  'auth_account_pending',
   'auth_account_status_invalid',
-  'auth_email_already_verified',
   'auth_email_taken',
-  'auth_institution_not_found',
-  'auth_invalid_credentials',
-  'auth_login_failed',
-  'auth_login_service_unavailable',
   'auth_logout_failed',
-  'auth_oauth_code_invalid',
-  'auth_oauth_exchange_failed',
-  'auth_oauth_login_failed',
-  'auth_oauth_provider_unsupported',
-  'auth_oauth_token_read_failed',
-  'auth_oauth_url_failed',
-  'auth_password_already_set',
-  'auth_password_change_failed',
   'auth_password_incorrect',
-  'auth_password_reset_failed',
-  'auth_password_reset_request_failed',
-  'auth_password_reset_token_invalid',
-  'auth_password_set_failed',
   'auth_permission_required',
   'auth_profile_load_failed',
   'auth_profile_update_failed',
   'auth_reauth_required',
-  'auth_registration_failed',
-  'auth_service_unavailable',
   'auth_token_invalid',
-  'auth_token_refresh_failed',
-  'auth_token_revoked',
   'auth_token_user_not_found',
   'auth_user_not_found',
-  'auth_verification_email_failed',
-  'auth_verification_failed',
-  'auth_verification_resend_failed',
-  'auth_verification_token_expired',
-  'auth_verification_token_invalid',
-  'auth_verification_token_used',
 ] as const;

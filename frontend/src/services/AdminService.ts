@@ -35,6 +35,8 @@ export interface UserListResponse {
 /** Response of `POST /api/admin/users/{id}/impersonate` (TF-741/TF-743). */
 export interface ImpersonateResponse {
   expires_in: number;
+  /** Server-side end of the impersonation (ISO 8601); preferred over `expires_in`. */
+  expires_at?: string;
   impersonation_session_id: number;
   target_user_id: number;
   target_user_email: string;

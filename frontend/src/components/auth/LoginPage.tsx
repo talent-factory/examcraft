@@ -7,7 +7,7 @@
  * `/login?error=…` zurückkehrt.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,16 +29,31 @@ const LOGIN_ERROR_CODES = [
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const { login, notice } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const errorParam = searchParams.get('error');
   // Unbekannte Codes (z. B. aus einer manipulierten URL) fallen auf den
   // allgemeinen Text zurück; der Parameter selbst wird nie angezeigt.
-  const errorCode = errorParam
-    ? (LOGIN_ERROR_CODES as readonly string[]).includes(errorParam)
-      ? errorParam
-      : 'login_failed'
-    : null;
+  const normalize = (code: string): string =>
+    (LOGIN_ERROR_CODES as readonly string[]).includes(code) ? code : 'login_failed';
+  const [errorCode, setErrorCode] = useState<string | null>(
+    errorParam ? normalize(errorParam) : null,
+  );
+
+  // EXAMCRAFT-139: Der Parameter wird nach dem Lesen aus der URL entfernt, damit
+  // ein Reload die Meldung nicht wiederholt. Die Meldung bleibt im State; ein
+  // neuer Fehler bei bereits gemounteter Seite ersetzt sie.
+  useEffect(() => {
+    if (errorParam === null) return;
+    console.warn('[LoginPage] Login error returned by backend:', normalize(errorParam));
+    setErrorCode(normalize(errorParam));
+    const next = new URLSearchParams(searchParams);
+    next.delete('error');
+    setSearchParams(next, { replace: true });
+    // Only a changed `error` param may re-run this; searchParams/setSearchParams
+    // change with every navigation and would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errorParam]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

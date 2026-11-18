@@ -215,7 +215,7 @@ export interface AuthContextType extends AuthState {
    * /api/admin/users/{id}/impersonate` hat das Impersonation-Cookie gesetzt):
    * lädt das Profil des Ziel-Benutzers neu und merkt sich die Laufzeit.
    */
-  startImpersonation: (payload: { expiresIn: number }) => Promise<void>;
+  startImpersonation: (payload: { expiresIn: number; expiresAt?: string }) => Promise<void>;
   /**
    * Beendet die Impersonation (`POST /api/admin/impersonate/end`) und lädt das
    * Profil des Admins neu. Ist keine Impersonation aktiv, passiert nichts.

@@ -281,6 +281,12 @@ def test_superadmin_can_impersonate_any_user_including_admin(test_client, test_d
     assert "access_token" not in data
     assert _imp_token(response)
     assert data["expires_in"] == 30 * 60
+    # expires_at is the server-side cap (started_at + max age), serialised with
+    # an offset so the browser does not read it as local time.
+    assert data["expires_at"].endswith(("Z", "+00:00"))
+    expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+    delta = expires_at - datetime.now(timezone.utc)
+    assert timedelta(minutes=29) < delta <= timedelta(minutes=30, seconds=5)
 
 
 def test_institution_admin_can_impersonate_non_admin_same_institution(
@@ -891,6 +897,7 @@ def test_impersonation_start_returns_no_tokens_and_sets_cookie(test_client, test
     assert response.status_code == 200
     assert set(response.json()) == {
         "expires_in",
+        "expires_at",
         "impersonation_session_id",
         "target_user_id",
         "target_user_email",

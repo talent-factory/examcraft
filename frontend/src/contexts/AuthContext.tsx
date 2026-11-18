@@ -82,6 +82,14 @@ function signedInState(user: AuthState['user'], impersonationExpiresAt: string |
   };
 }
 
+/** The server reports that there is no impersonation left to end. */
+function isImpersonationAlreadyEnded(error: unknown): boolean {
+  return (
+    error instanceof AppError &&
+    (error.status === 401 || (error.status === 400 && error.code === 'impersonation_not_active'))
+  );
+}
+
 function readImpersonationHint(): string | null {
   try {
     const value = localStorage.getItem(IMPERSONATION_EXPIRES_KEY);
@@ -275,7 +283,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Take over an impersonation the backend just started (it set the
    * impersonation cookie): load the target's profile and remember the cap.
    */
-  const startImpersonation = useCallback(async (payload: { expiresIn: number }) => {
+  const startImpersonation = useCallback(async (payload: { expiresIn: number; expiresAt?: string }) => {
     if (isImpersonatingRef.current) {
       // A second impersonation on top of an active one is refused by the
       // backend as well; stop before the banner state gets confused.
@@ -285,7 +293,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new AppError('impersonation_no_admin_session');
     }
 
-    const expiresAt = new Date(Date.now() + payload.expiresIn * 1000).toISOString();
+    // Server clock first (EXAMCRAFT-139): the cap is enforced server-side, so a
+    // skewed client clock must not shift the banner. The client clock is only
+    // the fallback for a response without (or with an invalid) `expires_at`.
+    const serverExpiry = payload.expiresAt ? new Date(payload.expiresAt) : null;
+    if (serverExpiry && Number.isNaN(serverExpiry.getTime())) {
+      console.warn('[AuthContext] Invalid impersonation expires_at, using client clock:', payload.expiresAt);
+    }
+    const expiresAt =
+      serverExpiry && !Number.isNaN(serverExpiry.getTime())
+        ? serverExpiry.toISOString()
+        : new Date(Date.now() + payload.expiresIn * 1000).toISOString();
     try {
       const targetUser = await loadProfile();
       writeImpersonationHint(expiresAt);
@@ -294,12 +312,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       // The backend session already exists; tell it the attempt is abandoned
       // instead of leaving it open until the cap / reaper ends it.
-      AdminService.endImpersonation().catch((endError) => {
+      console.error('[AuthContext] Starting impersonation failed:', error);
+      cancelImpersonationTimer();
+      writeImpersonationHint(null);
+      try {
+        await AdminService.endImpersonation();
+      } catch (endError) {
+        // Nothing left to close (session already gone): the original error is
+        // the real problem, not a dangling server session.
+        if (isImpersonationAlreadyEnded(endError)) throw error;
+        // The server-side impersonation stays open (cookie valid, no banner):
+        // tell the admin instead of failing silently (EXAMCRAFT-139).
         console.error('[AuthContext] Failed to close orphaned impersonation session:', endError);
-      });
+        throw new AppError('impersonation_cleanup_failed', String(error));
+      }
       throw error;
     }
-  }, [applySignedIn, loadProfile, scheduleImpersonationEnd]);
+  }, [applySignedIn, cancelImpersonationTimer, loadProfile, scheduleImpersonationEnd]);
 
   /**
    * Public entry point for ending impersonation (banner button, hard cap,
@@ -315,11 +344,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       // Nothing left to end (hard cap passed, reaper closed it, session gone):
       // the server already acts as the admin, so fall back locally.
-      const alreadyEnded =
-        error instanceof AppError &&
-        (error.status === 401 ||
-          (error.status === 400 && error.code === 'impersonation_not_active'));
-      if (!alreadyEnded) {
+      if (!isImpersonationAlreadyEnded(error)) {
         // The impersonation cookie is still valid, so every request keeps
         // running as the target user. Keep banner, hint and timer: hiding them
         // would show the admin as back while the server still acts as someone else.

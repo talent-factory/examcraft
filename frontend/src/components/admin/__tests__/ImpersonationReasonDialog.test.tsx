@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ImpersonationReasonDialog, takePendingImpersonation } from '../ImpersonationReasonDialog';
 import AdminService from '../../../services/AdminService';
@@ -95,6 +95,7 @@ beforeEach(() => {
   mockedAdminService.getUser.mockResolvedValue(targetUser as any);
   mockedAdminService.impersonateUser.mockResolvedValue({
     expires_in: 1800,
+    expires_at: '2030-01-01T10:30:00Z',
     impersonation_session_id: 1,
     target_user_id: 7,
     target_user_email: 'max@example.com',
@@ -174,7 +175,10 @@ describe('ImpersonationReasonDialog', () => {
       7,
       'reproduce support ticket TICKET-123',
     );
-    expect(mockStartImpersonation).toHaveBeenCalledWith({ expiresIn: 1800 });
+    expect(mockStartImpersonation).toHaveBeenCalledWith({
+      expiresIn: 1800,
+      expiresAt: '2030-01-01T10:30:00Z',
+    });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -192,9 +196,33 @@ describe('ImpersonationReasonDialog', () => {
       expect(mockLogin).toHaveBeenCalledWith({ reauth: true, returnTo: '/admin' }),
     );
     expect(takePendingImpersonation(1)).toEqual({ userId: 7, reason: 'valid reason text' });
+    expect(screen.getByTestId('impersonation-reauth-notice')).toHaveTextContent(
+      'admin.impersonation.reauthRedirect',
+    );
+    expect(screen.getByRole('button', { name: /Wird gestartet|admin.impersonation.dialogStarting/ })).toBeDisabled();
     expect(mockStartImpersonation).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('releases the dialog when the page is restored from the bfcache after the step-up', async () => {
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(
+      new AppError('auth_reauth_required', 'Reauth', 403),
+    );
+    renderDialog();
+    await screen.findByText(/Max Muster/);
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+    await screen.findByTestId('impersonation-reauth-notice');
+
+    const event = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(event, 'persisted', { value: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(screen.queryByTestId('impersonation-reauth-notice')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeEnabled();
   });
 
   it('prefills the reason restored after the step-up round trip', async () => {

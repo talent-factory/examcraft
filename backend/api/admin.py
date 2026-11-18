@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime, timezone
 from typing import Optional, List
 import logging
 import os
@@ -870,6 +871,9 @@ class ImpersonateRequest(BaseModel):
 
 class ImpersonateResponse(BaseModel):
     expires_in: int
+    # Server clock (ISO 8601, UTC): the frontend must not derive the cap from
+    # the client clock (EXAMCRAFT-139).
+    expires_at: datetime
     impersonation_session_id: int
     target_user_id: int
     target_user_email: str
@@ -1011,7 +1015,7 @@ async def start_impersonation(
     # admin out of impersonating anyone until the reaper aged it out
     # (TF-741 review fix).
     try:
-        imp_token, _imp_row = AuthService.create_impersonation_session(
+        imp_token, imp_row = AuthService.create_impersonation_session(
             target,
             db,
             impersonator_id=current_user.id,
@@ -1059,8 +1063,15 @@ async def start_impersonation(
         request=http_request,
     )
 
+    # Always serialise with an offset: a naive timestamp would be read as local
+    # time by the browser.
+    # Taken from the auth session that enforces the cap, not recomputed.
+    expires_at = imp_row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
     return ImpersonateResponse(
         expires_in=max_age,
+        expires_at=expires_at,
         impersonation_session_id=session.id,
         target_user_id=target.id,
         target_user_email=target.email,

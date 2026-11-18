@@ -411,6 +411,76 @@ describe('AuthContext – Impersonation', () => {
     spy.mockRestore();
   });
 
+  it('nutzt expiresAt des Servers statt der Client-Uhr für das Ablaufdatum', async () => {
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockResolvedValueOnce(target as never);
+    await act(async () => {
+      await latest.startImpersonation({ expiresIn: 1800, expiresAt: '2030-01-01T10:30:00Z' });
+    });
+    expect(latest.impersonationExpiresAt).toBe('2030-01-01T10:30:00.000Z');
+  });
+
+  it('fällt ohne gültiges expiresAt auf die Client-Uhr zurück und warnt bei ungültigem Wert', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const now = jest.spyOn(Date, 'now').mockReturnValue(new Date('2030-01-01T10:00:00Z').getTime());
+    try {
+      mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+      await mount();
+      mockAuth.getProfile.mockResolvedValueOnce(target as never);
+      await act(async () => {
+        await latest.startImpersonation({ expiresIn: 1800, expiresAt: 'garbage' });
+      });
+      expect(latest.impersonationExpiresAt).toBe('2030-01-01T10:30:00.000Z');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
+  it('schliesst die verwaiste Session und wirft den Ursprungsfehler, wenn der Cleanup gelingt', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValueOnce(new Error('boom'));
+    await act(async () => {
+      await expect(latest.startImpersonation({ expiresIn: 1800 })).rejects.toThrow('boom');
+    });
+    expect(mockAdmin.endImpersonation).toHaveBeenCalled();
+    expect(localStorage.getItem('examcraft_impersonation_expires_at')).toBeNull();
+    spy.mockRestore();
+  });
+
+  it('wirft den Ursprungsfehler, wenn die verwaiste Session schon beendet ist (401)', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValueOnce(new Error('boom'));
+    mockAdmin.endImpersonation.mockRejectedValueOnce(new AppError('auth_token_invalid', 'x', 401));
+    await act(async () => {
+      await expect(latest.startImpersonation({ expiresIn: 1800 })).rejects.toThrow('boom');
+    });
+    spy.mockRestore();
+  });
+
+  it('meldet impersonation_cleanup_failed, wenn die verwaiste Server-Session nicht schliesst', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockAuth.getProfile.mockResolvedValueOnce(admin as never);
+    await mount();
+    mockAuth.getProfile.mockRejectedValueOnce(new Error('boom'));
+    mockAdmin.endImpersonation.mockRejectedValueOnce(new Error('end failed'));
+    await act(async () => {
+      await expect(latest.startImpersonation({ expiresIn: 1800 })).rejects.toMatchObject({
+        code: 'impersonation_cleanup_failed',
+      });
+    });
+    expect(mockAdmin.endImpersonation).toHaveBeenCalled();
+    expect(localStorage.getItem('examcraft_impersonation_expires_at')).toBeNull();
+    expect(latest.isImpersonating).toBe(false);
+    spy.mockRestore();
+  });
+
   it('endImpersonation() fällt auf das Profil des Admins zurück', async () => {
     mockAuth.getProfile.mockResolvedValueOnce(admin as never);
     await mount();

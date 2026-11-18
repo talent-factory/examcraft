@@ -43,7 +43,7 @@ interface StoredPendingImpersonation extends PendingImpersonation {
   savedAt: number;
 }
 
-function savePendingImpersonation(pending: PendingImpersonation, adminId: number): void {
+function savePendingImpersonation(pending: PendingImpersonation, adminId: number): boolean {
   // A failed write is not fatal: after the step-up the dialog stays closed and
   // the admin re-selects the user and re-enters the reason.
   const saved = writeSessionSnapshot<StoredPendingImpersonation>(
@@ -54,6 +54,7 @@ function savePendingImpersonation(pending: PendingImpersonation, adminId: number
   if (!saved) {
     console.warn('[ImpersonationReasonDialog] Pending impersonation could not be saved.');
   }
+  return saved;
 }
 
 /**
@@ -101,6 +102,7 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
   const loadTarget = useCallback(async () => {
@@ -127,8 +129,24 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       setTarget(null);
       setReason('');
       setError(null);
+      setNotice(null);
+      setSaving(false);
     }
   }, [isOpen, userId, loadTarget]);
+
+  // After the step-up redirect the browser may restore this page from the
+  // back/forward cache (admin pressed "back" at the IdP) with `saving` still
+  // set; release the dialog then.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setSaving(false);
+        setNotice(null);
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   // Separate from the load effect: a new `loadTarget` identity (language
   // change) must not overwrite a reason the admin already typed.
@@ -146,12 +164,17 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       return;
     }
 
+    let redirecting = false;
     try {
       setSaving(true);
       setError(null);
+      setNotice(null);
 
       const response = await AdminService.impersonateUser(userId, trimmedReason);
-      await startImpersonation({ expiresIn: response.expires_in });
+      await startImpersonation({
+        expiresIn: response.expires_in,
+        expiresAt: response.expires_at,
+      });
 
       onSuccess();
       onClose();
@@ -159,17 +182,31 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       if (isAppError(err) && err.code === 'auth_reauth_required') {
         // Step-up: the IdP login is older than the backend accepts. Keep the
         // request and return to the admin panel, where the dialog reopens.
-        if (user) {
-          savePendingImpersonation({ userId, reason: trimmedReason }, user.id);
-        } else {
+        const kept = user
+          ? savePendingImpersonation({ userId, reason: trimmedReason }, user.id)
+          : false;
+        if (!user) {
           console.warn('[ImpersonationReasonDialog] No current user, step-up without resume.');
         }
-        login({ reauth: true, returnTo: STEP_UP_RETURN_TO });
+        // EXAMCRAFT-139: tell the admin why the page is about to change; promise
+        // kept input only when it really was saved.
+        setNotice(
+          t(kept ? 'admin.impersonation.reauthRedirect' : 'admin.impersonation.reauthRedirectNoResume'),
+        );
+        try {
+          login({ reauth: true, returnTo: STEP_UP_RETURN_TO });
+          // Stay in the saving state while the browser navigates away.
+          redirecting = true;
+        } catch (loginError) {
+          console.error('[ImpersonationReasonDialog] Step-up redirect failed:', loginError);
+          setNotice(null);
+          setError(translateError(loginError, t, 'admin.impersonation.dialogError'));
+        }
         return;
       }
       setError(translateError(err, t, 'admin.impersonation.dialogError'));
     } finally {
-      setSaving(false);
+      if (!redirecting) setSaving(false);
     }
   };
 
@@ -204,6 +241,16 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
                       {error && (
                         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">
                           {error}
+                        </div>
+                      )}
+
+                      {notice && (
+                        <div
+                          role="status"
+                          data-testid="impersonation-reauth-notice"
+                          className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm"
+                        >
+                          {notice}
                         </div>
                       )}
 

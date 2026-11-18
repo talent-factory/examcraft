@@ -1,9 +1,8 @@
 /**
  * SubmissionsService — API client for `/api/v1/submissions/*`.
  *
- * Mirrors `core/backend/api/submissions.py`. Auth-token handling
- * matches the project's other service classes (Bearer from
- * localStorage). All errors raise an `ApiError` with `kind`/`status`
+ * Mirrors `core/backend/api/submissions.py`. Auth runs on
+ * the session cookie (EXAMCRAFT-126), like the other service classes. All errors raise an `ApiError` with `kind`/`status`
  * so callers can branch on intent (network vs auth vs validation vs
  * server).
  */

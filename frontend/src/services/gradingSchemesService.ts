@@ -1,9 +1,8 @@
 /**
  * GradingSchemesService — API client for `/api/v1/grading-schemes/*`.
  *
- * Mirrors the backend in `core/backend/api/grading_schemes.py`. Auth-
- * token handling matches the project's other service classes (Bearer
- * from localStorage). All errors raise an `ApiError` with a `kind`
+ * Mirrors the backend in `core/backend/api/grading_schemes.py`. Auth
+ * runs on the session cookie (EXAMCRAFT-126), like the other service classes. All errors raise an `ApiError` with a `kind`
  * field so callers can branch on intent without re-parsing status
  * codes.
  */
