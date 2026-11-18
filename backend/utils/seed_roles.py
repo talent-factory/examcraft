@@ -5,9 +5,16 @@ permissions (defaults are added without removing any admin-added extras
 from the live DB). Display name and description are kept in sync with
 the seed data so a renamed role label updates on next deploy.
 
-Exception: roles flagged ``skip_if_foreign`` (``mcp_user``) are left untouched
-when the seed would add a permission they do not hold yet, so the seed never grants
-such a permission to a hand-made role (EXAMCRAFT-140).
+Exceptions, so the seed never grants permissions to a hand-made role:
+
+* Roles flagged ``skip_if_foreign`` (``mcp_user``) are left untouched when the
+  seed would add a permission they do not hold yet (EXAMCRAFT-140).
+* Seed system roles (``is_system_role=True``: admin, dozent, assistant, viewer)
+  are left untouched when the existing role of the same name is not a system
+  role (EXAMCRAFT-150). Hand-made roles come from the admin API, which always
+  stores ``is_system_role=False``; only the seed sets ``True``, on every start,
+  so productive system roles carry the flag. The permission set is deliberately
+  not compared: admins may add extras to a system role (set-merge floor).
 """
 
 import json
@@ -202,6 +209,18 @@ def seed_default_roles(db: Session):
 
     for role_data in roles_data:
         existing_role = db.query(Role).filter(Role.name == role_data["name"]).first()
+
+        if (
+            existing_role
+            and role_data["is_system_role"]
+            and not existing_role.is_system_role
+        ):
+            logger.warning(
+                "Role %s exists but is not a system role (hand-made); seed leaves "
+                "it unchanged and grants no default permissions",
+                role_data["name"],
+            )
+            continue
 
         if existing_role and role_data.get("skip_if_foreign"):
             existing_perms = set(_parse_existing_permissions(existing_role.permissions))
