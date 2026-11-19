@@ -19,8 +19,10 @@ Repositories abgelegt und nach dem Cutover vernichtet (Runbook).
 Konfiguration (Umgebung, nie in Dateien):
   ZITADEL_ISSUER           Basis-URL der Instanz
   ZITADEL_ORG_ID           ID der Org ``examcraft``
-  ZITADEL_IMPORT_TOKEN     kurzlebiges Token eines Admins (``import``: IAM-Admin,
-                           ``link``: Org-User-Manager genügt)
+  ZITADEL_IMPORT_TOKEN     kurzlebiges Token eines Admins (``import``: Mitglied der
+                           Instanz mit IAM_OWNER, sonst meldet Zitadel
+                           ``membership not found``; ``link``: Org-User-Manager
+                           genügt)
 
 Aufruf (aus ``core/backend``)::
 
@@ -35,6 +37,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import stat
 import sys
 from dataclasses import dataclass, field
@@ -55,6 +58,16 @@ DEFAULT_LANGUAGE = "de"
 _TIMEOUT_SECONDS = 60.0
 # ImportData überträgt alle Benutzer samt bcrypt-Hashes in einem Request.
 _IMPORT_TIMEOUT_SECONDS = 600.0
+# ImportData parst das Body-Feld ``timeout`` als Dauer. Fehlt es, antwortet
+# Zitadel mit HTTP 500 (``time: invalid duration ""``). Der Wert liegt unter dem
+# Client-Timeout, damit Zitadel zuerst selbst abbricht und einen Fehler meldet.
+_IMPORT_SERVER_TIMEOUT = "9m"
+# Zitadel-Fehlerschlüssel wie ``Errors.User.ExternalIDP.AlreadyExists``. Nur
+# dieses Muster wird ausgegeben, der übrige Meldungstext kann PII tragen.
+_ERROR_KEY = re.compile(r"Errors(?:\.[A-Za-z0-9_]+)+")
+# Die Org ``examcraft`` existiert immer schon: ImportData meldet sie als Fehler,
+# importiert die Benutzer aber trotzdem.
+_ORG_EXISTS_KEY = "Errors.Org.AlreadyExisting"
 _UNKNOWN_STATE_HINT = "Stand unbekannt, Org prüfen, nicht blind wiederholen"
 _PAGE_SIZE = 100
 _MAX_PAGES = 1000
@@ -238,6 +251,9 @@ def post_import(path: str, client: Optional[httpx.Client] = None) -> None:
     except (OSError, ValueError) as exc:
         # Nie den Inhalt (Hashes) ausgeben, nur die Fehlerklasse.
         raise ImportError_(f"Import-Datei nicht lesbar: {type(exc).__name__}") from exc
+    if isinstance(body, dict):
+        # Auch ältere Export-Dateien ohne ``timeout`` bleiben importierbar.
+        body.setdefault("timeout", _IMPORT_SERVER_TIMEOUT)
     owns_client = client is None
     client = client or httpx.Client(timeout=_IMPORT_TIMEOUT_SECONDS)
     try:
@@ -270,11 +286,11 @@ def post_import(path: str, client: Optional[httpx.Client] = None) -> None:
         raise ImportError_("ImportData: Antwort nicht lesbar, Stand prüfen") from exc
     if not isinstance(payload, dict):
         raise ImportError_("ImportData: unerwartetes Antwortformat, Stand prüfen")
-    errors = payload.get("errors")
+    errors = [e for e in (payload.get("errors") or []) if not _is_org_exists(e)]
     if errors:
         affected = sorted(
             {
-                str(e.get("userId") or e.get("id"))
+                f"{e.get('userId') or e.get('id')} ({_error_key(e)})"
                 for e in errors
                 if isinstance(e, dict) and (e.get("userId") or e.get("id"))
             }
@@ -283,6 +299,20 @@ def post_import(path: str, client: Optional[httpx.Client] = None) -> None:
             f"ImportData meldete {len(errors)} Fehler (Teilimport möglich, Org prüfen, "
             f"nicht blind wiederholen). Betroffene IDs: {affected or 'unbekannt'}"
         )
+
+
+def _error_key(error: dict[str, Any]) -> str:
+    """Zitadel-Fehlerschlüssel einer Meldung, sonst ``unbekannt`` (nie der Rohtext)."""
+    match = _ERROR_KEY.search(str(error.get("message") or ""))
+    return match.group(0) if match else "unbekannt"
+
+
+def _is_org_exists(error: Any) -> bool:
+    return (
+        isinstance(error, dict)
+        and error.get("type") == "org"
+        and _error_key(error) == _ORG_EXISTS_KEY
+    )
 
 
 def fetch_subs(client: Optional[httpx.Client] = None) -> dict[str, str]:
