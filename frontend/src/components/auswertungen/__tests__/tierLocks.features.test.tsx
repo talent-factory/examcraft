@@ -15,7 +15,7 @@ import { GradesService } from '../../../services/gradesService';
 
 jest.mock('../../../services/gradesService');
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1 }, accessToken: 'token-123', isAuthenticated: true }),
+  useAuth: () => ({ user: { id: 1 }, isAuthenticated: true }),
 }));
 
 const mockGrades = GradesService as jest.Mocked<typeof GradesService>;

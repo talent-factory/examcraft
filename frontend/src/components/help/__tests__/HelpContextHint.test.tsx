@@ -12,7 +12,7 @@ jest.mock('../../../services/HelpService', () => ({
 }));
 
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ accessToken: 'test-token' }),
+  useAuth: () => ({ isAuthenticated: true }),
 }));
 
 const mockedDismissHint = helpService.dismissHint as jest.Mock;
@@ -104,7 +104,7 @@ describe('HelpContextHint — permanent dismissal', () => {
     // Both assertions need waitFor: dismissHint is recorded synchronously on
     // call, but onDismissPermanently only runs after that promise resolves —
     // asserting it right after the first waitFor would race the microtask.
-    await waitFor(() => expect(mockedDismissHint).toHaveBeenCalledWith('test-token', 6));
+    await waitFor(() => expect(mockedDismissHint).toHaveBeenCalledWith(6));
     await waitFor(() => expect(onDismissPermanently).toHaveBeenCalled());
   });
 

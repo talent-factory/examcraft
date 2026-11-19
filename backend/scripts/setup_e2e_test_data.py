@@ -15,16 +15,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import SessionLocal
 from models.auth import User, Role, Institution, UserStatus
 from models.document import Document, DocumentStatus
-from services.auth_service import AuthService
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# E2E Test credentials (must match e2e/fixtures/auth.ts)
+
+def _dummy_sub(email: str) -> str:
+    """Placeholder Zitadel sub: seeded users have no password and no IdP user."""
+    return f"e2e-seed-{email}"
+
+
+# E2E test users (must match e2e/fixtures/auth.ts); no passwords: login goes
+# through the test-login endpoint, which only exists with E2E_TEST_LOGIN=true.
 E2E_TEST_USER = {
     "email": "e2e-test@example.com",
-    "password": "E2ETestPassword123",  # pragma: allowlist secret
     "first_name": "E2E",
     "last_name": "Testuser",
 }
@@ -33,16 +38,23 @@ E2E_TEST_USER = {
 # visibility E2E (TF-354) to prove a colleague cannot see a private upload.
 E2E_TEST_USER_B = {
     "email": "e2e-test-b@example.com",
-    "password": "E2ETestPassword123",  # pragma: allowlist secret
     "first_name": "E2E",
     "last_name": "Colleague",
+}
+
+# Superuser of the same institution — impersonation/step-up E2E (EXAMCRAFT-137).
+# A superuser passes `require_permission` without the opt-in `users:impersonate`
+# role (see utils/auth_utils.py) and may impersonate E2E_TEST_USER_B.
+E2E_TEST_ADMIN = {
+    "email": "e2e-admin@example.com",
+    "first_name": "E2E",
+    "last_name": "Admin",
 }
 
 # User in a DIFFERENT institution — proves cross-institution isolation.
 E2E_OTHER_INSTITUTION_SLUG = "e2e-test-other"
 E2E_TEST_USER_C = {
     "email": "e2e-test-c@example.com",
-    "password": "E2ETestPassword123",  # pragma: allowlist secret
     "first_name": "E2E",
     "last_name": "Outsider",
 }
@@ -85,10 +97,9 @@ def setup_e2e_user(db, institution):
 
     if existing:
         logger.info(f"   User already exists: {existing.email}")
-        # Update password to ensure it matches
-        existing.password_hash = AuthService.get_password_hash(
-            E2E_TEST_USER["password"]
-        )
+        # Make sure the dummy sub is set (login runs via the test-login endpoint)
+        existing.password_hash = None
+        existing.zitadel_sub = existing.zitadel_sub or _dummy_sub(existing.email)
         db.commit()
         return existing
 
@@ -97,7 +108,7 @@ def setup_e2e_user(db, institution):
 
     user = User(
         email=E2E_TEST_USER["email"],
-        password_hash=AuthService.get_password_hash(E2E_TEST_USER["password"]),
+        zitadel_sub=_dummy_sub(E2E_TEST_USER["email"]),
         first_name=E2E_TEST_USER["first_name"],
         last_name=E2E_TEST_USER["last_name"],
         institution_id=institution.id,
@@ -123,7 +134,8 @@ def _create_dozent_user(db, creds, institution):
     """Create (or refresh) a dozent user in ``institution`` — idempotent."""
     existing = db.query(User).filter(User.email == creds["email"]).first()
     if existing:
-        existing.password_hash = AuthService.get_password_hash(creds["password"])
+        existing.password_hash = None
+        existing.zitadel_sub = existing.zitadel_sub or _dummy_sub(existing.email)
         existing.institution_id = institution.id
         db.commit()
         logger.info(f"   User already exists: {existing.email}")
@@ -132,7 +144,7 @@ def _create_dozent_user(db, creds, institution):
     dozent_role = db.query(Role).filter(Role.name == "dozent").first()
     user = User(
         email=creds["email"],
-        password_hash=AuthService.get_password_hash(creds["password"]),
+        zitadel_sub=_dummy_sub(creds["email"]),
         first_name=creds["first_name"],
         last_name=creds["last_name"],
         institution_id=institution.id,
@@ -148,6 +160,35 @@ def _create_dozent_user(db, creds, institution):
     db.refresh(user)
     logger.info(f"   Created user: {user.email} (ID: {user.id})")
     return user
+
+
+def _create_e2e_admin(db, institution):
+    """Create (or refresh) the E2E superuser in ``institution`` — idempotent."""
+    existing = db.query(User).filter(User.email == E2E_TEST_ADMIN["email"]).first()
+    if existing:
+        existing.password_hash = None
+        existing.zitadel_sub = existing.zitadel_sub or _dummy_sub(existing.email)
+        existing.institution_id = institution.id
+        existing.is_superuser = True
+        db.commit()
+        logger.info(f"   User already exists: {existing.email}")
+        return existing
+
+    admin = User(
+        email=E2E_TEST_ADMIN["email"],
+        zitadel_sub=_dummy_sub(E2E_TEST_ADMIN["email"]),
+        first_name=E2E_TEST_ADMIN["first_name"],
+        last_name=E2E_TEST_ADMIN["last_name"],
+        institution_id=institution.id,
+        status=UserStatus.ACTIVE.value,
+        is_superuser=True,
+        is_email_verified=True,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    logger.info(f"   Created admin: {admin.email} (ID: {admin.id})")
+    return admin
 
 
 def setup_e2e_other_institution(db):
@@ -227,6 +268,7 @@ def cleanup_e2e_data(db):
         E2E_TEST_USER["email"],
         E2E_TEST_USER_B["email"],
         E2E_TEST_USER_C["email"],
+        E2E_TEST_ADMIN["email"],
     ]
     for email in emails:
         user = db.query(User).filter(User.email == email).first()
@@ -262,6 +304,7 @@ def main():
         # 2b. Setup additional users for the visibility E2E (TF-354):
         #     a same-institution colleague + a cross-institution outsider.
         _create_dozent_user(db, E2E_TEST_USER_B, institution)
+        _create_e2e_admin(db, institution)
         other_institution = setup_e2e_other_institution(db)
         _create_dozent_user(db, E2E_TEST_USER_C, other_institution)
 
@@ -273,7 +316,7 @@ def main():
         print("=" * 60)
         print("\nTest Credentials:")
         print(f"   Email: {E2E_TEST_USER['email']}")
-        print(f"   Password: {E2E_TEST_USER['password']}")
+        print("   Login: POST /api/v1/auth/test-login (E2E_TEST_LOGIN=true)")
         print(f"\nTest Documents: {len(documents)} document(s) created")
         print("\nRun E2E tests with:")
         print("   just e2e")

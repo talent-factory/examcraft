@@ -1,79 +1,28 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { withTokenRefreshLock, ACCESS_TOKEN_KEY, RefreshTrigger, ImpersonationEndedError } from './tokenRefreshLock';
+import axios, { AxiosInstance } from 'axios';
 
-// Endpoints excluded from the automatic 401-refresh-and-retry flow below,
-// beyond the existing `/api/auth/` exclusion:
-// - `/api/admin/impersonate/end` (TF-743) must run under the caller's
-//   *current* identity (AdminService.endImpersonation()'s contract). If it
-//   401s because the impersonation token already expired, letting this
-//   interceptor transparently refresh (which restores the admin's own
-//   session, see ImpersonationEndedError below) and retry would resend the
-//   "end impersonation" call as the admin instead of the target user.
-const RETRY_EXCLUDED_URL_PATTERNS = ['/api/auth/', '/api/admin/impersonate/end'];
-const isRetryExcluded = (url: string | undefined): boolean =>
-  !!url && RETRY_EXCLUDED_URL_PATTERNS.some((pattern) => url.includes(pattern));
+// EXAMCRAFT-126: Die Anmeldung ist eine serverseitige Session (BFF). Der
+// Browser hält nur ein opakes httpOnly-Cookie und sendet es bei jedem
+// Request mit; es gibt weder Tokens im Browser noch einen Refresh.
+//
+// Ausnahmen vom automatischen 401-Logout:
+// - `/api/auth/me` und `/api/v1/auth/` (Login-Flow) beantwortet der
+//   AuthContext selbst: ein 401 heisst dort schlicht "nicht angemeldet".
+// - `/api/admin/impersonate/end` (TF-743) läuft unter der aktuellen Identität;
+//   ein 401 darf die Admin-Session nicht lokal abräumen.
+const AUTH_EXCLUDED_URL_PATTERNS = ['/api/auth/me', '/api/v1/auth/', '/api/admin/impersonate/end'];
+const isAuthExcluded = (url: string | undefined): boolean =>
+  !!url && AUTH_EXCLUDED_URL_PATTERNS.some((pattern) => url.includes(pattern));
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-let refreshPromise: Promise<void> | null = null;
-let tokenRefreshCallback: (() => Promise<void>) | null = null;
 let logoutCallback: (() => Promise<void>) | null = null;
-let adoptStoredTokensCallback: (() => Promise<void>) | null = null;
-
-export function setTokenRefreshCallback(fn: () => Promise<void>): void {
-  tokenRefreshCallback = fn;
-}
 
 export function setLogoutCallback(fn: () => Promise<void>): void {
   logoutCallback = fn;
 }
 
-// Called when another tab won the refresh race — the fresh tokens are already
-// in localStorage and only need to be pulled into this tab's auth state.
-// Must throw if nothing usable was adopted (mirrors the `rotate` contract
-// below) rather than resolving silently, or a lost adoption looks like a
-// successful refresh to every caller of executeTokenRefresh.
-export function setAdoptStoredTokensCallback(fn: () => Promise<void>): void {
-  adoptStoredTokensCallback = fn;
-}
-
-// Single entry point for token refresh — all interceptor/timer paths (axios
-// interceptor, fetch interceptor, proactive timer) must go through this so
-// concurrent callers share one inflight refresh instead of racing for a
-// rotating refresh token. `refreshPromise` deduplicates within this tab, the
-// Web Lock inside withTokenRefreshLock deduplicates across tabs (TF-607).
-// The one exception is AuthContext's mount-time flow, which calls
-// withTokenRefreshLock directly — safe because it only runs once, before the
-// timer or either interceptor has anything to race against.
-export async function executeTokenRefresh(trigger: RefreshTrigger = 'unknown'): Promise<void> {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = withTokenRefreshLock(
-    async () => {
-      if (!tokenRefreshCallback) {
-        throw new Error('No token refresh callback registered');
-      }
-      await tokenRefreshCallback();
-    },
-    async () => {
-      if (!adoptStoredTokensCallback) {
-        throw new Error('No adopt-stored-tokens callback registered');
-      }
-      await adoptStoredTokensCallback();
-    },
-    trigger,
-  ).finally(() => { refreshPromise = null; });
-
-  return refreshPromise;
-}
-
-// Local-only teardown by design (TF-607): AuthContext registers this as
-// `clearLocalSession`, not `logout` — `logout` calls AuthService.logout(),
-// which revokes *every* session of the user on the backend. Escalating a
-// single request's auth failure to a full server-side revoke would sign the
-// user out of every open tab and device, not just recover this one.
+// Lokaler Abbau der Session (State leeren, zur Anmeldung leiten). Beendet die
+// Server-Session nicht: das Cookie ist bei einem 401 ohnehin ungültig.
 export function triggerAuthLogout(): void {
   if (logoutCallback) {
     logoutCallback().catch((err) => {
@@ -82,8 +31,16 @@ export function triggerAuthLogout(): void {
   }
 }
 
+const isApiRequest = (url: string): boolean =>
+  url.startsWith(API_BASE_URL) || url.startsWith('/api/') || url.startsWith('/ws/');
+
 let fetchInterceptorInstalled = false;
 
+/**
+ * Sorgt dafür, dass jeder fetch() an die API das Session-Cookie mitschickt
+ * (`credentials: 'include'`), und baut bei einem 401 die lokale Session ab.
+ * So müssen die Services weder Tokens noch Header kennen.
+ */
 export function setupFetchInterceptor(): void {
   if (fetchInterceptorInstalled) return;
   fetchInterceptorInstalled = true;
@@ -91,34 +48,17 @@ export function setupFetchInterceptor(): void {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const response = await originalFetch(input, init);
-
-    if (response.status !== 401) return response;
-
     const url = input instanceof Request ? input.url : String(input);
-    if (isRetryExcluded(url)) return response;
+    const apiRequest = isApiRequest(url);
+    const response = await originalFetch(
+      input,
+      apiRequest ? { credentials: 'include', ...init } : init,
+    );
 
-    try {
-      await executeTokenRefresh('fetch-401');
-    } catch (err) {
-      if (err instanceof ImpersonationEndedError) {
-        // The admin's own session was restored locally in place of the
-        // impersonation token that just 401'd. Retrying would silently
-        // resend this request as the admin rather than the impersonated
-        // user, and the admin session is valid, so this is not a logout —
-        // just surface the original 401 to the caller.
-        return response;
-      }
-      console.error('[apiClient] Fetch refresh failed:', err);
+    if (apiRequest && response.status === 401 && !isAuthExcluded(url)) {
       triggerAuthLogout();
-      return response;
     }
-
-    const newToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const newHeaders = new Headers(init?.headers);
-    if (newToken) newHeaders.set('Authorization', `Bearer ${newToken}`);
-
-    return originalFetch(input, { ...init, headers: newHeaders });
+    return response;
   };
 }
 
@@ -126,54 +66,15 @@ export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
-});
-
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
 });
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    if (
-      !originalRequest ||
-      error.response?.status !== 401 ||
-      isRetryExcluded(originalRequest.url)
-    ) {
-      return Promise.reject(error);
-    }
-
-    if (originalRequest._retry) {
+  (error) => {
+    if (error.response?.status === 401 && !isAuthExcluded(error.config?.url)) {
       triggerAuthLogout();
-      return Promise.reject(error);
     }
-
-    originalRequest._retry = true;
-
-    try {
-      await executeTokenRefresh('axios-401');
-    } catch (refreshErr) {
-      if (refreshErr instanceof ImpersonationEndedError) {
-        // See the matching branch in setupFetchInterceptor above: the admin
-        // session is already restored and valid, so this is not a logout —
-        // just don't retry under the wrong identity.
-        return Promise.reject(error);
-      }
-      console.error('[apiClient] Axios refresh failed:', refreshErr);
-      triggerAuthLogout();
-      return Promise.reject(error);
-    }
-
-    const newToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (newToken) {
-      originalRequest.headers.Authorization = `Bearer ${newToken}`;
-    }
-    return apiClient(originalRequest);
-  }
+    return Promise.reject(error);
+  },
 );

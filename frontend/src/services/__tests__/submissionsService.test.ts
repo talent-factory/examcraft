@@ -200,15 +200,8 @@ describe('SubmissionsService', () => {
 
   // ----- auth header injection -------------------------------------------
 
-  it('attaches Bearer token from localStorage when present', async () => {
-    localStorage.setItem('examcraft_access_token', 'jwt-abc');
-    mockFetch.mockResolvedValueOnce(json(200, sampleJob));
-    await SubmissionsService.getImportJob(1);
-    const init = mockFetch.mock.calls[0][1] as RequestInit;
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer jwt-abc');
-  });
-
-  it('omits Authorization when no token is stored', async () => {
+  it('sends no Authorization header (cookie session)', async () => {
+    localStorage.setItem('examcraft_access_token', 'legacy-token');
     mockFetch.mockResolvedValueOnce(json(200, sampleJob));
     await SubmissionsService.getImportJob(1);
     const init = mockFetch.mock.calls[0][1] as RequestInit;

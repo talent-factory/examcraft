@@ -415,100 +415,32 @@
   "auth": {
     "login": {
       "title": "Bentornato",
-      "subtitle": "Accedi al tuo account",
-      "email": "Indirizzo e-mail",
-      "emailPlaceholder": "tu@example.com",
-      "password": "Password",
-      "rememberMe": "Ricordami",
-      "forgotPassword": "Password dimenticata?",
-      "signingIn": "Accesso in corso...",
+      "subtitle": "Accedi con il tuo account Talent Factory.",
       "signIn": "Accedi",
-      "orContinueWith": "Oppure continua con",
-      "noAccount": "Non hai un account?",
-      "signUp": "Registrati",
-      "emailAndPasswordRequired": "Inserisci sia l'e-mail che la password"
-    },
-    "register": {
-      "title": "Crea account",
-      "firstName": "Nome",
-      "firstNamePlaceholder": "Mario",
-      "lastName": "Cognome",
-      "lastNamePlaceholder": "Rossi",
-      "email": "E-mail",
-      "emailPlaceholder": "tua.email@example.com",
-      "institutionCode": "Codice istituzione (Opzionale)",
-      "institutionCodeHint": "Inserisci il codice della tua istituzione se ne hai uno",
-      "institutionCodePlaceholder": "nome-istituzione",
-      "password": "Password",
-      "passwordReqTitle": "La password deve contenere:",
-      "passwordReqMinLength": "8+ caratteri",
-      "passwordReqUppercase": "Maiuscola (A–Z)",
-      "passwordReqLowercase": "Minuscola (a–z)",
-      "passwordReqNumber": "Numero (0–9)",
-      "confirmPassword": "Conferma password",
-      "creatingAccount": "Creazione account...",
-      "createAccount": "Crea account",
-      "hasAccount": "Hai già un account?",
-      "loginHere": "Accedi qui"
+      "switchAccount": "Accedi con un altro account"
     },
     "authPage": {
       "tagline": "Generazione di domande d'esame con IA",
-      "backToLogin": "← Torna al login",
       "terms": "Termini di servizio",
       "privacy": "Informativa sulla privacy",
       "imprint": "Informazioni legali"
     },
-    "verification": {
-      "bannerTitle": "Verifica e-mail richiesta",
-      "bannerText": "Verifica il tuo indirizzo e-mail per accedere a tutte le funzionalità. Controlla la tua casella di posta per il link di verifica.",
-      "resendButton": "Invia di nuovo l'e-mail di verifica",
-      "sending": "Invio in corso...",
-      "emailSent": "E-mail inviata!",
-      "successMessage": "E-mail di verifica inviata! Controlla la tua casella di posta."
+    "loginError": {
+      "login_failed": "Accesso non riuscito. Riprova.",
+      "login_expired": "L'accesso ha richiesto troppo tempo o è stato avviato in un'altra scheda. Riprova.",
+      "login_cancelled": "L'accesso è stato annullato.",
+      "idp_unavailable": "Il servizio di accesso non è al momento raggiungibile. Riprova più tardi.",
+      "email_conflict": "Questo indirizzo e-mail appartiene già a un altro account ExamCraft. Contatta il supporto.",
+      "account_not_migrated": "Il tuo account non è ancora stato trasferito al nuovo accesso. Contatta il supporto.",
+      "user_limit": "La tua istituzione ha raggiunto il numero massimo di utenti. Contatta il tuo amministratore.",
+      "claims_missing": "Il tuo account non fornisce tutti i dati necessari (ad es. un indirizzo e-mail verificato). Completali nell'account e riprova.",
+      "account_inactive": "Il tuo account non è attivo. Contatta il tuo amministratore.",
+      "reauth_failed": "Il nuovo accesso non è riuscito. Riprova."
     },
-    "oauth": {
-      "processing": "Elaborazione callback OAuth...",
-      "errorTitle": "Errore di autenticazione",
-      "returnToLogin": "Torna al login",
-      "noCodeError": "Nessun codice di autorizzazione ricevuto",
-      "missingTokens": "Token di autenticazione mancanti"
-    },
-    "resetRequest": {
-      "title": "Reimposta password",
-      "subtitle": "Inserisci il tuo indirizzo e-mail e ti invieremo un link per reimpostare la password.",
-      "email": "Indirizzo e-mail",
-      "emailPlaceholder": "tua.email@example.com",
-      "sending": "Invio in corso...",
-      "sendResetLink": "Invia link",
-      "cancel": "Annulla",
-      "checkEmail": "Controlla la tua e-mail",
-      "sentTo": "Abbiamo inviato un link per reimpostare la password a <strong>{{email}}</strong>. Controlla la tua casella di posta e segui le istruzioni.",
-      "redirecting": "Reindirizzamento in corso...",
-      "enterEmail": "Inserisci il tuo indirizzo e-mail",
-      "invalidEmail": "Inserisci un indirizzo e-mail valido"
-    },
-    "resetConfirm": {
-      "title": "Imposta nuova password",
-      "subtitle": "Inserisci la tua nuova password qui sotto.",
-      "newPassword": "Nuova password",
-      "passwordHint": "Minimo 8 caratteri",
-      "confirmPassword": "Conferma nuova password",
-      "resetting": "Reimpostazione...",
-      "resetPassword": "Reimposta password",
-      "cancel": "Annulla",
-      "successTitle": "Password reimpostata con successo",
-      "successMessage": "La tua password è stata reimpostata con successo. Ora puoi accedere con la tua nuova password.",
-      "redirectingToLogin": "Reindirizzamento al login..."
-    },
-    "validation": {
-      "required": "Compila tutti i campi obbligatori",
-      "passwordMismatch": "Le password non corrispondono",
-      "passwordMinLength": "La password deve contenere almeno 8 caratteri",
-      "passwordUppercase": "La password deve contenere almeno una lettera maiuscola",
-      "passwordLowercase": "La password deve contenere almeno una lettera minuscola",
-      "passwordNumber": "La password deve contenere almeno un numero",
-      "invalidEmail": "Inserisci un indirizzo e-mail valido",
-      "fillAllFields": "Compila tutti i campi"
+    "loginNotice": {
+      "session_expired": "La tua sessione è scaduta o è stata terminata. Accedi di nuovo.",
+      "session_unavailable": "Non è stato possibile verificare la tua sessione (server non raggiungibile o errore). Riprova.",
+      "logout_failed": "La disconnessione sul server non è riuscita. La tua sessione potrebbe essere ancora attiva. Se condividi questo computer, accedi di nuovo e poi disconnettiti ancora."
     }
   },
   "footer": {
@@ -530,6 +462,10 @@
       "purpose": {
         "title": "Finalità del trattamento dei dati",
         "text": "ExamCraft AI tratta i dati personali esclusivamente per fornire l'assistenza agli esami basata sull'IA: account utente, elaborazione di documenti, generazione di domande, suggerimenti di valutazione e comunicazione. Il trattamento si basa sul GDPR o sulla revisione della Legge federale svizzera sulla protezione dei dati (nDSG)."
+      },
+      "login": {
+        "title": "Accesso e account utente",
+        "text": "L'accesso avviene tramite il nostro servizio di identità gestito in proprio «Talent Factory Login» (tessera/Zitadel, regione di Francoforte, DE). Vengono trattati indirizzo e-mail, nome, hash della password, lingua preferita e dati tecnici di accesso (indirizzo IP, user agent, lingua del browser). La base giuridica è l'art. 6 par. 1 lett. b GDPR (esecuzione del contratto). Ciò vale anche per il trasferimento una tantum degli account esistenti, compreso l'hash della password, nel servizio di identità: serve a consentire di continuare ad accedere con la password attuale. I dati tecnici di accesso nei registri degli eventi del servizio di identità vengono rimossi dopo 90 giorni. In caso di cancellazione dell'account viene eliminato prima l'account nel servizio di identità, e i dati in ExamCraft AI solo dopo il successo di tale eliminazione. I dati di profilo degli account eliminati nei registri degli eventi vengono svuotati tramite una cancellazione dei campi. I backup giornalieri del servizio di identità vengono eliminati dopo 30 giorni. In alternativa è possibile accedere con Google, Microsoft o GitHub; l'accesso avviene allora presso tale fornitore e viene intermediato dal servizio di identità."
       },
       "hosting": {
         "title": "Hosting e localizzazione dei dati",
@@ -573,8 +509,12 @@
             "description": "Invio e-mail per newsletter ed e-mail transazionali (fornitore di trasporto di SubscribeFlow); Fornitore: Sendinblue SA (Brevo), Francia — sede/meccanismo di trasferimento in fase di chiarimento con Legal/DPO"
           },
           {
+            "name": "tessera/Zitadel",
+            "description": "Accesso, account utente e intermediazione dei provider di single sign-on (gestito in proprio, regione di Francoforte, DE); parte del nostro hosting Fly.io"
+          },
+          {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Accesso Single Sign-On facoltativo; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Single sign-on facoltativo, intermediato dal nostro servizio di identità; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -928,28 +868,6 @@
       "processing": "Elaborazione...",
       "subscribe": "Abbonati",
       "subscriptionError": "Impossibile avviare il processo di abbonamento. Riprova."
-    },
-    "registrationSuccess": {
-      "title": "Registrazione completata! 🎉",
-      "subtitle": "Benvenuto su ExamCraft AI! Abbiamo inviato un'e-mail di verifica a:",
-      "checkInbox": "Controlla la tua casella di posta e clicca sul link di verifica per attivare il tuo account. Il link scadrà tra 24 ore.",
-      "didntReceive": "Non hai ricevuto l'e-mail?",
-      "continueToDashboard": "Continua al dashboard",
-      "limitedAccess": "Puoi comunque accedere al dashboard, ma alcune funzionalità potrebbero essere limitate fino alla verifica della tua e-mail."
-    },
-    "verifyEmail": {
-      "verifying": "Verifica dell'e-mail in corso...",
-      "pleaseWait": "Attendi mentre verifichiamo il tuo indirizzo e-mail.",
-      "success": "E-mail verificata! 🎉",
-      "welcomeUser": "Benvenuto, {{name}}! La tua e-mail è stata verificata con successo.",
-      "fullAccess": "Ora puoi accedere a tutte le funzionalità di ExamCraft AI.",
-      "goToDashboard": "Vai al dashboard",
-      "failed": "Verifica fallita",
-      "linkExpired": "Il link di verifica potrebbe essere scaduto o non valido.",
-      "backToLogin": "Torna al login",
-      "noToken": "Link di verifica non valido. Nessun token fornito.",
-      "verificationFailed": "Verifica fallita",
-      "verifyEmailError": "Impossibile verificare l'e-mail. Riprova."
     },
     "paymentSuccess": {
       "title": "Pagamento riuscito!",
@@ -1443,15 +1361,14 @@
       "dialogTargetLabel": "Stai accedendo come:",
       "dialogReasonLabel": "Motivo (obbligatorio)",
       "dialogReasonPlaceholder": "es. riprodurre il ticket di supporto TICKET-123",
-      "dialogPasswordLabel": "La tua password (conferma)",
-      "dialogPasswordPlaceholder": "La tua password attuale",
       "dialogConfirm": "Accedi",
       "dialogStarting": "Avvio in corso...",
       "dialogCancel": "Annulla",
       "dialogLoadFailed": "Impossibile caricare l'utente",
       "dialogError": "Accesso come utente non riuscito",
+      "reauthRedirect": "Questa azione richiede un nuovo accesso. Verrai reindirizzato; i tuoi dati inseriti vengono conservati.",
+      "reauthRedirectNoResume": "Questa azione richiede un nuovo accesso. Verrai reindirizzato; i dati inseriti non hanno potuto essere salvati e andranno reinseriti.",
       "reasonTooShort": "Inserisci almeno {{min}} caratteri come motivo",
-      "passwordRequired": "Conferma la tua password",
       "bannerLabel": "Connesso come:",
       "bannerTimeRemaining": "Tempo rimanente: {{time}}",
       "bannerReturnButton": "Torna al mio account",
@@ -2755,8 +2672,7 @@
       "title": "Il mio profilo",
       "subtitle": "Gestisci le impostazioni e le preferenze del tuo account",
       "tabProfile": "Profilo",
-      "tabEdit": "Modifica profilo",
-      "tabPassword": "Cambia password"
+      "tabEdit": "Modifica profilo"
     },
     "profileView": {
       "noUserData": "Nessun dato utente disponibile",
@@ -2794,37 +2710,6 @@
       "cancel": "Annulla",
       "saving": "Salvataggio...",
       "saveChanges": "Salva modifiche"
-    },
-    "passwordChange": {
-      "headerSet": "Imposta password",
-      "headerChange": "Cambia password",
-      "oauthInfo": "Sei attualmente connesso tramite {{provider}}. Imposta una password per abilitare l'accesso con e-mail/password.",
-      "validationFillAll": "Compila tutti i campi",
-      "validationMismatch": "Le nuove password non corrispondono",
-      "validationMinLength": "La nuova password deve contenere almeno 8 caratteri",
-      "validationSamePassword": "La nuova password deve essere diversa dalla password attuale",
-      "validationUppercase": "La nuova password deve contenere almeno una lettera maiuscola",
-      "validationLowercase": "La nuova password deve contenere almeno una lettera minuscola",
-      "validationNumber": "La nuova password deve contenere almeno un numero",
-      "successSetTitle": "Password impostata con successo",
-      "successChangeTitle": "Password cambiata con successo",
-      "successSetMessage": "La tua password è stata impostata. Ora puoi accedere con la tua e-mail e password.",
-      "successChangeMessage": "La tua password è stata aggiornata. Ora puoi utilizzare la tua nuova password per accedere.",
-      "currentPassword": "Password attuale *",
-      "newPassword": "Nuova password *",
-      "passwordHint": "Minimo 8 caratteri",
-      "confirmPassword": "Conferma nuova password *",
-      "showPasswords": "Mostra password",
-      "securityTipsTitle": "Consigli per la sicurezza della password",
-      "tip1": "Usa almeno 8 caratteri",
-      "tip2": "Mescola lettere maiuscole e minuscole",
-      "tip3": "Includi numeri e caratteri speciali",
-      "tip4": "Evita parole e schemi comuni",
-      "cancel": "Annulla",
-      "setting": "Impostazione...",
-      "changing": "Modifica...",
-      "setPassword": "Imposta password",
-      "changePassword": "Cambia password"
     },
     "permissions": {
       "create_documents": "Creare documenti",
@@ -3099,7 +2984,6 @@
         "selectOrCreateSession": "Seleziona una sessione o creane una nuova."
       },
       "chat": {
-        "sessionExpired": "Sessione scaduta. Accedi nuovamente.",
         "errorSending": "Errore nell'invio del messaggio",
         "errorGenerating": "Errore nella generazione del template",
         "generateTemplate": "Genera template",
@@ -3206,10 +3090,6 @@
     }
   },
   "errors": {
-    "oauth": {
-      "providerError": "L'accesso presso il provider non è riuscito.",
-      "callbackFailed": "Non è stato possibile completare l'accesso."
-    },
     "activity_list_failed": "Impossibile caricare le attività.",
     "admin_cannot_deactivate_self": "Non puoi disattivare il tuo stesso account",
     "admin_cannot_remove_last_role": "Impossibile rimuovere l'ultimo ruolo",
@@ -3251,47 +3131,18 @@
     "archive_failed": "Archiviazione non riuscita",
     "archive_not_archived": "La domanda non è archiviata",
     "audit_logs_load_failed": "Impossibile caricare i log di audit",
-    "auth_account_disabled": "Il tuo account è stato disabilitato",
     "auth_account_locked": "Account bloccato. Riprova più tardi",
     "auth_account_not_active": "Il tuo account non è attivo",
-    "auth_account_pending": "Verifica prima il tuo indirizzo e-mail. Controlla la tua casella di posta.",
     "auth_account_status_invalid": "Il tuo account ha lo stato «{{status}}»",
-    "auth_email_already_verified": "L'indirizzo e-mail è già verificato",
     "auth_email_taken": "L'indirizzo e-mail è già registrato",
-    "auth_institution_not_found": "Istituzione non trovata",
-    "auth_invalid_credentials": "E-mail o password non validi",
-    "auth_login_failed": "Accesso fallito",
-    "auth_login_service_unavailable": "Servizio di accesso temporaneamente non disponibile",
     "auth_logout_failed": "Disconnessione fallita",
-    "auth_oauth_code_invalid": "Codice OAuth non valido",
-    "auth_oauth_exchange_failed": "Scambio del codice OAuth fallito",
-    "auth_oauth_login_failed": "Accesso OAuth fallito",
-    "auth_oauth_provider_unsupported": "Il provider OAuth non è supportato",
-    "auth_oauth_token_read_failed": "Impossibile leggere il token OAuth",
-    "auth_oauth_url_failed": "Impossibile ottenere l'URL di accesso OAuth",
-    "auth_password_already_set": "Questo account ha già una password",
-    "auth_password_change_failed": "Impossibile modificare la password",
     "auth_password_incorrect": "La password attuale non è corretta",
-    "auth_password_reset_failed": "Impossibile reimpostare la password",
-    "auth_password_reset_token_invalid": "Il link per reimpostare la password non è valido, è scaduto o è già stato utilizzato",
-    "auth_password_reset_request_failed": "Impossibile richiedere il reset della password",
-    "auth_password_set_failed": "Impossibile impostare la password",
     "auth_permission_required": "Autorizzazione «{{permission}}» richiesta",
     "auth_profile_load_failed": "Impossibile caricare il profilo",
     "auth_profile_update_failed": "Impossibile aggiornare il profilo",
-    "auth_registration_failed": "Registrazione fallita",
-    "auth_service_unavailable": "Servizio temporaneamente non disponibile",
     "auth_token_invalid": "Token non valido o scaduto",
-    "auth_token_refresh_failed": "Impossibile rinnovare la sessione",
-    "auth_token_revoked": "Il token è stato revocato",
     "auth_token_user_not_found": "Token non valido: l'utente non esiste più",
     "auth_user_not_found": "Utente non trovato",
-    "auth_verification_email_failed": "Impossibile inviare l'e-mail di verifica",
-    "auth_verification_failed": "Verifica dell'e-mail non riuscita",
-    "auth_verification_resend_failed": "Impossibile inviare di nuovo l'e-mail di verifica",
-    "auth_verification_token_expired": "Il token di verifica è scaduto",
-    "auth_verification_token_invalid": "Token di verifica non valido",
-    "auth_verification_token_used": "Il token di verifica è già stato utilizzato",
     "billing_no_institution": "L'utente deve essere associato a un'istituzione",
     "billing_portal_failed": "Si è verificato un errore durante la creazione della sessione del portale. Riprova.",
     "billing_portal_owner_only": "Solo la persona responsabile della fatturazione può gestire le impostazioni dell'abbonamento.",
@@ -3441,6 +3292,7 @@
     "help_track_id_invalid": "ID percorso non valido",
     "impersonation_action_locked": "Questa azione è bloccata durante una sessione di impersonazione attiva",
     "impersonation_already_active": "È già attiva una sessione di impersonazione",
+    "impersonation_cleanup_failed": "L'impersonazione non ha potuto essere annullata correttamente: la sessione lato server potrebbe essere ancora attiva. Esci e accedi di nuovo subito.",
     "impersonation_end_failed": "Impossibile terminare la sessione di impersonazione",
     "impersonation_no_admin_session": "L'impersonazione non può essere avviata senza una sessione di amministratore attiva",
     "impersonation_no_password_set": "Per il tuo account non è impostata alcuna password. Imposta prima una password nel tuo profilo per poter utilizzare l'impersonazione.",
@@ -3757,7 +3609,8 @@
     "wizard_sessions_load_failed": "Impossibile caricare le sessioni",
     "wizard_template_already_saved": "Il modello è già stato salvato.",
     "wizard_template_not_generated": "Non è ancora stato generato alcun modello.",
-    "wizard_user_not_found": "Utente non trovato."
+    "wizard_user_not_found": "Utente non trovato.",
+    "auth_reauth_required": "Per questa azione devi accedere di nuovo."
   },
   "help": {
     "title": "Aiuto",
@@ -4090,6 +3943,25 @@
       "security": "Sicurezza e affidabilità"
     },
     "entries": {
+      "v1_16_0_central_login": "L'accesso avviene ora tramite il login centrale di Talent Factory. Un solo account basta per ExamCraft AI e altri servizi.",
+      "v1_16_0_switch_account": "Nella pagina di accesso, «Accedi con un altro account» permette di accedere deliberatamente con un altro account.",
+      "v1_16_0_login_errors": "Gli errori di accesso vengono mostrati chiaramente nella pagina di accesso e le sessioni scadute riportano correttamente al login.",
+      "v1_15_1_ilias_titles": "Esportazione ILIAS: le domande compaiono in ILIAS con numero e argomento, ad esempio «01 – Tipi di pialla», invece di semplicemente «Domanda 1» (se è indicato un argomento)",
+      "v1_15_0_plan_limits": "Valutazione: le azioni non incluse nel piano attuale (ad es. approvazione collettiva nella revisione delle domande o schemi di voto personalizzati) appaiono disattivate e indicano da quale piano sono disponibili",
+      "v1_15_0_ui_language": "I testi integrati, come «Chiudi» o l'indicazione delle pagine nelle tabelle, seguono ora la lingua selezionata",
+      "v1_15_0_less_personal_data": "Meno dati personali nelle richieste all'IA: indirizzi e-mail e numeri AVS vengono rimossi prima di ogni richiesta, e nella correzione e nella valutazione dei portfolio anche i nomi degli studenti interessati",
+      "v1_15_0_readable_solutions": "Le soluzioni modello e i criteri di valutazione delle domande a risposta libera compaiono nella revisione delle domande come testo formattato invece che come JSON grezzo",
+      "v1_15_0_library_paging": "La biblioteca dei documenti non torna più alla pagina 1 quando si ricarica la pagina o si segue un link",
+      "v1_15_0_generation_start_time": "L'elenco delle generazioni in corso mostra di nuovo l'ora di inizio corretta",
+      "v1_14_0_portfolio_assessment": "Valutazione dei portfolio: i portfolio degli studenti possono essere valutati fase per fase dall'IA, e il docente verifica e conferma ogni risultato (se abilitata per il proprio ruolo)",
+      "v1_14_0_password_reset": "Password dimenticata? Ora puoi richiedere via e-mail un link di reimpostazione, valido per un'ora",
+      "v1_14_0_ai_labelling": "I contenuti generati dall'IA sono ora contrassegnati come tali nell'interfaccia e nelle esportazioni",
+      "v1_14_0_low_material_hint": "Generazione di domande: se il materiale selezionato non basta probabilmente per il numero di domande richiesto, prima dell'avvio compare un avviso",
+      "v1_14_0_no_duplicate_questions": "Se una generazione di domande viene interrotta da un riavvio del server, alla ripresa non vengono più create domande duplicate",
+      "v1_13_1_generic_templates": "I modelli di prompt generali per la generazione di domande sono di nuovo selezionabili per ogni tipo di domanda nella procedura guidata",
+      "v1_12_0_ilias_export": "Gli esami possono essere esportati in formato QTI per ILIAS (per gli utenti autorizzati)",
+      "v1_12_0_sidebar_collapsible": "La barra laterale può ora essere ridotta ed espansa",
+      "v1_12_0_underfilled_visible": "Se la generazione di domande produce meno domande di quelle richieste, ora viene segnalato invece di passare inosservato",
       "v1_11_0_admin_kebab_menu": "Gestione utenti nel pannello di amministrazione: azioni ora raggruppate in un menu chiaro",
       "v1_11_0_error_messages": "Messaggi di errore più coerenti e chiari durante l'accesso e l'amministrazione",
       "v1_11_0_stability": "Numerose piccole correzioni di bug e miglioramenti della stabilità",

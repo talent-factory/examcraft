@@ -22,7 +22,7 @@
 /* eslint-disable testing-library/prefer-screen-queries */
 import { test, expect } from './fixtures/auth';
 import { type APIRequestContext } from '@playwright/test';
-import { E2E_TEST_USER } from './fixtures/auth';
+import { E2E_TEST_USER, testLoginApi } from './fixtures/auth';
 
 const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
@@ -30,19 +30,13 @@ const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 // API helpers (mirrors document-visibility.spec.ts conventions)
 // ---------------------------------------------------------------------------
 
-async function login(request: APIRequestContext, creds: { email: string; password: string }): Promise<string> {
-  const res = await request.post(`${API_URL}/api/auth/login`, {
-    data: { email: creds.email, password: creds.password },
-  });
-  // Assert login succeeded (status is shown in the error message on failure).
-  expect(res.ok()).toBeTruthy();
-  const body = await res.json();
-  return body.access_token as string;
+async function login(request: APIRequestContext, creds: { email: string }): Promise<void> {
+  // Session cookie lands in the cookie jar of `request` (EXAMCRAFT-126).
+  await testLoginApi(request, creds.email);
 }
 
-async function uploadDoc(request: APIRequestContext, token: string, name: string): Promise<number> {
+async function uploadDoc(request: APIRequestContext, name: string): Promise<number> {
   const res = await request.post(`${API_URL}/api/v1/documents/upload`, {
-    headers: { Authorization: `Bearer ${token}` },
     multipart: {
       visibility: 'private',
       file: {
@@ -58,9 +52,8 @@ async function uploadDoc(request: APIRequestContext, token: string, name: string
   return body.document_id as number;
 }
 
-async function createUserTag(request: APIRequestContext, token: string, name: string): Promise<number> {
+async function createUserTag(request: APIRequestContext, name: string): Promise<number> {
   const res = await request.post(`${API_URL}/api/v1/documents/tags`, {
-    headers: { Authorization: `Bearer ${token}` },
     data: { name, scope: 'user' },
   });
   if (!res.ok()) {
@@ -70,9 +63,8 @@ async function createUserTag(request: APIRequestContext, token: string, name: st
   return body.id as number;
 }
 
-async function attachTag(request: APIRequestContext, token: string, docId: number, tagId: number): Promise<void> {
+async function attachTag(request: APIRequestContext, docId: number, tagId: number): Promise<void> {
   const res = await request.post(`${API_URL}/api/v1/documents/${docId}/tags`, {
-    headers: { Authorization: `Bearer ${token}` },
     data: { tag_ids: [tagId] },
   });
   if (!res.ok()) {
@@ -80,23 +72,20 @@ async function attachTag(request: APIRequestContext, token: string, docId: numbe
   }
 }
 
-async function deleteTag(request: APIRequestContext, token: string, id: number): Promise<void> {
+async function deleteTag(request: APIRequestContext, id: number): Promise<void> {
   // Best-effort, like deleteDoc. Only archived tags can be deleted.
   try {
-    const headers = { Authorization: `Bearer ${token}` };
-    await request.post(`${API_URL}/api/v1/tags/${id}/archive`, { headers });
-    await request.delete(`${API_URL}/api/v1/tags/${id}`, { headers });
+    await request.post(`${API_URL}/api/v1/tags/${id}/archive`);
+    await request.delete(`${API_URL}/api/v1/tags/${id}`);
   } catch {
     // Ignore cleanup errors.
   }
 }
 
-async function deleteDoc(request: APIRequestContext, token: string, id: number): Promise<void> {
+async function deleteDoc(request: APIRequestContext, id: number): Promise<void> {
   // Best-effort: wrap so cleanup never fails the suite.
   try {
-    await request.delete(`${API_URL}/api/v1/documents/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    await request.delete(`${API_URL}/api/v1/documents/${id}`);
   } catch {
     // Ignore cleanup errors.
   }
@@ -125,9 +114,6 @@ test.describe('Document library UX (TF-355)', () => {
 
   // Seeded document ids for the pagination test; populated in beforeAll.
   let seededIds: number[] = [];
-  // Playwright APIRequestContext is only available inside test hooks.
-  // We store the token here so afterAll can reuse it.
-  let tokenForCleanup = '';
   // Unique per run; names the seeded documents and the seeded tag.
   const prefix = `tf355-page-${Date.now()}`;
   // Tag attached to the first seeded document only (tag-filter test).
@@ -137,22 +123,22 @@ test.describe('Document library UX (TF-355)', () => {
   // Seed 13 tiny docs so there are at least 2 pages at the smallest page
   // size of 12.  Use a timestamp-based prefix to avoid collisions on reruns.
   test.beforeAll(async ({ request }) => {
-    tokenForCleanup = await login(request, E2E_TEST_USER);
+    await login(request, E2E_TEST_USER);
     const uploads: Promise<number>[] = [];
     for (let i = 0; i < 13; i++) {
-      uploads.push(uploadDoc(request, tokenForCleanup, `${prefix}-${i}.txt`));
+      uploads.push(uploadDoc(request, `${prefix}-${i}.txt`));
     }
     seededIds = await Promise.all(uploads);
 
-    seededTagId = await createUserTag(request, tokenForCleanup, tagName);
-    await attachTag(request, tokenForCleanup, seededIds[0], seededTagId);
+    seededTagId = await createUserTag(request, tagName);
+    await attachTag(request, seededIds[0], seededTagId);
   });
 
   test.afterAll(async ({ request }) => {
     // Delete all seeded docs; best-effort so test failures don't block cleanup.
-    await Promise.all(seededIds.map((id) => deleteDoc(request, tokenForCleanup, id)));
+    await Promise.all(seededIds.map((id) => deleteDoc(request, id)));
     if (seededTagId !== undefined) {
-      await deleteTag(request, tokenForCleanup, seededTagId);
+      await deleteTag(request, seededTagId);
     }
   });
 

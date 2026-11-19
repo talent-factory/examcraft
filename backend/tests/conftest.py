@@ -421,15 +421,25 @@ def admin_client(help_db):
     app.dependency_overrides.clear()
 
 
-def login_headers(test_client, email: str, password: str) -> dict:
-    """POST /api/auth/login and return an Authorization header dict.
+def login_headers(test_client, email: str, password: str | None = None) -> dict:
+    """Return a ``Cookie`` header dict that logs in as ``email`` (EXAMCRAFT-125).
+
+    The real login runs through Zitadel (OIDC), which tests cannot drive, so
+    this creates the server-side session directly, exactly like the OIDC
+    callback does. ``password`` is accepted only so existing call sites keep
+    working; it is ignored.
 
     Shared by test files that exercise real HTTP auth (as opposed to
-    dependency-override mock users) so they don't each redefine it.
+    dependency-override mock users). The DB session is taken from the
+    ``get_db`` override of the test client.
     """
-    response = test_client.post(
-        "/api/auth/login", json={"email": email, "password": password}
-    )
-    assert response.status_code == 200, response.text
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    from database import get_db
+    from models.auth import User
+    from services import session_service
+
+    override = app.dependency_overrides[get_db]
+    gen = override()
+    db = next(gen)
+    user = db.query(User).filter(User.email == email).one()
+    token, _row = session_service.create_session(db, user.id)
+    return {"Cookie": f"{session_service.SESSION_COOKIE_NAME}={token}"}

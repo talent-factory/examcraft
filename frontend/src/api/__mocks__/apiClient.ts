@@ -1,3 +1,5 @@
+export const API_BASE_URL = 'http://localhost:8000';
+
 export const apiClient = {
   get: jest.fn(),
   post: jest.fn(),
@@ -9,9 +11,6 @@ export const apiClient = {
   },
 };
 
-export const setTokenRefreshCallback = jest.fn();
 export const setLogoutCallback = jest.fn();
-export const setAdoptStoredTokensCallback = jest.fn();
 export const setupFetchInterceptor = jest.fn();
-export const executeTokenRefresh = jest.fn().mockResolvedValue(undefined);
 export const triggerAuthLogout = jest.fn();

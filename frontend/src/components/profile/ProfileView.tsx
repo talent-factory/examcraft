@@ -28,9 +28,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   // the user happens to switch languages again.
   useEffect(() => {
     const pending = getPendingLanguage();
-    const token = localStorage.getItem('examcraft_access_token');
-    if (!pending || !user || !token) return;
-    AuthService.updateProfile(token, { preferred_language: pending })
+    if (!pending || !user) return;
+    AuthService.updateProfile({ preferred_language: pending })
       .then(() => {
         clearPendingLanguage();
         setLanguageSaveFailed(false);
@@ -39,7 +38,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
         // Still unreachable. The choice keeps applying here, which is the
         // whole point of the marker — no need to bother the user again. But
         // silent forever is too silent: if this keeps failing on every visit
-        // (an expired token, a backend regression), there should be at least
+        // (an expired session, a backend regression), there should be at least
         // a console trace, unlike the explicit save path just below, which
         // also surfaces it in the UI.
         console.warn('[ProfileView] Retrying the pending language preference failed:', error);

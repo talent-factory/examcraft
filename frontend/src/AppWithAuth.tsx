@@ -10,14 +10,9 @@ import { AuthProvider } from './contexts/AuthContext';
 import { GenerationTasksProvider } from './contexts/GenerationTasksContext';
 import { ProtectedRoute, GuestRoute, PermissionGuard, RoleGuard } from './components/guards';
 import { AppLayout } from './components/layout';
-import { AuthPage } from './components/auth/AuthPage';
-import { OAuthCallback } from './components/auth/OAuthCallback';
+import { LoginPage } from './components/auth/LoginPage';
 import { PrivacyPage, TermsPage, ImprintPage, CompliancePage } from './pages/legal';
-import { PasswordResetRequest } from './components/auth/PasswordResetRequest';
-import { PasswordResetConfirm } from './components/auth/PasswordResetConfirm';
 import { ProfilePage } from './components/profile/ProfilePage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
-import RegistrationSuccessPage from './pages/RegistrationSuccessPage';
 import { Dashboard } from './pages/Dashboard';
 import Aktivitaeten from './pages/Aktivitaeten';
 import { Documents } from './pages/Documents';
@@ -84,23 +79,10 @@ export const AppWithAuth: React.FC = () => {
                 path="/login"
                 element={
                   <GuestRoute>
-                    <AuthPage />
+                    <LoginPage />
                   </GuestRoute>
                 }
               />
-              <Route
-                path="/register"
-                element={
-                  <GuestRoute>
-                    <AuthPage defaultTab="register" />
-                  </GuestRoute>
-                }
-              />
-              <Route path="/auth/callback" element={<OAuthCallback />} />
-              <Route path="/auth/reset-password" element={<PasswordResetRequest />} />
-              <Route path="/auth/reset-password/confirm" element={<PasswordResetConfirm />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-              <Route path="/registration-success" element={<RegistrationSuccessPage />} />
 
               {/* Public legal pages */}
               <Route path="/privacy" element={<PrivacyPage />} />

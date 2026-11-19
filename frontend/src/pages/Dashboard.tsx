@@ -12,7 +12,6 @@ import { de, enUS, fr, it } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
 import { QuickActionCard } from '../components/cards/QuickActionCard';
 import { StatsCard } from '../components/cards/StatsCard';
-import EmailVerificationBanner from '../components/auth/EmailVerificationBanner';
 import { translateError } from '../errors';
 import {
   fetchDashboardStats,
@@ -74,7 +73,6 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div data-testid="dashboard-content" className="space-y-8">
-      <EmailVerificationBanner />
 
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg p-8 text-white">

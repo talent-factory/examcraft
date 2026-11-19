@@ -232,16 +232,29 @@ def test_nicht_umgestellter_pfad_bleibt_unveraendert(envelope_db):
 
 def test_401_traegt_www_authenticate_header(envelope_db):
     """TF-773 review: main.py's generischer Handler muss ``headers``
-    durchreichen — sonst verliert jeder 401 lautlos ``WWW-Authenticate``,
-    obwohl die restliche Suite grün bliebe (kein anderer Test prüft den
-    Header). Bewusst OHNE ``get_current_user``-Override: dieser Test
-    braucht den echten Token-Ablehnungspfad in
-    ``auth_utils.py::get_current_user``, der den Header setzt."""
+    durchreichen — sonst verliert jeder 401 lautlos ``WWW-Authenticate``.
+
+    Seit EXAMCRAFT-125 setzt ``get_current_user`` (Cookie-Session statt
+    Bearer-Token) den Header nicht mehr selbst; der Durchreich-Vertrag des
+    Handlers gilt für jeden Aufrufer von ``api_error(..., headers=...)`` und
+    wird deshalb über eine Probe-Route geprüft. Zusätzlich: ein ungültiges
+    Session-Cookie liefert weiterhin den 401-Umschlag mit ``auth_token_invalid``.
+    """
     import api.tags as tags_module
     from database import get_db
+    from errors import api_error
 
     if "/api/v1/tags/{tag_id}" not in [r.path for r in app.routes]:
         app.include_router(tags_module.router)
+
+    path = "/__envelope-probe__/www-authenticate"
+    if path not in [r.path for r in app.routes]:
+
+        @app.get(path)
+        def _challenge_probe():  # pragma: no cover - über den Client gerufen
+            raise api_error(
+                401, "auth_token_invalid", "de", {"WWW-Authenticate": "Bearer"}
+            )
 
     def override_get_db():
         yield envelope_db
@@ -249,14 +262,16 @@ def test_401_traegt_www_authenticate_header(envelope_db):
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app, raise_server_exceptions=False)
 
-    response = client.delete(
-        "/api/v1/tags/999999",
-        headers={"Authorization": "Bearer not-a-real-token"},
-    )
-
+    response = client.get(path)
     assert response.status_code == 401, response.text
     assert response.json()["error_code"] == "auth_token_invalid"
     assert response.headers["www-authenticate"] == "Bearer"
+
+    response = client.delete(
+        "/api/v1/tags/999999", headers={"Cookie": "session_id=not-a-real-session"}
+    )
+    assert response.status_code == 401, response.text
+    assert response.json()["error_code"] == "auth_token_invalid"
 
 
 def test_validierungsfehler_traegt_reservierten_code(envelope_db):

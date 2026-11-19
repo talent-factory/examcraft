@@ -3,6 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { ReleaseNotesDialog } from '../ReleaseNotesDialog';
+import { RELEASE_NOTES } from '../../../data/releaseNotes';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const deTranslations = require('../../../locales/de/translation.json').releaseNotes;
 
 // The dialog's language pills go through useLanguageChange (review fix), which
 // calls useAuth() — mocked here the same way as the other layout component
@@ -50,16 +54,42 @@ describe('ReleaseNotesDialog', () => {
     it('renders the dialog title and current version badge', () => {
       renderDialog();
       expect(screen.getByText('Was ist neu in ExamCraft AI')).toBeInTheDocument();
-      expect(screen.getByTestId('release-notes-current-version-badge')).toHaveTextContent('1.11.0');
+      expect(screen.getByTestId('release-notes-current-version-badge')).toBeInTheDocument();
     });
 
+    // The badge prefers REACT_APP_VERSION and only falls back to the newest
+    // manifest entry — pin both branches so the test doesn't depend on the
+    // environment the suite happens to run in.
+    describe('current version badge source', () => {
+      const original = process.env.REACT_APP_VERSION;
+      afterEach(() => {
+        if (original === undefined) delete process.env.REACT_APP_VERSION;
+        else process.env.REACT_APP_VERSION = original;
+      });
+
+      it('falls back to the newest manifest entry when REACT_APP_VERSION is unset', () => {
+        delete process.env.REACT_APP_VERSION;
+        renderDialog();
+        expect(screen.getByTestId('release-notes-current-version-badge')).toHaveTextContent(
+          RELEASE_NOTES[0].version
+        );
+      });
+
+      it('prefers REACT_APP_VERSION over the manifest', () => {
+        process.env.REACT_APP_VERSION = '9.9.9';
+        renderDialog();
+        expect(screen.getByTestId('release-notes-current-version-badge')).toHaveTextContent(
+          '9.9.9'
+        );
+      });
+    });
+
+    // Derived from the manifest instead of hard-coding a version, so adding a
+    // release entry (see the release checklist) doesn't break this test.
     it('renders the newest release expanded with its "new" badge', () => {
       renderDialog();
-      expect(
-        screen.getByText(
-          'Benutzerverwaltung im Admin-Panel: Aktionen jetzt übersichtlich in einem Kebab-Menü zusammengefasst'
-        )
-      ).toBeInTheDocument();
+      const newestFirstItemId = RELEASE_NOTES[0].groups[0].items[0].id;
+      expect(screen.getByText(deTranslations.entries[newestFirstItemId])).toBeInTheDocument();
       expect(screen.getByText('Neu')).toBeInTheDocument();
     });
 
@@ -68,9 +98,11 @@ describe('ReleaseNotesDialog', () => {
     // in ReleaseNotesDialog.screenshot.test.tsx, independent of whatever the
     // production manifest currently contains. This test only asserts the
     // one thing that fixture can't: that the actual v1.11.0 entry's
-    // screenshot is wired up correctly.
+    // screenshot is wired up correctly (it is no longer the newest entry, so
+    // it has to be expanded first).
     it('renders the v1.11.0 entry\'s screenshot with a translated alt text', () => {
       renderDialog();
+      fireEvent.click(screen.getByRole('button', { name: /\b1\.11\.0\b/ }));
       const images = screen.getAllByRole('img');
       expect(images).toHaveLength(1);
       expect(images[0]).toHaveAttribute('src', '/release-notes/1.11.0/admin-kebab-menu.png');

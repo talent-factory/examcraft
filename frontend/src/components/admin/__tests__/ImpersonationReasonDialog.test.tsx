@@ -8,11 +8,12 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ImpersonationReasonDialog } from '../ImpersonationReasonDialog';
+import { ImpersonationReasonDialog, takePendingImpersonation } from '../ImpersonationReasonDialog';
 import AdminService from '../../../services/AdminService';
 import { AppError } from '../../../errors';
+import { clearAllSessionSnapshots } from '../../../utils/sessionSnapshot';
 
 // The global react-i18next mock (setupTests.ts) recreates `t` on every call
 // to useTranslation(), which is fine for most components but breaks this
@@ -26,15 +27,12 @@ const DE_STRINGS: Record<string, string> = {
   'admin.impersonation.dialogTargetLabel': 'Du meldest dich an als:',
   'admin.impersonation.dialogReasonLabel': 'Grund (Pflichtfeld)',
   'admin.impersonation.dialogReasonPlaceholder': 'z. B. Support-Anfrage TICKET-123 nachstellen',
-  'admin.impersonation.dialogPasswordLabel': 'Dein Passwort (Bestätigung)',
-  'admin.impersonation.dialogPasswordPlaceholder': 'Dein aktuelles Passwort',
   'admin.impersonation.dialogConfirm': 'Anmelden',
   'admin.impersonation.dialogStarting': 'Wird gestartet...',
   'admin.impersonation.dialogCancel': 'Abbrechen',
   'admin.impersonation.dialogLoadFailed': 'Benutzer konnte nicht geladen werden',
   'admin.impersonation.dialogError': 'Anmeldung als Nutzer fehlgeschlagen',
   'admin.impersonation.reasonTooShort': 'Bitte gib mindestens {{min}} Zeichen als Grund an',
-  'admin.impersonation.passwordRequired': 'Bitte bestätige dein Passwort',
   // TF-772: the dialog renders translated error codes now, so the stable `t`
   // has to resolve the errors.* keys these tests exercise. Echoing them back
   // instead would push translateError into its fallback branch and make the
@@ -42,8 +40,7 @@ const DE_STRINGS: Record<string, string> = {
   'errors.admin_user_not_found': 'Benutzer nicht gefunden',
   'errors.impersonation_rate_limit_exceeded':
     'Zu viele Impersonation-Sitzungen gestartet. Bitte versuch es später erneut.',
-  'errors.impersonation_snapshot_failed':
-    'Impersonation nicht gestartet: Der Browser-Speicher ist voll oder eingeschränkt, die Rückkehr zum Admin-Konto wäre nicht gesichert.',
+  'errors.impersonation_already_active': 'Es läuft bereits eine aktive Impersonation-Sitzung',
 };
 const mockStableT = (key: string, params?: Record<string, unknown>) => {
   let value = DE_STRINGS[key] ?? key;
@@ -67,8 +64,13 @@ jest.mock('../../../services/AdminService', () => ({
 }));
 
 const mockStartImpersonation = jest.fn();
+const mockLogin = jest.fn();
 jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: () => ({ startImpersonation: mockStartImpersonation }),
+  useAuth: () => ({
+    user: { id: 1 },
+    startImpersonation: mockStartImpersonation,
+    login: mockLogin,
+  }),
 }));
 
 const mockedAdminService = AdminService as jest.Mocked<typeof AdminService>;
@@ -89,11 +91,11 @@ const targetUser = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  sessionStorage.clear();
   mockedAdminService.getUser.mockResolvedValue(targetUser as any);
   mockedAdminService.impersonateUser.mockResolvedValue({
-    access_token: 'target-access-token',
-    token_type: 'bearer',
     expires_in: 1800,
+    expires_at: '2030-01-01T10:30:00Z',
     impersonation_session_id: 1,
     target_user_id: 7,
     target_user_email: 'max@example.com',
@@ -159,29 +161,12 @@ describe('ImpersonationReasonDialog', () => {
     expect(mockStartImpersonation).not.toHaveBeenCalled();
   });
 
-  it('rejects submit without an admin password, without calling the API', async () => {
-    renderDialog();
-    await screen.findByText(/Max Muster/);
-
-    fireEvent.change(screen.getByLabelText(/Grund/), {
-      target: { value: 'reproduce support ticket TICKET-123' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-
-    expect(await screen.findByText('Bitte bestätige dein Passwort')).toBeInTheDocument();
-    expect(mockedAdminService.impersonateUser).not.toHaveBeenCalled();
-    expect(mockStartImpersonation).not.toHaveBeenCalled();
-  });
-
-  it('starts impersonation and closes on a valid reason and password', async () => {
+  it('starts impersonation and closes on a valid reason', async () => {
     const { onClose, onSuccess } = renderDialog();
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), {
       target: { value: 'reproduce support ticket TICKET-123' },
-    });
-    fireEvent.change(screen.getByLabelText(/Dein Passwort/), {
-      target: { value: 'MyOwnPassword1!' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
@@ -189,13 +174,121 @@ describe('ImpersonationReasonDialog', () => {
     expect(mockedAdminService.impersonateUser).toHaveBeenCalledWith(
       7,
       'reproduce support ticket TICKET-123',
-      'MyOwnPassword1!',
     );
     expect(mockStartImpersonation).toHaveBeenCalledWith({
-      accessToken: 'target-access-token',
       expiresIn: 1800,
+      expiresAt: '2030-01-01T10:30:00Z',
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('sends the admin through a fresh IdP login when the backend demands a step-up', async () => {
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(
+      new AppError('auth_reauth_required', 'Reauth', 403),
+    );
+    const { onClose, onSuccess } = renderDialog();
+    await screen.findByText(/Max Muster/);
+
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith({ reauth: true, returnTo: '/admin' }),
+    );
+    expect(takePendingImpersonation(1)).toEqual({ userId: 7, reason: 'valid reason text' });
+    expect(screen.getByTestId('impersonation-reauth-notice')).toHaveTextContent(
+      'admin.impersonation.reauthRedirect',
+    );
+    expect(screen.getByRole('button', { name: /Wird gestartet|admin.impersonation.dialogStarting/ })).toBeDisabled();
+    expect(mockStartImpersonation).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('releases the dialog when the page is restored from the bfcache after the step-up', async () => {
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(
+      new AppError('auth_reauth_required', 'Reauth', 403),
+    );
+    renderDialog();
+    await screen.findByText(/Max Muster/);
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+    await screen.findByTestId('impersonation-reauth-notice');
+
+    const event = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(event, 'persisted', { value: true });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(screen.queryByTestId('impersonation-reauth-notice')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeEnabled();
+  });
+
+  it.each([
+    ['auth_forbidden', 403],
+    ['impersonation_forbidden', 403],
+    ['auth_token_invalid', 401],
+  ])('leitet bei %s (%i) nicht auf den Login um und merkt sich nichts', async (code, status) => {
+    mockedAdminService.impersonateUser.mockRejectedValueOnce(new AppError(code, 'nope', status));
+    const { onClose, onSuccess } = renderDialog();
+    await screen.findByText(/Max Muster/);
+
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+    await screen.findByText('Anmeldung als Nutzer fehlgeschlagen');
+    expect(mockLogin).not.toHaveBeenCalled();
+    expect(takePendingImpersonation(1)).toBeNull();
+    expect(mockStartImpersonation).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Anmelden' })).toBeEnabled();
+  });
+
+  it('prefills the reason restored after the step-up round trip', async () => {
+    renderDialog({ initialReason: 'restored reason' });
+    await screen.findByText(/Max Muster/);
+
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('restored reason');
+  });
+
+  it('does not overwrite a typed reason on re-render and drops the prefill after close', async () => {
+    const { rerender, onClose, onSuccess } = renderDialog({ initialReason: 'restored reason' });
+    await screen.findByText(/Max Muster/);
+    fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'typed afterwards' } });
+
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={true}
+        initialReason="restored reason"
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('typed afterwards');
+
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={false}
+        initialReason=""
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    rerender(
+      <ImpersonationReasonDialog
+        userId={7}
+        isOpen={true}
+        initialReason=""
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+    );
+    await screen.findByText(/Max Muster/);
+    expect(screen.getByLabelText(/Grund/)).toHaveValue('');
   });
 
   it('shows an error and stays open when AdminService.impersonateUser fails', async () => {
@@ -206,7 +299,6 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
-    fireEvent.change(screen.getByLabelText(/Dein Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     expect(
@@ -217,33 +309,26 @@ describe('ImpersonationReasonDialog', () => {
     expect(mockStartImpersonation).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    // TF-758 review fix: a failed attempt (e.g. wrong password) must not
-    // leave the password sitting in the input.
-    expect((screen.getByLabelText(/Dein Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('shows an error and stays open when startImpersonation fails after the backend already created the session', async () => {
-    // Not a service error: AuthContext.startImpersonation refuses when the
-    // recovery snapshot cannot be persisted. It reaches the same catch, so it
-    // carries a code too (TF-772) instead of an English developer sentence.
+    // Not a service error: AuthContext.startImpersonation refuses a second
+    // impersonation. It reaches the same catch, so it carries a code too
+    // (TF-772) instead of an English developer sentence.
     mockStartImpersonation.mockRejectedValueOnce(
-      new AppError('impersonation_snapshot_failed'),
+      new AppError('impersonation_already_active'),
     );
     const { onClose, onSuccess } = renderDialog();
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
-    fireEvent.change(screen.getByLabelText(/Dein Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     expect(
-      await screen.findByText(
-        'Impersonation nicht gestartet: Der Browser-Speicher ist voll oder eingeschränkt, die Rückkehr zum Admin-Konto wäre nicht gesichert.',
-      ),
+      await screen.findByText('Es läuft bereits eine aktive Impersonation-Sitzung'),
     ).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    expect((screen.getByLabelText(/Dein Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('resets target, reason, and error when closed, so reopening for a different user starts clean', async () => {
@@ -253,7 +338,6 @@ describe('ImpersonationReasonDialog', () => {
     const { rerender } = renderDialog();
     await screen.findByText('Benutzer nicht gefunden');
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'some leftover text' } });
-    fireEvent.change(screen.getByLabelText(/Dein Passwort/), { target: { value: 'leftover-pw' } });
 
     rerender(
       <ImpersonationReasonDialog userId={7} isOpen={false} onClose={jest.fn()} onSuccess={jest.fn()} />,
@@ -267,7 +351,6 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Erika/);
     expect(screen.queryByText('Benutzer nicht gefunden')).not.toBeInTheDocument();
     expect((screen.getByLabelText(/Grund/) as HTMLTextAreaElement).value).toBe('');
-    expect((screen.getByLabelText(/Dein Passwort/) as HTMLInputElement).value).toBe('');
   });
 
   it('does not close on a backdrop click while saving, but does once saving finishes', async () => {
@@ -282,7 +365,6 @@ describe('ImpersonationReasonDialog', () => {
     await screen.findByText(/Max Muster/);
 
     fireEvent.change(screen.getByLabelText(/Grund/), { target: { value: 'valid reason text' } });
-    fireEvent.change(screen.getByLabelText(/Dein Passwort/), { target: { value: 'MyOwnPassword1!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
     // Still saving: clicking the backdrop must not close the dialog out
@@ -291,8 +373,6 @@ describe('ImpersonationReasonDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     resolveImpersonate({
-      access_token: 'target-access-token',
-      token_type: 'bearer',
       expires_in: 1800,
       impersonation_session_id: 1,
       target_user_id: 7,
@@ -309,5 +389,46 @@ describe('ImpersonationReasonDialog', () => {
     fireEvent.click(screen.getByTestId('impersonation-dialog-backdrop'));
 
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('takePendingImpersonation (EXAMCRAFT-144)', () => {
+  const KEY = 'examcraft.snapshot.pending-impersonation';
+  const store = (data: object) =>
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ version: 1, savedAt: new Date().toISOString(), data }),
+    );
+
+  beforeEach(() => sessionStorage.clear());
+
+  it('returns the pending request once and removes it', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toEqual({ userId: 7, reason: 'abc' });
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('discards a request saved by a different admin', () => {
+    store({ userId: 7, reason: 'abc', adminId: 2, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('is wiped together with the other session snapshots on logout', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() });
+    clearAllSessionSnapshots();
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('ignores a stale request', () => {
+    store({ userId: 7, reason: 'abc', adminId: 1, savedAt: Date.now() - 11 * 60 * 1000 });
+    expect(takePendingImpersonation(1)).toBeNull();
+  });
+
+  it('ignores malformed content', () => {
+    sessionStorage.setItem(KEY, '{not json');
+    expect(takePendingImpersonation(1)).toBeNull();
+    store({ userId: '7', reason: 1, adminId: 1, savedAt: Date.now() });
+    expect(takePendingImpersonation(1)).toBeNull();
   });
 });

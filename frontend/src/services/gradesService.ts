@@ -29,11 +29,7 @@ import {
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 function authHeaders(extra: HeadersInit = {}): HeadersInit {
-  const token = localStorage.getItem('examcraft_access_token');
-  return {
-    ...extra,
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+  return { ...extra };
 }
 
 /**

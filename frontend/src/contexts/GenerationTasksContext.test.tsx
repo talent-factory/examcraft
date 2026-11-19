@@ -3,9 +3,14 @@ import React from 'react';
 import { GenerationTasksProvider, useGenerationTasks } from './GenerationTasksContext';
 
 // Mock the AuthContext to provide a stable token by default; overridable
-// per-test (mockUseAuth.mockReturnValue(...)) to simulate a silent token
-// refresh, which changes `accessToken` and re-runs the recovery effect.
-const mockUseAuth = jest.fn(() => ({ isAuthenticated: true, accessToken: 'test-token' }));
+// per-test (mockUseAuth.mockReturnValue(...)) to simulate a identity change
+// (impersonation start/end), which changes `user.id` and re-runs the recovery effect.
+const mockCheckSession = jest.fn(() => Promise.resolve(true));
+const mockUseAuth = jest.fn(() => ({
+  isAuthenticated: true,
+  user: { id: 1 },
+  checkSession: mockCheckSession,
+}));
 jest.mock('./AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -54,8 +59,11 @@ class MockWebSocket {
     this.sentMessages.push(data);
   }
 
-  close() {
+  closeCodes: Array<number | undefined> = [];
+
+  close(code?: number) {
     this.readyState = 3;
+    this.closeCodes.push(code);
   }
 
   // Test helpers
@@ -85,7 +93,13 @@ beforeEach(() => {
     Promise.resolve({ task_id: taskId, status: 'SUCCESS', result: null, error: null }),
   );
   mockUseAuth.mockReset();
-  mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'test-token' });
+  mockCheckSession.mockReset();
+mockCheckSession.mockResolvedValue(true);
+mockUseAuth.mockReturnValue({
+  isAuthenticated: true,
+  user: { id: 1 },
+  checkSession: mockCheckSession,
+});
 });
 
 // Helper component exposes context to tests
@@ -241,11 +255,148 @@ describe('GenerationTasksProvider — sticky terminal state (TF-328)', () => {
     act(() => {
       ws.emitClose(1006);
     });
+    await waitFor(() => expect(mockCheckSession).toHaveBeenCalled());
 
     await waitFor(
       () => expect(MockWebSocket.instances.length).toBe(2),
       { timeout: 3000 },
     );
+  });
+
+  it('does not reconnect on the auth close code when the session is gone', async () => {
+    mockCheckSession.mockResolvedValue(false);
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    act(() => {
+      ws.emitClose(4401);
+    });
+
+    await waitFor(() => expect(captured!.tasks['task-1'].status).toBe('UNKNOWN'));
+    expect(mockCheckSession).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('retries after the auth close code only while the session is still valid', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(4401);
+    });
+    await waitFor(() => expect(MockWebSocket.instances.length).toBe(2), { timeout: 3000 });
+    expect(mockCheckSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not revive a socket when the provider is torn down during the session check', async () => {
+    let resolveProbe: (v: boolean) => void = () => {};
+    mockCheckSession.mockReturnValue(new Promise<boolean>((r) => (resolveProbe = r)));
+    const { unmount } = render(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    unmount();
+    await act(async () => {
+      resolveProbe(true);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not revive a task dismissed during the session check', async () => {
+    let resolveProbe: (v: boolean) => void = () => {};
+    mockCheckSession.mockReturnValue(new Promise<boolean>((r) => (resolveProbe = r)));
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    await act(async () => {
+      resolveProbe(true);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect after dismissing a task whose socket reports a code-less close', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    // The browser reports 1005 for a close without a status code.
+    act(() => {
+      ws.emitClose(1005);
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+    expect(captured!.tasks['task-1']).toBeUndefined();
+  });
+
+  it('cancels a pending reconnect when the task is dismissed', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    act(() => {
+      captured!.dismissTask('task-1');
+    });
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect on a policy close (1008) and keeps the session', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    // A PROGRESS buffered before the close must not flush over UNKNOWN.
+    act(() => {
+      ws.emitMessage({ task_id: 'task-1', status: 'PROGRESS', progress: 40 });
+    });
+    act(() => {
+      ws.emitClose(1008);
+    });
+    expect(captured!.tasks['task-1'].status).toBe('UNKNOWN');
+    expect(mockCheckSession).not.toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(captured!.tasks['task-1'].status).toBe('UNKNOWN');
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('does not reconnect after an abnormal close when the session is gone', async () => {
+    mockCheckSession.mockResolvedValue(false);
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1006);
+    });
+    await waitFor(() => expect(captured!.tasks['task-1'].status).toBe('UNKNOWN'));
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
+  });
+
+  it('cancels a pending reconnect when the provider unmounts', async () => {
+    const { unmount } = render(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    unmount();
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances.length).toBe(1);
   });
 });
 
@@ -336,13 +487,13 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
     expect(task.generatedQuestionCount).toBe(6);
   });
 
-  // Regression: the recovery effect re-runs on every accessToken change
-  // (silent token refresh), not only on mount, and used to rebuild each
+  // Regression: the recovery effect re-runs on every user/auth change
+  // (e.g. impersonation start/end), not only on mount, and used to rebuild each
   // task from scratch — carrying over `result` but dropping
   // `contextLimited`/`generatedQuestionCount`. If the second refetch then
   // fails (eg the Celery result really has expired by then), the under-fill
   // notice used to be lost for the rest of the session.
-  it('does not lose the recovered under-fill flags on a silent token refresh', async () => {
+  it('does not lose the recovered under-fill flags on an identity change', async () => {
     mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-limited')] });
     mockGetTaskResult.mockResolvedValueOnce({
       task_id: 'task-limited',
@@ -359,7 +510,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
     mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 2 } });
     rerender(
       <GenerationTasksProvider>
         <Capture />
@@ -413,7 +564,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
   // Same trap as the under-fill flags above: the rebuild on a silent token
   // refresh must not drop the error code when the refetch then fails.
-  it('does not lose the recovered error code on a silent token refresh (TF-967)', async () => {
+  it('does not lose the recovered error code on an identity change (TF-967)', async () => {
     mockGetActiveTasks.mockResolvedValue({ tasks: [completedTask('task-failed', 'FAILURE')] });
     mockGetTaskResult.mockResolvedValueOnce({
       task_id: 'task-failed',
@@ -430,7 +581,7 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
 
     mockGetTaskResult.mockRejectedValueOnce(new Error('HTTP 404'));
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    mockUseAuth.mockReturnValue({ isAuthenticated: true, accessToken: 'refreshed-token' });
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: { id: 2 } });
     rerender(
       <GenerationTasksProvider>
         <Capture />
@@ -523,5 +674,130 @@ describe('GenerationTasksProvider — recovery of completed tasks (TF-608)', () 
       expect(captured!.getTask('task-running')?.messageCode).toBe('question_generated'),
     );
     expect(captured!.getTask('task-running')?.messageParams).toEqual({ current: 2, total: 6 });
+  });
+});
+
+describe('GenerationTasksProvider — Cookie-Session (EXAMCRAFT-137)', () => {
+  const runningTask = (taskId: string) => ({
+    task_id: taskId,
+    status: 'PROGRESS',
+    progress: 10,
+    message: null,
+    created_at: new Date().toISOString(),
+    topic: 'Heapsort',
+    question_count: 5,
+  });
+
+  it('übergibt beim Handshake kein Token und sendet nach dem Öffnen nichts', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    ws.emitOpen();
+
+    expect(ws.url).toMatch(/^wss?:\/\/[^?]+\/ws\/tasks\/task-1$/);
+    expect(ws.url).not.toMatch(/token|access|auth|\?/i);
+    expect(ws.sentMessages).toEqual([]);
+  });
+
+  it('schliesst die Sockets des alten Benutzers bei einem Identitätswechsel und verbindet neu', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const oldSocket = MockWebSocket.instances[0];
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      user: { id: 2 },
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(oldSocket.closeCodes).toEqual([1000]));
+    // Der Handler des alten Sockets ist abgehängt: ein spätes Close plant nichts mehr.
+    expect(oldSocket.onclose).toBeNull();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2));
+    expect(MockWebSocket.instances[1]).not.toBe(oldSocket);
+  });
+
+  it('verbindet nach einem abnormalen Close mit gültiger Session neu (Positivkontrolle)', async () => {
+    renderProvider();
+    const ws = await startTaskAndGetWs();
+    act(() => {
+      ws.emitClose(1011);
+    });
+    // Ohne diese Kontrolle bewiese der Logout-Test unten nichts: er prüft, dass
+    // der Reconnect ausbleibt, den es hier nachweislich gibt.
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2), { timeout: 3000 });
+  });
+
+  it('schliesst die Sockets nicht, wenn sich bei einem Re-Render die Identität nicht ändert', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(socket.closeCodes).toEqual([]);
+    expect(socket.onclose).not.toBeNull();
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+  });
+
+  it('verbindet nach einem Logout nicht mehr neu, auch nicht über geplante Reconnects', async () => {
+    const { rerender } = renderProvider();
+    const ws = await startTaskAndGetWs();
+    // Geplanter Reconnect (1 s), dann Logout, bevor er feuert.
+    act(() => {
+      ws.emitClose(1011);
+    });
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('schliesst offene Sockets beim Logout und holt keine Tasks mehr', async () => {
+    mockGetActiveTasks.mockResolvedValue({ tasks: [runningTask('task-run')] });
+    const { rerender } = renderProvider();
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: false,
+      user: null,
+      checkSession: mockCheckSession,
+    });
+    rerender(
+      <GenerationTasksProvider>
+        <Capture />
+      </GenerationTasksProvider>,
+    );
+
+    await waitFor(() => expect(socket.closeCodes).toEqual([1000]));
+    expect(socket.onclose).toBeNull();
+    expect(mockGetActiveTasks).toHaveBeenCalledTimes(1);
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });

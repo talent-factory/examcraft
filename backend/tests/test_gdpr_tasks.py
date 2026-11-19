@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 
 from models.auth import AuditLog, Institution, User, UserStatus
+from services.audit_service import AuditService
 
 
 def _make_institution(db, slug: str) -> Institution:
@@ -91,7 +92,7 @@ def test_process_scheduled_deletions_dispatches_only_due_users(test_db):
     ):
         result = process_scheduled_deletions.run()
 
-    assert result == {"dispatched": 1}
+    assert result == {"dispatched": 1, "more_pending": False}
     mock_execute.delay.assert_called_once_with(due.id)
 
 
@@ -127,7 +128,7 @@ def test_process_scheduled_deletions_dispatches_multiple_due_users(test_db):
     ):
         result = process_scheduled_deletions.run()
 
-    assert result == {"dispatched": 2}
+    assert result == {"dispatched": 2, "more_pending": False}
     dispatched_ids = {call.args[0] for call in mock_execute.delay.call_args_list}
     assert dispatched_ids == {due_1.id, due_2.id}
 
@@ -412,3 +413,181 @@ def test_gdpr_action_strings_are_categorized_as_business():
 
     assert category_for_action("account_deleted_scheduled") == "business"
     assert category_for_action("gdpr_scheduled_deletion_failed") == "business"
+
+
+def test_sweep_limits_batch_and_writes_audit_entry(test_db):
+    from tasks import gdpr_tasks
+
+    institution = _make_institution(test_db, "gdpr-tasks-batch")
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    for i in range(3):
+        _make_user(
+            test_db,
+            institution,
+            f"u{i}@gdpr-tasks-batch.ch",
+            deletion_requested_at=past - timedelta(days=30),
+            scheduled_deletion_date=past,
+        )
+    test_db.commit()
+
+    with (
+        patch.object(gdpr_tasks, "SWEEP_BATCH_LIMIT", 2),
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch.object(gdpr_tasks.execute_gdpr_deletion, "delay") as delay,
+    ):
+        result = gdpr_tasks.process_scheduled_deletions.run()
+
+    assert result == {"dispatched": 2, "more_pending": True}
+    assert delay.call_count == 2
+    entry = (
+        test_db.query(AuditLog).filter(AuditLog.action == "gdpr_sweep_dispatched").one()
+    )
+    assert "more_pending" in entry.additional_data
+
+
+def _due_user(test_db, slug, *, days_overdue=1):
+    institution = _make_institution(test_db, slug)
+    past = datetime.now(timezone.utc) - timedelta(days=days_overdue)
+    user = _make_user(
+        test_db,
+        institution,
+        f"u@{slug}.ch",
+        deletion_requested_at=past - timedelta(days=30),
+        scheduled_deletion_date=past,
+    )
+    user.zitadel_sub = f"sub-{slug}"
+    test_db.commit()
+    return user
+
+
+def test_execute_deletion_transient_zitadel_error_is_retried_without_audit(test_db):
+    from services.zitadel_user_service import ZitadelTransientError
+    from tasks import gdpr_tasks
+
+    user = _due_user(test_db, "gdpr-tasks-zit-transient")
+
+    with (
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch(
+            "services.gdpr_deletion_service.delete_zitadel_user",
+            side_effect=ZitadelTransientError("down"),
+        ),
+    ):
+        with pytest.raises(ZitadelTransientError):
+            gdpr_tasks.execute_gdpr_deletion.run(user.id)
+
+    assert test_db.get(User, user.id) is not None
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "gdpr_scheduled_deletion_failed")
+        .count()
+        == 0
+    )
+    assert (
+        gdpr_tasks.execute_gdpr_deletion.autoretry_for == gdpr_tasks._TRANSIENT_ERRORS
+    )
+
+
+def test_execute_deletion_permanent_zitadel_error_audits_immediately(test_db):
+    from services.zitadel_user_service import ZitadelError
+    from tasks import gdpr_tasks
+
+    user = _due_user(test_db, "gdpr-tasks-zit-permanent")
+
+    with (
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch(
+            "services.gdpr_deletion_service.delete_zitadel_user",
+            side_effect=ZitadelError("403"),
+        ),
+    ):
+        with (
+            patch.object(gdpr_tasks.logger, "critical") as critical,
+            pytest.raises(ZitadelError),
+        ):
+            gdpr_tasks.execute_gdpr_deletion.run(user.id)
+
+    assert any("ZITADEL" in str(c.args[0]) for c in critical.call_args_list)
+    kept = test_db.get(User, user.id)
+    assert kept is not None
+    assert kept.deletion_requested_at is not None
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "gdpr_scheduled_deletion_failed")
+        .count()
+        == 1
+    )
+
+
+def test_sweep_exact_limit_reports_no_more_pending(test_db):
+    from tasks import gdpr_tasks
+
+    for i in range(2):
+        _due_user(test_db, f"gdpr-tasks-exact-{i}")
+
+    with (
+        patch.object(gdpr_tasks, "SWEEP_BATCH_LIMIT", 2),
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch.object(gdpr_tasks.execute_gdpr_deletion, "delay"),
+    ):
+        result = gdpr_tasks.process_scheduled_deletions.run()
+
+    assert result == {"dispatched": 2, "more_pending": False}
+
+
+def test_sweep_rotates_failed_users_by_last_failure_time(test_db):
+    """Gestern (24h+) fehlgeschlagene User dürfen den Batch nicht dauerhaft belegen."""
+    from tasks import gdpr_tasks
+
+    failing_old = _due_user(test_db, "gdpr-tasks-rot-failold", days_overdue=10)
+    failing_new = _due_user(test_db, "gdpr-tasks-rot-failnew", days_overdue=9)
+    fresh = _due_user(test_db, "gdpr-tasks-rot-fresh", days_overdue=2)
+    for user, age in (
+        (failing_old, timedelta(days=3)),
+        (failing_new, timedelta(hours=25)),
+    ):
+        entry = AuditService.log_action(
+            db=test_db,
+            action="gdpr_scheduled_deletion_failed",
+            user_id=user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=str(user.id),
+            status=AuditService.STATUS_ERROR,
+        )
+        entry.created_at = datetime.now(timezone.utc) - age
+    test_db.commit()
+
+    with (
+        patch.object(gdpr_tasks, "SWEEP_BATCH_LIMIT", 2),
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+        patch.object(gdpr_tasks.execute_gdpr_deletion, "delay") as delay,
+    ):
+        result = gdpr_tasks.process_scheduled_deletions.run()
+
+    dispatched_ids = [c.args[0] for c in delay.call_args_list]
+    # Nie Fehlgeschlagene zuerst, dann der am längsten zurückliegende Fehlschlag.
+    assert dispatched_ids == [fresh.id, failing_old.id]
+    assert result["more_pending"] is True
+
+
+def test_sweep_without_due_users_writes_no_audit_entry(test_db):
+    from tasks import gdpr_tasks
+
+    with (
+        patch("tasks.gdpr_tasks.SessionLocal", return_value=test_db),
+        patch.object(test_db, "close"),
+    ):
+        result = gdpr_tasks.process_scheduled_deletions.run()
+
+    assert result == {"dispatched": 0, "more_pending": False}
+    assert (
+        test_db.query(AuditLog)
+        .filter(AuditLog.action == "gdpr_sweep_dispatched")
+        .count()
+        == 0
+    )

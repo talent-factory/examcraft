@@ -9,7 +9,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { REFRESH_LEAD_MS } from '../../api/tokenRefreshLock';
 
 /**
  * Matches the `h-10` Tailwind class below (40px). NOT read by anything —
@@ -42,61 +41,38 @@ export const ImpersonationBanner: React.FC = () => {
       setRemainingMs(null);
       return;
     }
-    // The session actually reverts to the admin at REFRESH_LEAD_MS before
-    // the hard cap (AuthContext's proactive timer), not at the hard cap
-    // itself — count down to that real deadline so this never promises
-    // more time than the session actually has left.
-    const effectiveDeadlineMs = new Date(impersonationExpiresAt).getTime() - REFRESH_LEAD_MS;
+    // The session reverts to the admin at the hard cap (TF-741); the server
+    // drops the impersonation cookie by itself and AuthContext reloads the
+    // admin's profile at that moment.
+    const effectiveDeadlineMs = new Date(impersonationExpiresAt).getTime();
     const tick = () => setRemainingMs(Math.max(0, effectiveDeadlineMs - Date.now()));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [isImpersonating, impersonationExpiresAt]);
 
-  // Auto-dismiss the "couldn't confirm server-side" notice below — it must
-  // outlive the navigate('/dashboard') call in handleReturn (this banner
-  // stays mounted across that in-layout navigation), but shouldn't linger
-  // forever.
+  // The notice only makes sense while the impersonation is still active.
   useEffect(() => {
-    if (!serverEndFailed) return;
-    const timer = setTimeout(() => setServerEndFailed(false), 8000);
-    return () => clearTimeout(timer);
-  }, [serverEndFailed]);
+    if (!isImpersonating) setServerEndFailed(false);
+  }, [isImpersonating]);
 
   const handleReturn = useCallback(async () => {
     setEnding(true);
     setServerEndFailed(false);
     try {
       // endImpersonation() tells the backend to revoke the impersonation
-      // session (TF-741) and restores the admin session locally — the
-      // local restore always succeeds even if the backend call failed
-      // (network error, or the session already expired server-side and
-      // there was nothing left to revoke); backendEndFailed just tells us
-      // whether to surface that below, since a support engineer chasing a
-      // stuck/duplicate impersonation_sessions row needs a starting point
-      // beyond a browser console log nobody was watching.
+      // session (TF-741). When that fails the impersonation cookie is still
+      // valid and requests keep running as the target user, so the banner
+      // stays and tells the admin to retry (EXAMCRAFT-126).
       const { backendEndFailed } = await endImpersonation();
       setServerEndFailed(backendEndFailed);
+      if (!backendEndFailed) navigate('/dashboard');
     } finally {
       setEnding(false);
-      navigate('/dashboard');
     }
   }, [endImpersonation, navigate]);
 
-  if (!isImpersonating && !serverEndFailed) return null;
-
-  if (!isImpersonating) {
-    // Impersonation already ended locally; only the transient "couldn't
-    // confirm the server-side session was closed" notice remains.
-    return (
-      <div
-        data-testid="impersonation-banner-server-end-failed"
-        className="fixed top-0 inset-x-0 z-[60] h-10 bg-amber-500 text-white flex items-center justify-center gap-2 px-4 text-sm shadow-md"
-      >
-        <span>{t('admin.impersonation.bannerServerEndFailed')}</span>
-      </div>
-    );
-  }
+  if (!isImpersonating) return null;
 
   const targetLabel = user ? `${user.first_name} ${user.last_name} (${user.email})` : '';
 
@@ -108,6 +84,11 @@ export const ImpersonationBanner: React.FC = () => {
       <span>
         {t('admin.impersonation.bannerLabel')} <strong>{targetLabel}</strong>
       </span>
+      {serverEndFailed && (
+        <span role="alert" data-testid="impersonation-banner-end-failed">
+          {t('admin.impersonation.bannerServerEndFailed')}
+        </span>
+      )}
       {remainingMs !== null && (
         <span className="font-mono bg-orange-700 px-2 py-0.5 rounded" data-testid="impersonation-banner-countdown">
           {t('admin.impersonation.bannerTimeRemaining', { time: formatRemaining(remainingMs) })}

@@ -24,7 +24,6 @@ ExamCraft/
 │   │   └── v1/          # Versioned API
 │   ├── services/        # Business Logic
 │   │   ├── auth_service.py    # JWT Authentication
-│   │   ├── oauth_service.py   # Google/Microsoft OAuth
 │   │   ├── redis_service.py   # Session Management
 │   │   └── audit_service.py   # Security Logging
 │   ├── middleware/      # Middleware

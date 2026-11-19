@@ -84,7 +84,6 @@ describe('DocumentService', () => {
         'http://localhost:8000/api/v1/documents/upload',
         {
           method: 'POST',
-          headers: expect.any(Object),
           body: expect.any(FormData)
         }
       );

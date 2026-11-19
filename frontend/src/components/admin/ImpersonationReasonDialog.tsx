@@ -1,21 +1,89 @@
 /**
  * Impersonation Reason Dialog Component (TF-743)
- * Confirms the target user and collects the mandatory reason and the
- * admin's own step-up password (TF-758) before
+ * Confirms the target user and collects the mandatory reason before
  * POST /api/admin/users/{id}/impersonate is called.
+ *
+ * EXAMCRAFT-126: The step-up (TF-758) is no longer a password field here. The
+ * backend demands a fresh IdP login (`auth_reauth_required`, 403); the dialog
+ * then sends the admin through `/api/v1/auth/login?reauth=true&return_to=/admin`
+ * and, on return, reopens prefilled from the saved request (EXAMCRAFT-144).
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminService, { UserDetailResponse } from '../../services/AdminService';
-import { translateError } from '../../errors';
+import { isAppError, translateError } from '../../errors';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  clearSessionSnapshot,
+  readSessionSnapshot,
+  writeSessionSnapshot,
+} from '../../utils/sessionSnapshot';
 
 const REASON_MIN_LENGTH = 3;
 const REASON_MAX_LENGTH = 500;
 
+// EXAMCRAFT-144: the step-up leaves the app for the IdP, so the pending request
+// (target user + reason, never a password or token) is kept as a session
+// snapshot (TF-608: wiped on logout) and the dialog reopens prefilled on
+// return. It is bound to the saving admin, because a step-up can end in a
+// different account (`prompt=login`), and one click confirms.
+const PENDING_SNAPSHOT_KEY = 'pending-impersonation';
+const PENDING_SNAPSHOT_VERSION = 1;
+const STEP_UP_RETURN_TO = '/admin';
+const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
+
+export interface PendingImpersonation {
+  userId: number;
+  reason: string;
+}
+
+interface StoredPendingImpersonation extends PendingImpersonation {
+  adminId: number;
+  savedAt: number;
+}
+
+function savePendingImpersonation(pending: PendingImpersonation, adminId: number): boolean {
+  // A failed write is not fatal: after the step-up the dialog stays closed and
+  // the admin re-selects the user and re-enters the reason.
+  const saved = writeSessionSnapshot<StoredPendingImpersonation>(
+    PENDING_SNAPSHOT_KEY,
+    PENDING_SNAPSHOT_VERSION,
+    { ...pending, adminId, savedAt: Date.now() },
+  );
+  if (!saved) {
+    console.warn('[ImpersonationReasonDialog] Pending impersonation could not be saved.');
+  }
+  return saved;
+}
+
+/**
+ * Read and remove the pending request. Null when absent, stale, malformed or
+ * saved by a different admin than `adminId`.
+ */
+export function takePendingImpersonation(adminId: number): PendingImpersonation | null {
+  const data = readSessionSnapshot<StoredPendingImpersonation>(
+    PENDING_SNAPSHOT_KEY,
+    PENDING_SNAPSHOT_VERSION,
+  );
+  if (!data) return null;
+  clearSessionSnapshot(PENDING_SNAPSHOT_KEY);
+  if (
+    Number.isInteger(data.userId) &&
+    typeof data.reason === 'string' &&
+    data.adminId === adminId &&
+    typeof data.savedAt === 'number' &&
+    Date.now() - data.savedAt <= PENDING_MAX_AGE_MS
+  ) {
+    return { userId: data.userId, reason: data.reason };
+  }
+  return null;
+}
+
 interface ImpersonationReasonDialogProps {
   userId: number | null;
+  /** Reason restored after a step-up round trip. */
+  initialReason?: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -23,20 +91,19 @@ interface ImpersonationReasonDialogProps {
 
 export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps> = ({
   userId,
+  initialReason = '',
   isOpen,
   onClose,
   onSuccess,
 }) => {
   const { t } = useTranslation();
-  const { startImpersonation } = useAuth();
+  const { user, startImpersonation, login } = useAuth();
   const [target, setTarget] = useState<UserDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [reason, setReason] = useState('');
-  // TF-758: step-up re-authentication -- the admin re-enters their own
-  // (current) password before the impersonation token is minted.
-  const [adminPassword, setAdminPassword] = useState('');
 
   const loadTarget = useCallback(async () => {
     if (!userId) return;
@@ -61,10 +128,31 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       // must not show the previous reason or a stale target.
       setTarget(null);
       setReason('');
-      setAdminPassword('');
       setError(null);
+      setNotice(null);
+      setSaving(false);
     }
   }, [isOpen, userId, loadTarget]);
+
+  // After the step-up redirect the browser may restore this page from the
+  // back/forward cache (admin pressed "back" at the IdP) with `saving` still
+  // set; release the dialog then.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setSaving(false);
+        setNotice(null);
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
+
+  // Separate from the load effect: a new `loadTarget` identity (language
+  // change) must not overwrite a reason the admin already typed.
+  useEffect(() => {
+    if (isOpen && userId) setReason(initialReason);
+  }, [isOpen, userId, initialReason]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,31 +164,49 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
       return;
     }
 
-    if (!adminPassword) {
-      setError(t('admin.impersonation.passwordRequired'));
-      return;
-    }
-
+    let redirecting = false;
     try {
       setSaving(true);
       setError(null);
+      setNotice(null);
 
-      const response = await AdminService.impersonateUser(userId, trimmedReason, adminPassword);
+      const response = await AdminService.impersonateUser(userId, trimmedReason);
       await startImpersonation({
-        accessToken: response.access_token,
         expiresIn: response.expires_in,
+        expiresAt: response.expires_at,
       });
 
       onSuccess();
       onClose();
     } catch (err) {
+      if (isAppError(err) && err.code === 'auth_reauth_required') {
+        // Step-up: the IdP login is older than the backend accepts. Keep the
+        // request and return to the admin panel, where the dialog reopens.
+        const kept = user
+          ? savePendingImpersonation({ userId, reason: trimmedReason }, user.id)
+          : false;
+        if (!user) {
+          console.warn('[ImpersonationReasonDialog] No current user, step-up without resume.');
+        }
+        // EXAMCRAFT-139: tell the admin why the page is about to change; promise
+        // kept input only when it really was saved.
+        setNotice(
+          t(kept ? 'admin.impersonation.reauthRedirect' : 'admin.impersonation.reauthRedirectNoResume'),
+        );
+        try {
+          login({ reauth: true, returnTo: STEP_UP_RETURN_TO });
+          // Stay in the saving state while the browser navigates away.
+          redirecting = true;
+        } catch (loginError) {
+          console.error('[ImpersonationReasonDialog] Step-up redirect failed:', loginError);
+          setNotice(null);
+          setError(translateError(loginError, t, 'admin.impersonation.dialogError'));
+        }
+        return;
+      }
       setError(translateError(err, t, 'admin.impersonation.dialogError'));
-      // TF-758 review fix: don't leave the (possibly wrong) password sitting
-      // in state/DOM after a failed attempt -- the admin re-enters it either
-      // way, and this keeps its lifetime in memory as short as possible.
-      setAdminPassword('');
     } finally {
-      setSaving(false);
+      if (!redirecting) setSaving(false);
     }
   };
 
@@ -138,6 +244,16 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
                         </div>
                       )}
 
+                      {notice && (
+                        <div
+                          role="status"
+                          data-testid="impersonation-reauth-notice"
+                          className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm"
+                        >
+                          {notice}
+                        </div>
+                      )}
+
                       {target && (
                         <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg text-sm">
                           <p className="text-orange-900">
@@ -168,29 +284,6 @@ export const ImpersonationReasonDialog: React.FC<ImpersonationReasonDialogProps>
                         />
                       </div>
 
-                      <div>
-                        <label htmlFor="impersonation-admin-password" className="block text-sm font-medium text-gray-700 mb-1">
-                          {t('admin.impersonation.dialogPasswordLabel')}
-                        </label>
-                        <input
-                          id="impersonation-admin-password"
-                          name="admin_password"
-                          type="password"
-                          // TF-758 review fix: this is a step-up re-auth, not a
-                          // login form -- "current-password" would let a saved
-                          // browser/password-manager entry autofill it, which
-                          // defeats the "left-open device" half of the threat
-                          // model this field exists for (no fresh knowledge of
-                          // the credential is actually proven). "off" is the
-                          // best-effort signal most browsers respect here.
-                          autoComplete="off"
-                          value={adminPassword}
-                          onChange={(e) => setAdminPassword(e.target.value)}
-                          required
-                          placeholder={t('admin.impersonation.dialogPasswordPlaceholder')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                        />
-                      </div>
                     </div>
                   )}
                 </div>

@@ -7,7 +7,14 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from services.auth_service import AuthService
-from models.auth import User, UserSession, UserStatus, Institution
+from models.auth import (
+    ImpersonationSession,
+    Institution,
+    User,
+    UserSession,
+    UserStatus,
+)
+from services import session_service
 
 
 @pytest.fixture
@@ -86,7 +93,7 @@ class TestPasswordHashing:
         """TF-758 review fix: a corrupted/malformed stored hash must fail
         closed -- like a wrong password -- rather than raise and turn into
         an unhandled 500 for whichever endpoint is checking a password
-        (login, change-password, the impersonation step-up)."""
+        (any caller checking a password)."""
         assert (
             AuthService.verify_password("anything", "not-a-valid-bcrypt-hash") is False
         )
@@ -292,84 +299,99 @@ class TestTokenRevocation:
         assert AuthService.is_token_revoked(token_jti, test_db) is False
 
 
-class TestImpersonationTokens:
-    """Test impersonation token minting (TF-741)."""
+class TestImpersonationSessions:
+    """Impersonation login sessions (TF-741, EXAMCRAFT-125)."""
 
-    def test_create_impersonation_token_carries_target_and_impersonation_claims(
-        self, test_db: Session, test_user: User
+    @pytest.fixture
+    def imp(self, test_db: Session, test_user: User):
+        admin = User(
+            email="admin-imp@example.com",
+            first_name="Ad",
+            last_name="Min",
+            institution_id=test_user.institution_id,
+            status=UserStatus.ACTIVE.value,
+        )
+        test_db.add(admin)
+        test_db.flush()
+        row = ImpersonationSession(
+            admin_user_id=admin.id, target_user_id=test_user.id, reason="support"
+        )
+        test_db.add(row)
+        test_db.flush()
+        return admin, row
+
+    def test_session_carries_target_and_impersonator(
+        self, test_db: Session, test_user: User, imp
     ):
-        tokens = AuthService.create_impersonation_token(
+        admin, imp_row = imp
+
+        token, row = AuthService.create_impersonation_session(
             test_user,
             test_db,
-            impersonator_id=999,
-            impersonation_session_id=42,
+            impersonator_id=admin.id,
+            impersonation_session_id=imp_row.id,
         )
 
-        assert "access_token" in tokens
-        assert "refresh_token" not in tokens
-        assert tokens["token_type"] == "bearer"
+        assert row.user_id == test_user.id
+        assert row.impersonator_id == admin.id
+        assert row.impersonation_session_id == imp_row.id
+        assert session_service.get_active_session(test_db, token).id == row.id
 
-        payload = AuthService.decode_token(tokens["access_token"])
-        assert payload is not None
-        assert payload["sub"] == str(test_user.id)
-        assert payload["impersonator_id"] == 999
-        assert payload["impersonation_session_id"] == 42
-
-    def test_create_impersonation_token_expires_in_30_minutes_hard_cap(
-        self, test_db: Session, test_user: User
+    def test_session_has_30_minute_hard_cap(
+        self, test_db: Session, test_user: User, imp
     ):
-        from services.auth_service import IMPERSONATION_TOKEN_EXPIRE_MINUTES
+        admin, imp_row = imp
 
-        assert IMPERSONATION_TOKEN_EXPIRE_MINUTES == 30
-
-        tokens = AuthService.create_impersonation_token(
-            test_user, test_db, impersonator_id=999, impersonation_session_id=42
+        _, row = AuthService.create_impersonation_session(
+            test_user,
+            test_db,
+            impersonator_id=admin.id,
+            impersonation_session_id=imp_row.id,
         )
-        assert tokens["expires_in"] == 30 * 60
 
-        payload = AuthService.decode_token(tokens["access_token"])
-        lifetime_seconds = payload["exp"] - payload["iat"]
-        assert abs(lifetime_seconds - 30 * 60) < 5
+        assert session_service.IMPERSONATION_SESSION_MAX_AGE == timedelta(minutes=30)
+        expires = row.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        remaining = expires - datetime.now(timezone.utc)
+        assert timedelta(minutes=29) < remaining <= timedelta(minutes=30)
 
-    def test_create_impersonation_token_creates_session_without_refresh_jti(
-        self, test_db: Session, test_user: User
+    def test_cookie_token_is_stored_only_as_hash(
+        self, test_db: Session, test_user: User, imp
     ):
-        """No refresh token means no refresh_token_jti — otherwise the shared
-        /auth/refresh endpoint could mint an uncapped, un-flagged access
-        token for the target user and defeat the 30-minute hard cap.
-        """
-        tokens = AuthService.create_impersonation_token(
-            test_user, test_db, impersonator_id=999, impersonation_session_id=42
-        )
-        access_payload = AuthService.decode_token(tokens["access_token"])
+        admin, imp_row = imp
 
-        session = (
-            test_db.query(UserSession)
-            .filter(UserSession.token_jti == access_payload["jti"])
-            .first()
+        token, row = AuthService.create_impersonation_session(
+            test_user,
+            test_db,
+            impersonator_id=admin.id,
+            impersonation_session_id=imp_row.id,
         )
-        assert session is not None
-        assert session.user_id == test_user.id
-        assert session.refresh_token_jti is None
-        assert session.is_active is True
 
-    def test_impersonation_token_can_be_revoked_via_existing_mechanism(
-        self, test_db: Session, test_user: User
+        assert row.token_hash != token
+        assert len(row.token_hash) == 64
+
+    def test_ending_the_impersonation_ends_its_session(
+        self, test_db: Session, test_user: User, imp
     ):
-        tokens = AuthService.create_impersonation_token(
-            test_user, test_db, impersonator_id=999, impersonation_session_id=42
+        admin, imp_row = imp
+        token, _ = AuthService.create_impersonation_session(
+            test_user,
+            test_db,
+            impersonator_id=admin.id,
+            impersonation_session_id=imp_row.id,
         )
-        access_payload = AuthService.decode_token(tokens["access_token"])
-        token_jti = access_payload["jti"]
+        assert session_service.get_active_session(test_db, token) is not None
 
-        assert AuthService.is_token_revoked(token_jti, test_db) is False
-        assert AuthService.revoke_token(token_jti, test_db) is True
-        assert AuthService.is_token_revoked(token_jti, test_db) is True
+        ended = session_service.delete_impersonation_sessions(test_db, imp_row.id)
+        test_db.commit()
+
+        assert ended == 1
+        assert session_service.get_active_session(test_db, token) is None
 
 
 class TestPasswordLockout:
-    """TF-758: the shared failed-attempt lockout used by both POST
-    /auth/login and the impersonation step-up in api/admin.py."""
+    """TF-758: the failed-attempt lockout helpers of AuthService."""
 
     def test_fresh_user_is_not_locked_out(self, test_user: User):
         assert AuthService.is_locked_out(test_user) is False

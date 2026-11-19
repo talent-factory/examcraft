@@ -5,7 +5,7 @@ JWT Token Generation, Validation, Refresh Token Logic
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from jose import JWTError, jwt
 import bcrypt
 from fastapi import Request
@@ -13,7 +13,14 @@ from sqlalchemy.orm import Session
 import secrets
 import logging
 
-from models.auth import ImpersonationSession, User, UserSession, UserStatus
+from models.auth import (
+    AuthSession,
+    ImpersonationSession,
+    User,
+    UserSession,
+    UserStatus,
+)
+from services import session_service
 from services.audit_service import AuditService
 from services.redis_service import SessionStore, TokenBlacklist
 
@@ -43,7 +50,11 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 # TF-741: impersonation access tokens are hard-capped at 30 minutes —
 # deliberately NOT driven by an env var, since this is a security
 # invariant of the impersonation feature, not a deployment setting.
-IMPERSONATION_TOKEN_EXPIRE_MINUTES = 30
+# Single source: the lifetime of the impersonation login session. The reaper
+# (tasks/maintenance_tasks.py) derives its threshold from this value.
+IMPERSONATION_TOKEN_EXPIRE_MINUTES = int(
+    session_service.IMPERSONATION_SESSION_MAX_AGE.total_seconds() // 60
+)
 
 
 class AuthService:
@@ -281,71 +292,36 @@ class AuthService:
         }
 
     @staticmethod
-    def create_impersonation_token(
+    def create_impersonation_session(
         target_user: User,
         db: Session,
         impersonator_id: int,
         impersonation_session_id: int,
-    ) -> Dict[str, Any]:
-        """Create an access token for impersonating ``target_user`` (TF-741).
+    ) -> Tuple[str, "AuthSession"]:
+        """Create the login session for impersonating ``target_user``.
 
-        Deliberately mints an ACCESS TOKEN ONLY — no refresh token. Issuing
-        a refresh token here would let the shared ``/auth/refresh`` endpoint
-        mint a fresh access token for the target user without the
-        ``impersonator_id``/``impersonation_session_id`` claims and without
-        the 30-minute cap, silently turning a time-boxed support session
-        into a permanent, unflagged session as the target user. Once this
-        token expires, the normal 401 path applies; there is no renewal.
-
-        Args:
-            target_user: The user being impersonated (token is issued "as" them)
-            db: Database session
-            impersonator_id: ID of the admin performing the impersonation
-            impersonation_session_id: ID of the ``ImpersonationSession`` row
+        EXAMCRAFT-125: impersonation is a server-side session of its own
+        (``impersonator_id`` set), hard-capped at 30 minutes and never
+        renewed. Its cookie token is returned once; the caller sets it.
+        Commits, which also persists the (so far only flushed)
+        ``ImpersonationSession`` row in the same transaction.
 
         Returns:
-            Dictionary with ``access_token``, ``token_type``, ``expires_in``
+            ``(cookie_token, auth_session_row)``
         """
-        token_data = {
-            "sub": str(target_user.id),
-            "email": target_user.email,
-            "institution_id": target_user.institution_id,
-            "roles": [role.name for role in target_user.roles],
-            "impersonator_id": impersonator_id,
-            "impersonation_session_id": impersonation_session_id,
-        }
-
-        access_token = AuthService.create_access_token(
-            token_data,
-            expires_delta=timedelta(minutes=IMPERSONATION_TOKEN_EXPIRE_MINUTES),
+        token, row = session_service.create_session(
+            db,
+            target_user.id,
+            max_age=session_service.IMPERSONATION_SESSION_MAX_AGE,
+            impersonator_id=impersonator_id,
+            impersonation_session_id=impersonation_session_id,
         )
-        access_payload = AuthService.decode_token(access_token)
-
-        if not access_payload:
-            raise ValueError("Failed to decode impersonation access token")
-
-        # No refresh_token_jti: this session is not refreshable (see above).
-        session = UserSession(
-            user_id=target_user.id,
-            token_jti=access_payload["jti"],
-            refresh_token_jti=None,
-            expires_at=datetime.fromtimestamp(access_payload["exp"]),
-            is_active=True,
-        )
-        db.add(session)
-        db.commit()
-
         logger.info(
-            f"Created impersonation token for user {target_user.email} "
+            f"Created impersonation session for user {target_user.email} "
             f"(ID: {target_user.id}) by admin ID {impersonator_id} "
             f"(session ID: {impersonation_session_id})"
         )
-
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "expires_in": IMPERSONATION_TOKEN_EXPIRE_MINUTES * 60,
-        }
+        return token, row
 
     # TF-758: shared with the impersonation step-up in api/admin.py so that
     # repeatedly guessing an account's own password through *either* surface
@@ -563,12 +539,11 @@ class AuthService:
     @staticmethod
     def end_impersonation_session(
         impersonation_session_id: int,
-        token_jti: str,
         db: Session,
         request: Optional[Request] = None,
     ) -> Dict[str, bool]:
-        """Atomically close an ``ImpersonationSession`` row and revoke its
-        token (TF-741 review fix).
+        """Atomically close an ``ImpersonationSession`` row and end its
+        login session (TF-741 review fix, EXAMCRAFT-125).
 
         Used both by ``POST /admin/impersonate/end`` (impersonation token
         still present) and by ``POST /auth/logout`` called while
@@ -609,9 +584,12 @@ class AuthService:
                 synchronize_session=False,
             )
         )
+        # Closing the row and ending the login session are one transaction: the
+        # impersonation must not appear ended while its session still works.
+        sessions_ended = session_service.delete_impersonation_sessions(
+            db, impersonation_session_id
+        )
         db.commit()
-
-        token_revoked = AuthService.revoke_token(token_jti, db)
 
         if updated_rows > 0 and session_row is not None:
             AuthService.record_impersonation_ended(
@@ -626,7 +604,7 @@ class AuthService:
                 request=request,
             )
 
-        return {"session_closed": updated_rows > 0, "token_revoked": token_revoked}
+        return {"session_closed": updated_rows > 0, "token_revoked": sessions_ended > 0}
 
     @staticmethod
     def end_own_impersonation_session(
@@ -674,6 +652,7 @@ class AuthService:
                 synchronize_session=False,
             )
         )
+        session_service.delete_impersonation_sessions(db, session.id)
         db.commit()
 
         if updated_rows > 0:

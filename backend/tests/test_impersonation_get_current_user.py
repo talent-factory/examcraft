@@ -12,9 +12,9 @@ Two behavior changes over the normal auth path:
 
 import pytest
 from fastapi import HTTPException
-from fastapi.security import HTTPAuthorizationCredentials
 
-from models.auth import Institution, User, UserStatus
+from models.auth import ImpersonationSession, Institution, User, UserStatus
+from services import session_service
 from services.auth_service import AuthService
 from utils.auth_utils import get_current_user
 from utils.impersonation_context import (
@@ -48,6 +48,8 @@ def _make_user(db, inst, email, status=UserStatus.ACTIVE.value):
     user = User(
         email=email,
         password_hash="dummy",
+        # the impersonating admin must still hold users:impersonate
+        is_superuser=email.startswith("admin"),
         first_name="Test",
         last_name="User",
         institution_id=inst.id,
@@ -58,8 +60,28 @@ def _make_user(db, inst, email, status=UserStatus.ACTIVE.value):
     return user
 
 
-def _bearer(token: str) -> HTTPAuthorizationCredentials:
-    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+def _login(db, user) -> str:
+    token, _row = session_service.create_session(db, user.id)
+    return token
+
+
+def _impersonation_session_id(db, admin, target) -> int:
+    """A real ImpersonationSession row (auth_sessions has an FK to it)."""
+    row = ImpersonationSession(
+        admin_user_id=admin.id, target_user_id=target.id, reason="test"
+    )
+    db.add(row)
+    db.commit()
+    return row.id
+
+
+async def _current(db, session_token, impersonation_token=None):
+    return await get_current_user(
+        request=None,
+        session_token=session_token,
+        impersonation_token=impersonation_token,
+        db=db,
+    )
 
 
 @pytest.mark.asyncio
@@ -67,9 +89,9 @@ async def test_normal_token_leaves_impersonation_context_unset(test_db):
     inst = _make_institution(test_db)
     user = _make_user(test_db, inst, "normal@get-current-user-impersonation.ch")
     test_db.commit()
-    tokens = AuthService.create_tokens_for_user(user, test_db)
+    token = _login(test_db, user)
 
-    result = await get_current_user(_bearer(tokens["access_token"]), test_db)
+    result = await _current(test_db, token)
 
     assert result.id == user.id
     assert get_impersonation_context() is None
@@ -82,17 +104,19 @@ async def test_impersonation_token_sets_impersonation_context(test_db):
     target = _make_user(test_db, inst, "target@get-current-user-impersonation.ch")
     test_db.commit()
 
-    tokens = AuthService.create_impersonation_token(
-        target, test_db, impersonator_id=admin.id, impersonation_session_id=7
+    admin_token = _login(test_db, admin)
+    imp_id = _impersonation_session_id(test_db, admin, target)
+    imp_token, _row = AuthService.create_impersonation_session(
+        target, test_db, impersonator_id=admin.id, impersonation_session_id=imp_id
     )
 
-    result = await get_current_user(_bearer(tokens["access_token"]), test_db)
+    result = await _current(test_db, admin_token, imp_token)
 
     assert result.id == target.id
     ctx = get_impersonation_context()
     assert ctx is not None
     assert ctx.impersonator_id == admin.id
-    assert ctx.impersonation_session_id == 7
+    assert ctx.impersonation_session_id == imp_id
 
 
 @pytest.mark.asyncio
@@ -109,11 +133,13 @@ async def test_impersonation_token_bypasses_target_status_check(test_db):
     )
     test_db.commit()
 
-    tokens = AuthService.create_impersonation_token(
-        target, test_db, impersonator_id=admin.id, impersonation_session_id=8
+    admin_token = _login(test_db, admin)
+    imp_id = _impersonation_session_id(test_db, admin, target)
+    imp_token, _row = AuthService.create_impersonation_session(
+        target, test_db, impersonator_id=admin.id, impersonation_session_id=imp_id
     )
 
-    result = await get_current_user(_bearer(tokens["access_token"]), test_db)
+    result = await _current(test_db, admin_token, imp_token)
 
     assert result.id == target.id
 
@@ -129,28 +155,48 @@ async def test_normal_token_for_suspended_user_still_rejected(test_db):
         status=UserStatus.SUSPENDED.value,
     )
     test_db.commit()
-    tokens = AuthService.create_tokens_for_user(user, test_db)
+    token = _login(test_db, user)
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(_bearer(tokens["access_token"]), test_db)
+        await _current(test_db, token)
 
     assert exc_info.value.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_revoked_impersonation_token_still_rejected(test_db):
+async def test_ended_impersonation_session_falls_back_to_admin(test_db):
     inst = _make_institution(test_db)
     admin = _make_user(test_db, inst, "admin3@get-current-user-impersonation.ch")
     target = _make_user(test_db, inst, "target3@get-current-user-impersonation.ch")
     test_db.commit()
 
-    tokens = AuthService.create_impersonation_token(
-        target, test_db, impersonator_id=admin.id, impersonation_session_id=9
+    admin_token = _login(test_db, admin)
+    imp_id = _impersonation_session_id(test_db, admin, target)
+    imp_token, _row = AuthService.create_impersonation_session(
+        target, test_db, impersonator_id=admin.id, impersonation_session_id=imp_id
     )
-    access_payload = AuthService.decode_token(tokens["access_token"])
-    AuthService.revoke_token(access_payload["jti"], test_db)
+    session_service.delete_impersonation_sessions(test_db, imp_id)
+    test_db.commit()
+
+    result = await _current(test_db, admin_token, imp_token)
+
+    assert result.id == admin.id
+    assert get_impersonation_context() is None
+
+
+@pytest.mark.asyncio
+async def test_impersonation_cookie_without_login_session_rejected(test_db):
+    inst = _make_institution(test_db)
+    admin = _make_user(test_db, inst, "admin4@get-current-user-impersonation.ch")
+    target = _make_user(test_db, inst, "target4@get-current-user-impersonation.ch")
+    test_db.commit()
+
+    imp_id = _impersonation_session_id(test_db, admin, target)
+    imp_token, _row = AuthService.create_impersonation_session(
+        target, test_db, impersonator_id=admin.id, impersonation_session_id=imp_id
+    )
 
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(_bearer(tokens["access_token"]), test_db)
+        await _current(test_db, None, imp_token)
 
     assert exc_info.value.status_code == 401

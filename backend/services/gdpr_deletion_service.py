@@ -42,6 +42,7 @@ für die vollständige Analyse der FK-Policy und die Design-Entscheidungen.
 
 import logging
 import os
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -49,6 +50,7 @@ from models.auth import User
 from models.document import Document
 from services.audit_service import AuditService
 from services.storage_service import storage_service
+from services.zitadel_user_service import delete_zitadel_user
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,36 @@ def _delete_document_files(file_paths: list[str], user_id: int) -> None:
             )
 
 
+def _ensure_due_for_sweep(db: Session, user: User) -> None:
+    """Stellt den User für den täglichen Sweep fällig, falls noch nicht geschehen.
+
+    Muss VOR dem Zitadel-Aufruf committet sein: Ist der Zitadel-User gelöscht
+    (oder die Antwort darauf verloren) und der lokale Teil scheitert oder der
+    Prozess stirbt, kann sich der User nicht mehr anmelden und die Löschung
+    nicht selbst wiederholen. Bei der Sofortlöschung ist
+    ``deletion_requested_at`` nicht gesetzt, der Sweep würde ihn nie finden.
+    Bereits gesetzte Zeitstempel (Antrag, Frist) bleiben unverändert; im
+    geplanten Pfad entfällt der Commit ganz (Row-Lock des Tasks bleibt).
+    """
+    if user.deletion_requested_at is not None:
+        return
+    now = datetime.now(timezone.utc)
+    user.deletion_requested_at = now
+    if user.scheduled_deletion_date is None:
+        user.scheduled_deletion_date = now
+    db.commit()
+
+
+def _log_partial_failure(zitadel_result: str, user_id: int) -> None:
+    if zitadel_result in ("deleted", "already_absent"):
+        logger.critical(
+            "GDPR-Löschung: Zitadel-User von User %s ist gelöscht, die lokale "
+            "Löschung ist fehlgeschlagen. Der User ist für den nächsten Sweep "
+            "fällig.",
+            user_id,
+        )
+
+
 def delete_user_and_gdpr_data(db: Session, user: User, *, action: str) -> dict:
     """Löscht `user` und alle verknüpften Daten atomar.
 
@@ -118,11 +150,18 @@ def delete_user_and_gdpr_data(db: Session, user: User, *, action: str) -> dict:
             unterscheiden.
 
     Returns:
-        dict mit ``user_id`` und ``email`` des gelöschten Users (für Logging
+        dict mit ``user_id``, ``email`` und ``zitadel`` (``deleted``,
+        ``already_absent`` oder ``no_sub``) des gelöschten Users (für Logging
         und Tests — nach dem Löschen sind diese Werte am ORM-Objekt nicht
         mehr zuverlässig abrufbar).
 
     Raises:
+        ZitadelError / ZitadelTransientError: wenn der Zitadel-User nicht
+            gelöscht werden konnte — lokal wurde dann nichts verändert.
+            Scheitert dagegen der lokale Teil NACH erfolgreicher Zitadel-
+            Löschung, ist der User bereits für den Sweep fällig gestellt
+            (``_ensure_due_for_sweep``, vor dem Zitadel-Aufruf); der
+            Wiederholungslauf sieht 404.
         RuntimeError: wenn der Audit-Log-Eintrag nicht geschrieben werden
             konnte (fail-closed, siehe unten) — die Session ist dann bereits
             zurückgerollt, der User bleibt unverändert bestehen.
@@ -135,13 +174,32 @@ def delete_user_and_gdpr_data(db: Session, user: User, *, action: str) -> dict:
     user_id = user.id
     email = user.email
 
+    # Zitadel zuerst (EXAMCRAFT-128, ADR 0008): schlägt der Aufruf fehl, bleibt
+    # der lokale User unverändert und die Löschung wird später wiederholt
+    # (idempotent, 404 zählt als Erfolg). Umgekehrt würde ein lokal gelöschter
+    # User sein Zitadel-Profil dauerhaft verwaisen lassen.
+    # Ohne ``zitadel_sub`` (Konto noch nicht migriert, vor dem Cutover) gibt es
+    # nichts zu löschen: der Schritt entfällt, die lokale Löschung läuft.
+    zitadel_sub = user.zitadel_sub
+    if zitadel_sub:
+        _ensure_due_for_sweep(db, user)
+        zitadel_result = (
+            "deleted" if delete_zitadel_user(zitadel_sub) else "already_absent"
+        )
+    else:
+        zitadel_result = "no_sub"
+        logger.warning(
+            "GDPR-Löschung: User %s hat keine zitadel_sub, Zitadel-Schritt entfällt",
+            user_id,
+        )
+
     audit_entry = AuditService.log_action(
         db=db,
         action=action,
         user_id=user_id,
         resource_type=AuditService.RESOURCE_USER,
         resource_id=str(user_id),
-        additional_data={"email": email},
+        additional_data={"email": email, "zitadel": zitadel_result},
         commit=False,
     )
     if audit_entry is None:
@@ -150,6 +208,7 @@ def delete_user_and_gdpr_data(db: Session, user: User, *, action: str) -> dict:
         # fehlgeschlagener Audit-Log-Schreibversuch darf die Löschung nicht
         # unbeaufsichtigt durchlaufen lassen (und log_action hat bei Fehler
         # bereits intern db.rollback() aufgerufen).
+        _log_partial_failure(zitadel_result, user_id)
         raise RuntimeError(
             f"GDPR-Löschung abgebrochen: Audit-Log-Eintrag konnte nicht "
             f"geschrieben werden für User {user_id}"
@@ -174,9 +233,10 @@ def delete_user_and_gdpr_data(db: Session, user: User, *, action: str) -> dict:
         # Admin-Bulk-Delete) garantiert eine konsistente Session hinterlassen,
         # statt sich stillschweigend auf fremde Disziplin zu verlassen.
         db.rollback()
+        _log_partial_failure(zitadel_result, user_id)
         raise
 
     _delete_document_files(document_file_paths, user_id)
 
     logger.info("GDPR-Löschung abgeschlossen für User %s (%s)", user_id, email)
-    return {"user_id": user_id, "email": email}
+    return {"user_id": user_id, "email": email, "zitadel": zitadel_result}

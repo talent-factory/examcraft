@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+from tests.conftest import login_headers
 from database import get_db
 from models.auth import User, Role, Institution, UserStatus
 from services.auth_service import AuthService
@@ -127,7 +128,7 @@ def _create_test_client(db):
 
 
 def _create_user_and_login(db, client, role_name="viewer"):
-    """Helper: create user with given role, login, return (user, access_token)."""
+    """Helper: create user with given role, login, return (user, session headers)."""
     # Filter by the slugs the file's fixtures use; `.first()` would pick up
     # leaked Institution rows from other test files (test_exam_api's
     # dwq-test-inst, exam-test-university, etc.) that commit raw sessions
@@ -155,12 +156,7 @@ def _create_user_and_login(db, client, role_name="viewer"):
     db.commit()
     db.refresh(user)
 
-    login_resp = client.post(
-        "/api/auth/login",
-        json={"email": "profiletest@example.com", "password": "TestPass123!"},
-    )
-    assert login_resp.status_code == 200
-    access_token = login_resp.json()["access_token"]
+    access_token = login_headers(client, "profiletest@example.com")
 
     return user, access_token
 
@@ -189,9 +185,7 @@ class TestPermissionsParsing:
         try:
             _, token = _create_user_and_login(db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             data = resp.json()
 
@@ -215,9 +209,7 @@ class TestPermissionsParsing:
         try:
             _, token = _create_user_and_login(db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             data = resp.json()
 
@@ -260,9 +252,7 @@ class TestPermissionsParsing:
         try:
             _, token = _create_user_and_login(test_db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             permissions = resp.json()["roles"][0]["permissions"]
             assert permissions == []
@@ -277,9 +267,7 @@ class TestPermissionsParsing:
         try:
             _, token = _create_user_and_login(db, client, "dozent")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             permissions = resp.json()["roles"][0]["permissions"]
 
@@ -312,9 +300,7 @@ class TestInstitutionInProfile:
         try:
             _, token = _create_user_and_login(db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             data = resp.json()
 
@@ -338,9 +324,7 @@ class TestInstitutionInProfile:
         try:
             _, token = _create_user_and_login(db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
 
             institution = resp.json()["institution"]
@@ -359,9 +343,7 @@ class TestInstitutionInProfile:
         try:
             _, token = _create_user_and_login(db, client, "viewer")
 
-            resp = client.get(
-                "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
-            )
+            resp = client.get("/api/auth/me", headers=token)
             assert resp.status_code == 200
             data = resp.json()
 

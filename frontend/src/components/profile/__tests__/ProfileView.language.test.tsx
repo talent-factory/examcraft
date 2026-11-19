@@ -40,7 +40,6 @@ const selectLanguage = (code: string) =>
 beforeEach(async () => {
   localStorage.clear();
   updateProfile.mockReset();
-  localStorage.setItem('examcraft_access_token', 'token');
   await i18n.changeLanguage('it');
 });
 
@@ -88,7 +87,7 @@ describe('ProfileView language switching', () => {
     selectLanguage('de');
 
     await waitFor(() =>
-      expect(updateProfile).toHaveBeenCalledWith('token', { preferred_language: 'de' })
+      expect(updateProfile).toHaveBeenCalledWith({ preferred_language: 'de' })
     );
     await waitFor(() => expect(getPendingLanguage()).toBeNull());
   });
@@ -100,7 +99,7 @@ describe('ProfileView language switching', () => {
     render(<ProfileView />);
 
     await waitFor(() =>
-      expect(updateProfile).toHaveBeenCalledWith('token', { preferred_language: 'de' })
+      expect(updateProfile).toHaveBeenCalledWith({ preferred_language: 'de' })
     );
     await waitFor(() => expect(getPendingLanguage()).toBeNull());
   });

@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+from tests.conftest import login_headers
 from database import get_db
 from models.rbac import (
     Feature,
@@ -145,7 +146,7 @@ def api_client(rbac_api_db):
     from api.v1 import rbac as rbac_api
 
     # Idempotent: avoid appending duplicate routes on every call.
-    if not any(getattr(r, "path", None) == "/api/auth/login" for r in app.routes):
+    if not any(getattr(r, "path", None) == "/api/auth/me" for r in app.routes):
         app.include_router(auth.router)
     if not any(
         getattr(r, "path", None) == "/api/v1/rbac/tiers/current" for r in app.routes
@@ -158,11 +159,8 @@ def api_client(rbac_api_db):
 
 
 def get_auth_token(client, email: str = "apitest@test.com"):
-    """Helper to get auth token"""
-    response = client.post(
-        "/api/auth/login", json={"email": email, "password": "testpassword123"}
-    )
-    return response.json()["access_token"]
+    """Helper: Session-Cookie-Header für den Testbenutzer (EXAMCRAFT-125)."""
+    return login_headers(client, email)
 
 
 # ============================================
@@ -174,9 +172,7 @@ def test_list_features(api_client):
     """Test GET /api/v1/rbac/features"""
     token = get_auth_token(api_client)
 
-    response = api_client.get(
-        "/api/v1/rbac/features", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = api_client.get("/api/v1/rbac/features", headers=token)
 
     assert response.status_code == 200
     features = response.json()
@@ -190,7 +186,7 @@ def test_list_features_by_category(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/features?category=generation",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 200
@@ -204,7 +200,7 @@ def test_get_feature_by_id(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/features/feat_api_test_1",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 200
@@ -222,9 +218,7 @@ def test_list_roles(api_client):
     """Test GET /api/v1/rbac/roles"""
     token = get_auth_token(api_client)
 
-    response = api_client.get(
-        "/api/v1/rbac/roles", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = api_client.get("/api/v1/rbac/roles", headers=token)
 
     assert response.status_code == 200
     roles = response.json()
@@ -236,9 +230,7 @@ def test_get_role_by_id(api_client):
     """Test GET /api/v1/rbac/roles/{role_id}"""
     token = get_auth_token(api_client)
 
-    response = api_client.get(
-        "/api/v1/rbac/roles/role_api_test", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = api_client.get("/api/v1/rbac/roles/role_api_test", headers=token)
 
     assert response.status_code == 200
     role = response.json()
@@ -285,7 +277,7 @@ def test_check_permission(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/check-permission/api_test_feature_1",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 200
@@ -300,7 +292,7 @@ def test_check_quota(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/check-quota/documents?requested_amount=5",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 200
@@ -318,7 +310,7 @@ def test_get_feature_by_id_returns_404_for_unknown_id(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/features/does-not-exist",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 404
@@ -330,7 +322,7 @@ def test_get_role_by_id_returns_404_for_unknown_id(api_client):
 
     response = api_client.get(
         "/api/v1/rbac/roles/does-not-exist",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=token,
     )
 
     assert response.status_code == 404
@@ -398,9 +390,7 @@ def test_get_my_tier_returns_users_institution_tier(api_client, free_tier):
     resolves it."""
     token = get_auth_token(api_client)
 
-    response = api_client.get(
-        "/api/v1/rbac/tiers/my", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = api_client.get("/api/v1/rbac/tiers/my", headers=token)
 
     assert response.status_code == 200
     assert response.json()["name"] == "free"

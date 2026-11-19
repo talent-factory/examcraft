@@ -3,14 +3,14 @@
  * Admin page for managing users, roles, and permissions
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { UserList } from './UserList';
 import { UserEditDialog } from './UserEditDialog';
 import { RoleAssignmentDialog } from './RoleAssignmentDialog';
 import { OrgUnitAssignmentDialog } from './OrgUnitAssignmentDialog';
-import { ImpersonationReasonDialog } from './ImpersonationReasonDialog';
+import { ImpersonationReasonDialog, takePendingImpersonation } from './ImpersonationReasonDialog';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagementPage: React.FC = () => {
@@ -22,7 +22,20 @@ export const UserManagementPage: React.FC = () => {
   const [manageRolesUserId, setManageRolesUserId] = useState<number | null>(null);
   const [manageOrgUnitsUserId, setManageOrgUnitsUserId] = useState<number | null>(null);
   const [impersonateUserId, setImpersonateUserId] = useState<number | null>(null);
+  const [impersonateInitialReason, setImpersonateInitialReason] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // EXAMCRAFT-144: back from the step-up login, reopen the dialog prefilled.
+  useEffect(() => {
+    if (!user || !hasPermission('users:impersonate')) return;
+    const pending = takePendingImpersonation(user.id);
+    if (pending) {
+      setImpersonateInitialReason(pending.reason);
+      setImpersonateUserId(pending.userId);
+    }
+    // Runs once the current user is known; the entry is consumed on first read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleEditUser = (userId: number) => {
     if (!isAdmin) return;
@@ -41,6 +54,7 @@ export const UserManagementPage: React.FC = () => {
 
   const handleImpersonateUser = (userId: number) => {
     if (!hasPermission('users:impersonate')) return;
+    setImpersonateInitialReason('');
     setImpersonateUserId(userId);
   };
 
@@ -137,6 +151,7 @@ export const UserManagementPage: React.FC = () => {
         */}
         <ImpersonationReasonDialog
           userId={impersonateUserId}
+          initialReason={impersonateInitialReason}
           isOpen={impersonateUserId !== null}
           onClose={() => setImpersonateUserId(null)}
           onSuccess={handleImpersonationStarted}

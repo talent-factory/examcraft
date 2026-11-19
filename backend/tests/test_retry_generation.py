@@ -341,13 +341,13 @@ def test_weg_a_crash_after_commit_then_retry_is_rejected(weg_a_stage, test_db, m
 
     from api.rag_exams import retry_generation
     from errors import AppHTTPException
-    from tasks.question_tasks import _try_update_job_status
+    from services.generation_job_state import record_terminal
     from utils.tenant_utils import SubscriptionLimits
 
     s = weg_a_stage
     _run_until_crash_after_commit(s)
     # What /active-tasks and the watchdog do with Celery's FAILURE.
-    _try_update_job_status(s.task_id, "FAILURE")
+    record_terminal(s.task_id, "FAILURE", retry=False)
     test_db.expire_all()
     assert s.job.status == "SUCCESS"
     assert _question_count(test_db, s.inst) == 3

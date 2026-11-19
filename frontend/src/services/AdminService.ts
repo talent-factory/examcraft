@@ -34,9 +34,9 @@ export interface UserListResponse {
 
 /** Response of `POST /api/admin/users/{id}/impersonate` (TF-741/TF-743). */
 export interface ImpersonateResponse {
-  access_token: string;
-  token_type: string;
   expires_in: number;
+  /** Server-side end of the impersonation (ISO 8601); preferred over `expires_in`. */
+  expires_at?: string;
   impersonation_session_id: number;
   target_user_id: number;
   target_user_email: string;
@@ -121,12 +121,10 @@ export interface TransferUserResponse {
 }
 
 class AdminService {
+  // The session cookie travels with every request (credentials: 'include' via
+  // the fetch interceptor, EXAMCRAFT-126); only the content type is set here.
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('examcraft_access_token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    };
+    return { 'Content-Type': 'application/json' };
   }
 
   /**
@@ -223,15 +221,14 @@ class AdminService {
    */
   async impersonateUser(
     userId: number,
-    reason: string,
-    adminPassword: string
+    reason: string
   ): Promise<ImpersonateResponse> {
     const response = await fetch(
       `${API_BASE_URL}/api/admin/users/${userId}/impersonate`,
       {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ reason, admin_password: adminPassword }),
+        body: JSON.stringify({ reason }),
       }
     );
 
@@ -243,23 +240,11 @@ class AdminService {
   }
 
   /**
-   * Ends the active impersonation session (TF-741). Uses the *current*
-   * (impersonation) token — the target-user identity — to identify which
-   * session to end, so this must be called before the caller restores the
-   * admin's own token locally.
-   *
-   * `accessTokenOverride` lets a caller pass the impersonation token
-   * explicitly instead of relying on `localStorage` at call time — needed
-   * when the token was never persisted there in the first place (e.g. a
-   * rollback right after `AdminService.impersonateUser` succeeded but
-   * before the frontend session swap, where `localStorage` still holds the
-   * admin's own token, not the freshly-issued target token this call needs
-   * to identify the orphaned session).
+   * Ends the active impersonation session (TF-741). The backend identifies the
+   * session through the impersonation cookie of the request.
    */
-  async endImpersonation(accessTokenOverride?: string): Promise<void> {
-    const headers: HeadersInit = accessTokenOverride
-      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${accessTokenOverride}` }
-      : this.getAuthHeaders();
+  async endImpersonation(): Promise<void> {
+    const headers = this.getAuthHeaders();
 
     const response = await fetch(
       `${API_BASE_URL}/api/admin/impersonate/end`,

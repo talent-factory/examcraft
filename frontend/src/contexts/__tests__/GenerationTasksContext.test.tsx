@@ -6,7 +6,6 @@ import { GenerationTasksProvider, useGenerationTasks } from '../GenerationTasksC
 jest.mock('../AuthContext', () => ({
   useAuth: () => ({
     isAuthenticated: false,
-    accessToken: null,
   }),
 }));
 

@@ -26,7 +26,7 @@ def _build_app() -> FastAPI:
     def set_route():
         set_impersonation_context(
             ImpersonationContext(
-                impersonator_id=1, impersonation_session_id=2, token_jti="jti-1"
+                impersonator_id=1, impersonation_session_id=2, auth_session_id=3
             )
         )
         ctx = get_impersonation_context()

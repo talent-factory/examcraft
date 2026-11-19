@@ -9,7 +9,7 @@ import HelpWidget, { clampPanelDimension } from '../HelpWidget';
 jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 1, roles: [{ name: 'teacher' }], institution: null },
-    accessToken: 'test-token',
+    isAuthenticated: true,
     hasRole: (role: string) => role === 'teacher',
     // TF-625: HelpWidget uses useRoleBasedNavigation to hide deep dives with
     // no reachable route — that hook calls hasPermission.

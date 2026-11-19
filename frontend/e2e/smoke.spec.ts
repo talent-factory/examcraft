@@ -25,14 +25,10 @@ test.describe('Smoke Tests - Frontend', () => {
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
 
-    // Login form should be visible
-    await expect(page.locator('form, [role="form"]')).toBeVisible({ timeout: 10000 });
-
-    // Email input should exist
-    await expect(page.locator('input[type="email"], input[name="email"]')).toBeVisible();
-
-    // Password input should exist
-    await expect(page.locator('input[type="password"], input[name="password"]')).toBeVisible();
+    // EXAMCRAFT-126: no credential form any more; one button starts the
+    // OIDC login at the backend.
+    await expect(page.locator('[data-testid="login-button"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
   });
 
   // TF-657: Das Hilfe-Widget hängt in AppWithAuth ausserhalb von <Routes> und
@@ -52,19 +48,9 @@ test.describe('Smoke Tests - Frontend', () => {
 
     // Positiver Anker zuerst: beweist, dass die App überhaupt gerendert hat.
     // Ohne ihn wäre die Assertion darunter auch bei totem Frontend grün.
-    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="login-button"]')).toBeVisible({ timeout: 10000 });
 
     await expect(page.locator('[data-testid="help-fab"]')).toHaveCount(0);
-  });
-
-  test('should display register page', async ({ page }) => {
-    await page.goto('/register');
-
-    // Page should load
-    await expect(page.locator('body')).toBeVisible();
-
-    // Should have a form
-    await expect(page.locator('form, [role="form"]')).toBeVisible({ timeout: 10000 });
   });
 
   test('should have correct page title', async ({ page }) => {

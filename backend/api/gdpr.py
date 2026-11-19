@@ -17,6 +17,13 @@ from services.audit_service import AuditService
 from services.translation_service import get_request_locale
 from utils.auth_utils import get_current_user, block_during_impersonation
 from services.gdpr_deletion_service import delete_user_and_gdpr_data
+from starlette.concurrency import run_in_threadpool
+
+from services.zitadel_user_service import (
+    ZitadelError,
+    ZitadelTransientError,
+    fetch_zitadel_profile,
+)
 from errors import api_error
 
 logger = logging.getLogger(__name__)
@@ -109,6 +116,32 @@ async def export_user_data(
             # GDPR export failure (see main.py's Sentry setup) rather than
             # vanish into an app-log-only warning.
             logger.error(f"Could not export questions: {e}", exc_info=True)
+
+        # Zitadel-Profildaten (EXAMCRAFT-128): Identität liegt im IdP.
+        # Bei jedem Fehlen steht der Grund im Export, damit die betroffene
+        # Person (Art. 15/20) nachvollziehen kann, warum der Teil fehlt.
+        if not current_user.zitadel_sub:
+            user_data["zitadel_profile"] = {
+                "status": "not_available",
+                "reason": "no_profile",
+            }
+        else:
+            try:
+                profile = await run_in_threadpool(
+                    fetch_zitadel_profile, current_user.zitadel_sub
+                )
+                user_data["zitadel_profile"] = profile or {
+                    "status": "not_available",
+                    "reason": "no_profile",
+                }
+            except Exception as e:
+                logger.error(f"Could not export Zitadel profile: {e}", exc_info=True)
+                user_data["zitadel_profile"] = {
+                    "status": "unavailable",
+                    "reason": "not_configured"
+                    if isinstance(e, ZitadelError)
+                    else "temporarily_unavailable",
+                }
 
         # Export audit logs
         from models.auth import AuditLog
@@ -319,6 +352,16 @@ async def delete_account_immediately(
 
     except HTTPException:
         raise
+    except (ZitadelError, ZitadelTransientError) as e:
+        # Zitadel-User nicht löschbar: lokal wurde nichts gelöscht, der User
+        # kann es später erneut versuchen. Eigener Marker, damit On-Call das
+        # nicht mit dem Audit-Log-Abbruch (RuntimeError unten) verwechselt.
+        logger.error(
+            f"Account deletion aborted (Zitadel) for user {current_user.id}: {e}",
+            exc_info=True,
+        )
+        db.rollback()
+        raise api_error(500, "gdpr_deletion_failed", locale)
     except RuntimeError as e:
         # Fail-closed-Abbruch aus delete_user_and_gdpr_data: der Audit-Log-
         # Eintrag konnte nicht geschrieben werden, die Löschung wurde

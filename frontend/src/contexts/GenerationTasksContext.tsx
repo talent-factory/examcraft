@@ -27,6 +27,13 @@ const GenerationTasksContext = createContext<GenerationTasksContextType | undefi
 const FLUSH_INTERVAL_MS = 500;
 const WS_RECONNECT_MAX_RETRIES = 3;
 const WS_RECONNECT_BASE_DELAY_MS = 1000;
+// Close codes of /ws/tasks (docs/developer/websocket-close-codes.md).
+// 4401: the handshake had no valid session. 1008: policy violation of a valid
+// session (foreign task/origin). 1006: abnormal closure, which is also what a
+// browser reports when a proxy rejects the handshake.
+const WS_CLOSE_UNAUTHENTICATED = 4401;
+const WS_CLOSE_POLICY = 1008;
+const WS_CLOSE_ABNORMAL = 1006;
 const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILURE', 'REVOKED']);
 
 // TF-608: dismissed tasks survive the reload. Without this, the recently
@@ -63,7 +70,11 @@ const rememberDismissedTaskId = (taskId: string): void => {
 };
 
 export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, user, checkSession } = useAuth();
+  // The identity behind the session cookie: it changes on an impersonation
+  // start/end, where the open sockets (authenticated at their handshake) and
+  // the recovered task list belong to the previous identity.
+  const userId = user?.id ?? null;
   const [tasks, setTasks] = useState<Record<string, GenerationTaskState>>({});
   // TF-608: lets the recovery effect below read the *current* task state
   // (in particular an already-fetched `result`) without depending on `tasks`
@@ -84,6 +95,16 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   const terminalTaskIdsRef = useRef<Set<string>>(new Set());
   const wsRef = useRef<Record<string, WebSocket>>({});
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Scheduled reconnects per task: cancelled on cleanup, so a logout or an
+  // identity switch cannot revive a socket afterwards.
+  const reconnectTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Bumped on every cleanup; an async close handler that finishes after a
+  // cleanup (session probe in flight) sees a changed value and does nothing.
+  const generationRef = useRef(0);
+  const checkSessionRef = useRef(checkSession);
+  useEffect(() => {
+    checkSessionRef.current = checkSession;
+  }, [checkSession]);
 
   // Keep `tasksRef` mirroring `tasks` after every commit. Unlike
   // `terminalTaskIdsRef` above, this doesn't need same-turn sync (no
@@ -118,19 +139,21 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
   }, []);
 
   // Connect WebSocket for a task
-  const connectWebSocket = useCallback((taskId: string, token: string, retryCount = 0) => {
+  const connectWebSocket = useCallback((taskId: string, retryCount = 0) => {
+    clearTimeout(reconnectTimersRef.current[taskId]);
+    delete reconnectTimersRef.current[taskId];
     if (wsRef.current[taskId]) {
+      // Detach first: closing the replaced socket must not run its reconnect logic.
+      wsRef.current[taskId].onclose = null;
       wsRef.current[taskId].close();
     }
 
     const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     const wsBase = apiBaseUrl.replace(/^http/, 'ws');
+    // The session cookie authenticates the handshake (EXAMCRAFT-126): the
+    // socket must target the same origin as the API, nothing is sent after open.
     const ws = new WebSocket(`${wsBase}/ws/tasks/${taskId}`);
     wsRef.current[taskId] = ws;
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ token }));
-    };
 
     ws.onmessage = (event) => {
       let data: TaskStatusMessage;
@@ -194,7 +217,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     };
 
     ws.onclose = (event) => {
-      delete wsRef.current[taskId];
+      // A newer socket for the same task may already own the slot.
+      if (wsRef.current[taskId] === ws) delete wsRef.current[taskId];
 
       // Sticky-terminal guard: if the task already reached a terminal state
       // (set sync inside the `ws.onmessage` handler before the `setTasks`
@@ -205,15 +229,65 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
-      if (event.code !== 1000 && event.code !== 1001 && retryCount < WS_RECONNECT_MAX_RETRIES) {
+      if (event.code === 1000 || event.code === 1001) return;
+
+      const markUnknown = (reason: string) => {
+        console.warn(
+          `[GenerationTasks] Task ${taskId} marked UNKNOWN (close code ${event.code}): ${reason}`
+        );
+        // A buffered PROGRESS must not flush over the UNKNOWN status.
+        delete progressRef.current[taskId];
+        setTasks((prev) => {
+          const current = prev[taskId];
+          // A task that reached a terminal state meanwhile keeps it.
+          if (!current || TERMINAL_STATUSES.has(current.status)) return prev;
+          return { ...prev, [taskId]: { ...current, status: 'UNKNOWN' } };
+        });
+      };
+
+      const scheduleReconnect = () => {
+        if (retryCount >= WS_RECONNECT_MAX_RETRIES) {
+          markUnknown('reconnect attempts exhausted');
+          return;
+        }
         const delay = WS_RECONNECT_BASE_DELAY_MS * Math.pow(2, retryCount);
-        setTimeout(() => connectWebSocket(taskId, token, retryCount + 1), delay);
-      } else if (retryCount >= WS_RECONNECT_MAX_RETRIES) {
-        setTasks((prev) => ({
-          ...prev,
-          [taskId]: prev[taskId] ? { ...prev[taskId], status: 'UNKNOWN' } : prev[taskId],
-        }));
+        reconnectTimersRef.current[taskId] = setTimeout(() => {
+          delete reconnectTimersRef.current[taskId];
+          connectWebSocket(taskId, retryCount + 1);
+        }, delay);
+      };
+
+      // Policy violation of a valid session (foreign task/origin): retrying
+      // cannot help.
+      if (event.code === WS_CLOSE_POLICY) {
+        markUnknown('rejected by the server');
+        return;
       }
+
+      // A rejected handshake (4401) or an abnormal closure (1006) must not be
+      // retried blindly: check the session first. On 401 the auth context signs
+      // the user out and the task ends as UNKNOWN. A still valid session means
+      // the cause was transient (e.g. a lapsed impersonation cookie), so the
+      // bounded reconnect applies.
+      if (event.code === WS_CLOSE_UNAUTHENTICATED || event.code === WS_CLOSE_ABNORMAL) {
+        const generation = generationRef.current;
+        void checkSessionRef.current().then((sessionValid) => {
+          // Gone or finished meanwhile (cleanup, dismiss, retry, terminal state):
+          // nothing to revive and nothing to overwrite.
+          if (
+            generation !== generationRef.current ||
+            !tasksRef.current[taskId] ||
+            terminalTaskIdsRef.current.has(taskId)
+          ) {
+            return;
+          }
+          if (sessionValid) scheduleReconnect();
+          else markUnknown('session no longer valid');
+        });
+        return;
+      }
+
+      scheduleReconnect();
     };
 
     ws.onerror = (event) => {
@@ -224,7 +298,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Recovery: fetch recoverable tasks on mount when authenticated
   useEffect(() => {
-    if (!isAuthenticated || !accessToken) return;
+    if (!isAuthenticated) return;
 
     const recover = async () => {
       try {
@@ -245,8 +319,8 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
           if (dismissed.has(task.task_id)) continue;
 
           // TF-608 fix: this effect runs not only on mount but again on
-          // every `accessToken` change (silent token refresh, see the
-          // dependency array below) — mid-session, not only after a reload.
+          // every `isAuthenticated`/user change (see the dependency array below)
+          // — mid-session, not only after a reload.
           // Without `tasksRef`, a `result` already loaded via WebSocket or a
           // previous recovery pass would get overwritten here with `null`
           // and would stay unreachable until the (possibly failing) refetch
@@ -265,7 +339,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
             createdAt: task.created_at,
             result: existingResult,
             // TF-736: carried over alongside `result` for the same reason —
-            // a silent token refresh must not wipe out an under-fill notice
+            // a repeated recovery pass must not wipe out an under-fill notice
             // that a previous recovery pass already fetched from the job row.
             generatedQuestionCount: existingTask?.generatedQuestionCount ?? null,
             contextLimited: existingTask?.contextLimited ?? false,
@@ -288,7 +362,7 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
               terminalTaskIds.push(task.task_id);
             }
           } else {
-            connectWebSocket(task.task_id, accessToken);
+            connectWebSocket(task.task_id);
           }
         }
 
@@ -342,10 +416,18 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     recover();
 
     return () => {
-      Object.values(wsRef.current).forEach((ws) => ws.close());
+      // Detach onclose first: a stale socket of the previous identity must not
+      // schedule a reconnect after a logout or an impersonation switch.
+      generationRef.current += 1;
+      Object.values(reconnectTimersRef.current).forEach(clearTimeout);
+      reconnectTimersRef.current = {};
+      Object.values(wsRef.current).forEach((ws) => {
+        ws.onclose = null;
+        ws.close(1000);
+      });
       wsRef.current = {};
     };
-  }, [isAuthenticated, accessToken, connectWebSocket]);
+  }, [isAuthenticated, userId, connectWebSocket]);
 
   const startGeneration = useCallback(async (request: RAGExamRequest): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
@@ -368,12 +450,10 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       },
     }));
 
-    if (accessToken) {
-      connectWebSocket(task_id, accessToken);
-    }
+    connectWebSocket(task_id);
 
     return task_id;
-  }, [accessToken, connectWebSocket]);
+  }, [connectWebSocket]);
 
   const retryTask = useCallback(async (taskId: string): Promise<string> => {
     const { loadRAGService } = await import('../utils/componentLoader');
@@ -383,8 +463,13 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
     const { task_id: newTaskId } = await RAGService.retryGeneration(taskId);
 
     // Close old WebSocket to prevent resource leak
+    clearTimeout(reconnectTimersRef.current[taskId]);
+    delete reconnectTimersRef.current[taskId];
     if (wsRef.current[taskId]) {
-      wsRef.current[taskId].close();
+      // Detach first: a close without a code reports 1005, which would
+      // otherwise schedule a reconnect for a task that is gone.
+      wsRef.current[taskId].onclose = null;
+      wsRef.current[taskId].close(1000);
       delete wsRef.current[taskId];
     }
 
@@ -405,12 +490,10 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       return next;
     });
 
-    if (accessToken) {
-      connectWebSocket(newTaskId, accessToken);
-    }
+    connectWebSocket(newTaskId);
 
     return newTaskId;
-  }, [accessToken, connectWebSocket]);
+  }, [connectWebSocket]);
 
   const dismissTask = useCallback((taskId: string) => {
     rememberDismissedTaskId(taskId);
@@ -433,8 +516,13 @@ export const GenerationTasksProvider: React.FC<{ children: React.ReactNode }> = 
       delete next[taskId];
       return next;
     });
+    clearTimeout(reconnectTimersRef.current[taskId]);
+    delete reconnectTimersRef.current[taskId];
     if (wsRef.current[taskId]) {
-      wsRef.current[taskId].close();
+      // Detach first: a close without a code reports 1005, which would
+      // otherwise schedule a reconnect for a task that is gone.
+      wsRef.current[taskId].onclose = null;
+      wsRef.current[taskId].close(1000);
       delete wsRef.current[taskId];
     }
   }, []);

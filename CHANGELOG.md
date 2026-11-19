@@ -9,6 +9,48 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-18
+
+### Added
+
+- **Ein Login über tessera/Zitadel:** Die Anmeldung läuft über den
+  zentralen Identity Provider (OIDC mit Server-Session), die alten
+  Login-Masken sind zurückgebaut. Das Frontend ist auf den neuen Ablauf
+  umgestellt, inklusive des Links «Mit anderem Konto anmelden» und
+  sichtbarer Auth-Fehler auf der Login-Seite (EXAMCRAFT-120 bis
+  EXAMCRAFT-126, EXAMCRAFT-135, EXAMCRAFT-143).
+- **MCP-OAuth über Zitadel:** Neue Permission `mcp:use`; die Rolle wird
+  per Migration angelegt (EXAMCRAFT-127, EXAMCRAFT-140).
+- **DSGVO-Löschung und Export beziehen Zitadel-User ein:** Beim Löschen
+  wird auch der Zitadel-User entfernt. Die Health-Prüfung überwacht die
+  Zitadel-Konfiguration (EXAMCRAFT-128, EXAMCRAFT-134).
+- **Bulk-Import-Skript und Cutover-Runbook** für die Migration der
+  bestehenden Benutzer nach Zitadel (EXAMCRAFT-130).
+- **`just verify-prod`:** Gleicht pro Fly-App die gesetzten Secrets mit
+  `infra/required-secrets.toml` ab, ohne Werte zu lesen (EXAMCRAFT-86).
+- **Release-Notes-Gate** für die «Was ist neu»-Einträge (EXAMCRAFT-89).
+
+### Changed
+
+- Neue Spalte `users.zitadel_sub` und Tabelle `auth_sessions`
+  (Migrationen EXAMCRAFT-121, EXAMCRAFT-125, EXAMCRAFT-127; additiv).
+- Generation-Job-Zustand in einem Modul gebündelt (EXAMCRAFT-88).
+- Compliance: tessera/Zitadel als Subprozessor in Datenschutzerklärung,
+  TOM 5 und AVV §12 (EXAMCRAFT-131).
+
+### Fixed
+
+- Impersonation setzt nach dem Step-up fort; Login-Feinschliff nach der
+  Cookie-Session-Umstellung (EXAMCRAFT-139, EXAMCRAFT-144).
+- Eigener Fehlercode `account_not_migrated` statt `email_conflict`
+  (EXAMCRAFT-142).
+- Kein WebSocket-Reconnect bei abgelaufener Session (EXAMCRAFT-136).
+- Der Rollen-Seed füllt handgemachte Rollen nicht mehr auf
+  (EXAMCRAFT-140, EXAMCRAFT-150).
+- **«Was ist neu» zeigt wieder die aktuelle Version:** Die Einträge für
+  1.12.0 bis 1.15.1 sind nachgetragen, in Deutsch, Englisch, Französisch
+  und Italienisch (EXAMCRAFT-90).
+
 ## [1.15.1] - 2026-10-30
 
 ### Changed

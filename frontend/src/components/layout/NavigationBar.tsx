@@ -17,7 +17,10 @@ export const NavigationBar: React.FC = () => {
   const { t, i18n } = useTranslation();
 
   const handleLogout = async () => {
-    await logout();
+    const result = await logout();
+    // Ending an impersonation failed: the impersonation banner stays and the
+    // user must not be sent away as if signed out.
+    if (result && result.backendEndFailed) return;
     navigate('/login');
   };
 

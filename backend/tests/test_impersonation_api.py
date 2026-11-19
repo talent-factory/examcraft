@@ -15,12 +15,16 @@ from database import get_db
 from main import app
 from models.auth import (
     AuditLog,
+    AuthSession,
     ImpersonationSession,
     Institution,
     Role,
     User,
     UserStatus,
 )
+from datetime import datetime, timedelta, timezone
+
+from services import session_service
 from services.auth_service import AuthService
 
 
@@ -62,6 +66,18 @@ def _fake_ratelimit_redis(monkeypatch):
         lambda: client,
     )
     return client
+
+
+@pytest.fixture(autouse=True)
+def _no_celery_broker():
+    """Starting an impersonation queues the started-email Celery task; no
+    broker is needed here (dispatch is covered by test_tf759_* and
+    test_tf742_*)."""
+    with (
+        patch("tasks.notification_tasks.send_impersonation_started_email"),
+        patch("tasks.notification_tasks.send_impersonation_ended_email"),
+    ):
+        yield
 
 
 def _patch_impersonation_rate_limiter(monkeypatch, limiter):
@@ -117,10 +133,11 @@ def test_client(test_db):
     # this test environment (main.py's registration is deployment-mode
     # dependent) -- explicitly include what this file needs, same
     # pattern as tests/test_auth_api.py.
-    from api import admin, auth, gdpr
+    from api import admin, auth, auth_oidc, gdpr
     from api.v1 import billing
 
     app.include_router(auth.router)
+    app.include_router(auth_oidc.router)
     app.include_router(admin.router)
     app.include_router(gdpr.router)
     app.include_router(billing.router, prefix="/api/v1/billing", tags=["billing"])
@@ -197,12 +214,29 @@ def _make_admin_role_user(db, inst, email):
     return user
 
 
-def _tokens(db, user):
-    return AuthService.create_tokens_for_user(user, db)
+def _login(db, user, authenticated_at=None):
+    """Login-session cookie token; ``authenticated_at`` defaults to "just now"
+    (a fresh IdP login, so the impersonation step-up passes)."""
+    if authenticated_at is None:
+        authenticated_at = datetime.now(timezone.utc)
+    token, _row = session_service.create_session(
+        db, user.id, authenticated_at=authenticated_at
+    )
+    return token
 
 
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+def _auth(token: str, impersonation_token: str | None = None) -> dict:
+    cookie = f"{session_service.SESSION_COOKIE_NAME}={token}"
+    if impersonation_token:
+        cookie += f"; {session_service.IMPERSONATION_COOKIE_NAME}={impersonation_token}"
+    return {"Cookie": cookie}
+
+
+def _imp_token(response) -> str:
+    """The ``impersonation_id`` cookie set by a successful start."""
+    token = response.cookies.get(session_service.IMPERSONATION_COOKIE_NAME)
+    assert token, "start did not set the impersonation cookie"
+    return token
 
 
 def _impersonate(
@@ -210,13 +244,16 @@ def _impersonate(
     admin_token,
     target_id,
     reason="Support-Anfrage TICKET-1",
-    admin_password="Test1234!",
 ):
-    return client.post(
+    response = client.post(
         f"/api/admin/users/{target_id}/impersonate",
-        json={"reason": reason, "admin_password": admin_password},
+        json={"reason": reason},
         headers=_auth(admin_token),
     )
+    # The TestClient jar would otherwise carry the impersonation cookie into
+    # later requests; the tests send their cookies explicitly.
+    client.cookies.clear()
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -234,15 +271,22 @@ def test_superadmin_can_impersonate_any_user_including_admin(test_client, test_d
         test_db, other_inst, "target-admin@tf741-super-any.ch"
     )
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = _impersonate(test_client, admin_token, target_admin.id)
 
     assert response.status_code == 200
     data = response.json()
     assert data["target_user_id"] == target_admin.id
-    assert "access_token" in data
+    assert "access_token" not in data
+    assert _imp_token(response)
     assert data["expires_in"] == 30 * 60
+    # expires_at is the server-side cap (started_at + max age), serialised with
+    # an offset so the browser does not read it as local time.
+    assert data["expires_at"].endswith(("Z", "+00:00"))
+    expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+    delta = expires_at - datetime.now(timezone.utc)
+    assert timedelta(minutes=29) < delta <= timedelta(minutes=30, seconds=5)
 
 
 def test_institution_admin_can_impersonate_non_admin_same_institution(
@@ -253,7 +297,7 @@ def test_institution_admin_can_impersonate_non_admin_same_institution(
     _grant_impersonate_permission(test_db, admin)
     target = _make_user(test_db, inst, "target@tf741-inst-admin-ok.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
+    admin_token = _login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target.id)
 
@@ -268,7 +312,7 @@ def test_institution_admin_blocked_cross_institution(test_client, test_db):
     _grant_impersonate_permission(test_db, admin)
     target = _make_user(test_db, other_inst, "target@tf741-cross-inst-b.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
+    admin_token = _login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target.id)
 
@@ -283,7 +327,7 @@ def test_institution_admin_blocked_target_is_admin_role(test_client, test_db):
         test_db, inst, "target-admin@tf741-target-admin.ch"
     )
     test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
+    admin_token = _login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target_admin.id)
 
@@ -306,7 +350,7 @@ def test_institution_admin_blocked_target_has_admin_permission_via_custom_role(
     target.roles.append(custom_role)
     test_db.flush()
     test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
+    admin_token = _login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target.id)
 
@@ -321,7 +365,7 @@ def test_institution_admin_blocked_target_is_superuser(test_client, test_db):
         test_db, inst, "target-super@tf741-target-super.ch", is_superuser=True
     )
     test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
+    admin_token = _login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target_super.id)
 
@@ -333,7 +377,7 @@ def test_user_without_permission_is_blocked(test_client, test_db):
     plain_user = _make_user(test_db, inst, "plain@tf741-no-perm.ch")
     target = _make_user(test_db, inst, "target@tf741-no-perm.ch")
     test_db.commit()
-    token = _tokens(test_db, plain_user)["access_token"]
+    token = _login(test_db, plain_user)
 
     response = _impersonate(test_client, token, target.id)
 
@@ -344,7 +388,7 @@ def test_target_user_not_found_returns_404(test_client, test_db):
     inst = _make_institution(test_db, "tf741-404")
     superadmin = _make_user(test_db, inst, "super@tf741-404.ch", is_superuser=True)
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = _impersonate(test_client, admin_token, 999_999_999)
 
@@ -355,7 +399,7 @@ def test_self_impersonation_rejected(test_client, test_db):
     inst = _make_institution(test_db, "tf741-self")
     superadmin = _make_user(test_db, inst, "super@tf741-self.ch", is_superuser=True)
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = _impersonate(test_client, admin_token, superadmin.id)
 
@@ -363,11 +407,11 @@ def test_self_impersonation_rejected(test_client, test_db):
 
 
 # ---------------------------------------------------------------------------
-# Atomicity: a failed token mint must not leave an orphaned "active" session
+# Atomicity: a failed session creation must not leave an orphaned "active" session
 # ---------------------------------------------------------------------------
 
 
-def test_failed_token_mint_leaves_no_orphaned_session(test_client, test_db):
+def test_failed_session_creation_leaves_no_orphaned_session(test_client, test_db):
     """TF-741 review fix: the ImpersonationSession row used to be committed
     *before* AuthService.create_impersonation_token ran. If minting failed
     partway (decode failure, DB blip), the row stayed committed as "active"
@@ -383,13 +427,13 @@ def test_failed_token_mint_leaves_no_orphaned_session(test_client, test_db):
     target = _make_user(test_db, inst, "target@tf741-atomic-fail.ch")
     other_target = _make_user(test_db, inst, "other-target@tf741-atomic-fail.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     sessions_before = test_db.query(ImpersonationSession).count()
 
     with patch(
-        "api.admin.AuthService.create_impersonation_token",
-        side_effect=ValueError("Failed to decode impersonation access token"),
+        "api.admin.AuthService.create_impersonation_session",
+        side_effect=ValueError("Failed to create impersonation session"),
     ):
         failed = _impersonate(test_client, admin_token, target.id)
 
@@ -409,13 +453,13 @@ def test_failed_token_mint_leaves_no_orphaned_session(test_client, test_db):
 # ---------------------------------------------------------------------------
 
 
-def test_nested_impersonation_via_admins_own_token_rejected(test_client, test_db):
+def test_nested_impersonation_via_admins_own_session_rejected(test_client, test_db):
     inst = _make_institution(test_db, "tf741-nest-a")
     superadmin = _make_user(test_db, inst, "super@tf741-nest-a.ch", is_superuser=True)
     target1 = _make_user(test_db, inst, "target1@tf741-nest-a.ch")
     target2 = _make_user(test_db, inst, "target2@tf741-nest-a.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     first = _impersonate(test_client, admin_token, target1.id)
     assert first.status_code == 200
@@ -425,7 +469,7 @@ def test_nested_impersonation_via_admins_own_token_rejected(test_client, test_db
     assert second.status_code == 409
 
 
-def test_nested_impersonation_via_impersonation_token_rejected(test_client, test_db):
+def test_nested_impersonation_via_impersonation_session_rejected(test_client, test_db):
     inst = _make_institution(test_db, "tf741-nest-b")
     superadmin = _make_user(test_db, inst, "super@tf741-nest-b.ch", is_superuser=True)
     # target1 is itself a superuser: FastAPI resolves Depends() -- including
@@ -442,13 +486,17 @@ def test_nested_impersonation_via_impersonation_token_rejected(test_client, test
     target1 = _make_user(test_db, inst, "target1@tf741-nest-b.ch", is_superuser=True)
     target2 = _make_user(test_db, inst, "target2@tf741-nest-b.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     first = _impersonate(test_client, admin_token, target1.id)
     assert first.status_code == 200
-    impersonation_token = first.json()["access_token"]
+    impersonation_token = _imp_token(first)
 
-    second = _impersonate(test_client, impersonation_token, target2.id)
+    second = test_client.post(
+        f"/api/admin/users/{target2.id}/impersonate",
+        json={"reason": "Support-Anfrage TICKET-1"},
+        headers=_auth(admin_token, impersonation_token),
+    )
 
     assert second.status_code == 409
 
@@ -458,19 +506,19 @@ def test_nested_impersonation_via_impersonation_token_rejected(test_client, test
 # ---------------------------------------------------------------------------
 
 
-def test_end_impersonation_ends_session_and_revokes_token(test_client, test_db):
+def test_end_impersonation_ends_session_and_deletes_login_session(test_client, test_db):
     inst = _make_institution(test_db, "tf741-end")
     superadmin = _make_user(test_db, inst, "super@tf741-end.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf741-end.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id)
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
     session_id = start.json()["impersonation_session_id"]
 
     end_response = test_client.post(
-        "/api/admin/impersonate/end", headers=_auth(impersonation_token)
+        "/api/admin/impersonate/end", headers=_auth(admin_token, impersonation_token)
     )
     assert end_response.status_code == 204
 
@@ -482,11 +530,22 @@ def test_end_impersonation_ends_session_and_revokes_token(test_client, test_db):
     assert session.ended_at is not None
     assert session.end_reason == "manual"
 
-    # The revoked token is now unusable.
-    me_response = test_client.get("/api/auth/me", headers=_auth(impersonation_token))
-    assert me_response.status_code == 401
+    # The impersonation login session is gone: the (now stale) cookie no
+    # longer acts as the target, the admin falls back to their own identity.
+    test_db.expire_all()
+    assert (
+        test_db.query(AuthSession)
+        .filter(AuthSession.impersonation_session_id == session_id)
+        .count()
+        == 0
+    )
+    me_response = test_client.get(
+        "/api/auth/me", headers=_auth(admin_token, impersonation_token)
+    )
+    assert me_response.status_code == 200
+    assert me_response.json()["email"] == superadmin.email
 
-    # The admin's own token, untouched, still works ("back to my account").
+    # The admin's own session, untouched, still works ("back to my account").
     admin_me = test_client.get("/api/auth/me", headers=_auth(admin_token))
     assert admin_me.status_code == 200
 
@@ -495,7 +554,7 @@ def test_end_without_active_impersonation_rejected(test_client, test_db):
     inst = _make_institution(test_db, "tf741-end-none")
     superadmin = _make_user(test_db, inst, "super@tf741-end-none.ch", is_superuser=True)
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = test_client.post(
         "/api/admin/impersonate/end", headers=_auth(admin_token)
@@ -504,10 +563,10 @@ def test_end_without_active_impersonation_rejected(test_client, test_db):
     assert response.status_code == 400
 
 
-def test_end_impersonation_recovers_via_admins_own_token_if_impersonation_token_lost(
+def test_end_impersonation_recovers_via_admins_own_session_if_impersonation_cookie_lost(
     test_client, test_db
 ):
-    """TF-741 review fix: if the impersonation token itself is lost (tab
+    """TF-741 review fix: if the impersonation cookie itself is lost (tab
     closed, storage cleared, browser crash), the admin previously had no
     way to end their own open session -- POST /impersonate/end required
     the (lost) impersonation token, and start_impersonation's own-session
@@ -522,12 +581,12 @@ def test_end_impersonation_recovers_via_admins_own_token_if_impersonation_token_
     target = _make_user(test_db, inst, "target@tf741-end-recover.ch")
     other_target = _make_user(test_db, inst, "other-target@tf741-end-recover.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, target.id)
     assert start.status_code == 200
     session_id = start.json()["impersonation_session_id"]
-    # The impersonation token itself is deliberately never used here --
+    # The impersonation cookie itself is deliberately never sent here --
     # simulating that it was lost.
 
     end_response = test_client.post(
@@ -564,18 +623,18 @@ def test_logout_during_impersonation_ends_session_not_target_sessions(
     )
     target = _make_user(test_db, inst, "target@tf741-logout-imp.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     # The target has an independent session of their own that must survive.
-    target_own_token = _tokens(test_db, target)["access_token"]
+    target_own_token = _login(test_db, target)
 
     start = _impersonate(test_client, admin_token, target.id)
     assert start.status_code == 200
     session_id = start.json()["impersonation_session_id"]
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
 
     logout_response = test_client.post(
-        "/api/auth/logout", headers=_auth(impersonation_token)
+        "/api/v1/auth/logout", headers=_auth(admin_token, impersonation_token)
     )
     assert logout_response.status_code == 204
 
@@ -592,9 +651,10 @@ def test_logout_during_impersonation_ends_session_not_target_sessions(
     target_me = test_client.get("/api/auth/me", headers=_auth(target_own_token))
     assert target_me.status_code == 200
 
-    # The admin's own token is untouched too.
+    # The admin's own session is untouched too and acts as the admin again.
     admin_me = test_client.get("/api/auth/me", headers=_auth(admin_token))
     assert admin_me.status_code == 200
+    assert admin_me.json()["email"] == superadmin.email
 
 
 # ---------------------------------------------------------------------------
@@ -614,13 +674,15 @@ def test_impersonating_suspended_target_still_allows_requests(test_client, test_
         status=UserStatus.SUSPENDED.value,
     )
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     start = _impersonate(test_client, admin_token, suspended_target.id)
     assert start.status_code == 200
-    impersonation_token = start.json()["access_token"]
+    impersonation_token = _imp_token(start)
 
-    me_response = test_client.get("/api/auth/me", headers=_auth(impersonation_token))
+    me_response = test_client.get(
+        "/api/auth/me", headers=_auth(admin_token, impersonation_token)
+    )
 
     assert me_response.status_code == 200
     assert me_response.json()["email"] == suspended_target.email
@@ -636,158 +698,124 @@ def _start_impersonation(test_client, test_db, slug):
     superadmin = _make_user(test_db, inst, f"super@{slug}.ch", is_superuser=True)
     target = _make_user(test_db, inst, f"target@{slug}.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
     start = _impersonate(test_client, admin_token, target.id)
     assert start.status_code == 200
-    return start.json()["access_token"]
-
-
-def test_change_password_blocked_during_impersonation(test_client, test_db):
-    token = _start_impersonation(test_client, test_db, "tf741-guard-pw")
-
-    response = test_client.post(
-        "/api/auth/change-password",
-        json={"current_password": "irrelevant", "new_password": "NewPass1234!"},
-        headers=_auth(token),
-    )
-
-    assert response.status_code == 403
+    return _auth(admin_token, _imp_token(start))
 
 
 def test_request_deletion_blocked_during_impersonation(test_client, test_db):
-    token = _start_impersonation(test_client, test_db, "tf741-guard-del-req")
+    headers = _start_impersonation(test_client, test_db, "tf741-guard-del-req")
 
-    response = test_client.post("/api/v1/gdpr/request-deletion", headers=_auth(token))
+    response = test_client.post("/api/v1/gdpr/request-deletion", headers=headers)
 
     assert response.status_code == 403
 
 
 def test_delete_account_now_blocked_during_impersonation(test_client, test_db):
-    token = _start_impersonation(test_client, test_db, "tf741-guard-del-now")
+    headers = _start_impersonation(test_client, test_db, "tf741-guard-del-now")
 
     response = test_client.request(
         "DELETE",
         "/api/v1/gdpr/delete-account-now",
         params={"password": "irrelevant"},
-        headers=_auth(token),
+        headers=headers,
     )
 
     assert response.status_code == 403
 
 
 def test_create_checkout_session_blocked_during_impersonation(test_client, test_db):
-    token = _start_impersonation(test_client, test_db, "tf741-guard-checkout")
+    headers = _start_impersonation(test_client, test_db, "tf741-guard-checkout")
 
     response = test_client.post(
         "/api/v1/billing/create-checkout-session",
         json={"price_id": "price_test"},
-        headers=_auth(token),
+        headers=headers,
     )
 
     assert response.status_code == 403
 
 
 def test_customer_portal_blocked_during_impersonation(test_client, test_db):
-    token = _start_impersonation(test_client, test_db, "tf741-guard-portal")
+    headers = _start_impersonation(test_client, test_db, "tf741-guard-portal")
 
-    response = test_client.post("/api/v1/billing/customer-portal", headers=_auth(token))
-
-    assert response.status_code == 403
-
-
-def test_set_password_blocked_during_impersonation(test_client, test_db):
-    """TF-741 review fix: /auth/set-password needs no existing credential,
-    so an admin impersonating an OAuth-only target could otherwise give
-    that account an admin-chosen password that outlives the 30-minute
-    impersonation session entirely -- the guard was missing here even
-    though it was applied to /auth/change-password."""
-    inst = _make_institution(test_db, "tf741-guard-set-pw")
-    superadmin = _make_user(
-        test_db, inst, "super@tf741-guard-set-pw.ch", is_superuser=True
-    )
-    oauth_target = User(
-        email="oauth-target@tf741-guard-set-pw.ch",
-        password_hash=None,
-        first_name="Test",
-        last_name="User",
-        institution_id=inst.id,
-        status=UserStatus.ACTIVE.value,
-        oauth_provider="google",
-    )
-    test_db.add(oauth_target)
-    test_db.flush()
-    test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    start = _impersonate(test_client, admin_token, oauth_target.id)
-    assert start.status_code == 200
-    token = start.json()["access_token"]
-
-    response = test_client.post(
-        "/api/auth/set-password",
-        json={"password": "NewPass1234!"},
-        headers=_auth(token),
-    )
+    response = test_client.post("/api/v1/billing/customer-portal", headers=headers)
 
     assert response.status_code == 403
 
 
-def test_change_password_endpoint_reachable_without_impersonation(test_client, test_db):
-    """Regression: the guard must not block the normal, non-impersonated path."""
-    inst = _make_institution(test_db, "tf741-guard-regression")
-    user = _make_user(test_db, inst, "user@tf741-guard-regression.ch")
-    test_db.commit()
-    token = _tokens(test_db, user)["access_token"]
-
-    response = test_client.post(
-        "/api/auth/change-password",
-        json={"current_password": "Test1234!", "new_password": "NewPass1234!"},
-        headers=_auth(token),
-    )
-
-    assert response.status_code == 204
-
-
 # ---------------------------------------------------------------------------
-# TF-758: admin password re-entry (step-up) before minting the token
+# EXAMCRAFT-125: step-up -- the admin's login must be recent (IdP auth_time)
 # ---------------------------------------------------------------------------
 
 
-def test_impersonation_wrong_admin_password_rejected(test_client, test_db):
-    """Wrong ``admin_password`` blocks the start -- no session is created."""
-    inst = _make_institution(test_db, "tf758-wrong-pw")
-    superadmin = _make_user(test_db, inst, "super@tf758-wrong-pw.ch", is_superuser=True)
-    target = _make_user(test_db, inst, "target@tf758-wrong-pw.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    response = _impersonate(
-        test_client, admin_token, target.id, admin_password="WrongPassword!"
+def _stale_login(db, user):
+    return _login(
+        db, user, authenticated_at=datetime.now(timezone.utc) - timedelta(hours=2)
     )
 
-    assert response.status_code == 400
+
+def test_impersonation_stale_login_rejected(test_client, test_db):
+    """A login older than the step-up window blocks the start: 403
+    ``auth_reauth_required``, no impersonation session, no cookie."""
+    inst = _make_institution(test_db, "ec125-stale")
+    superadmin = _make_user(test_db, inst, "super@ec125-stale.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@ec125-stale.ch")
+    test_db.commit()
+    admin_token = _stale_login(test_db, superadmin)
+
+    response = _impersonate(test_client, admin_token, target.id)
+
+    assert response.status_code == 403
+    assert "auth_reauth_required" in response.text
+    assert session_service.IMPERSONATION_COOKIE_NAME not in response.cookies
     assert (
         test_db.query(ImpersonationSession)
         .filter(ImpersonationSession.admin_user_id == superadmin.id)
         .count()
         == 0
     )
+    assert (
+        test_db.query(AuthSession)
+        .filter(AuthSession.impersonator_id.isnot(None))
+        .count()
+        == 0
+    )
 
 
-def test_impersonation_wrong_admin_password_is_audited(test_client, test_db):
-    """A failed step-up attempt is written to the audit trail (STATUS_FAILURE,
+def test_impersonation_missing_authenticated_at_rejected(test_client, test_db):
+    """No recorded IdP ``auth_time`` means no proof of a recent login: 403."""
+    inst = _make_institution(test_db, "ec125-no-auth-time")
+    superadmin = _make_user(
+        test_db, inst, "super@ec125-no-auth-time.ch", is_superuser=True
+    )
+    target = _make_user(test_db, inst, "target@ec125-no-auth-time.ch")
+    test_db.commit()
+    token, _row = session_service.create_session(
+        test_db, superadmin.id, authenticated_at=None
+    )
+
+    response = _impersonate(test_client, token, target.id)
+
+    assert response.status_code == 403
+    assert "auth_reauth_required" in response.text
+
+
+def test_impersonation_stale_login_is_audited(test_client, test_db):
+    """A rejected step-up is written to the audit trail (STATUS_FAILURE,
     same ACTION_IMPERSONATION_START action as a successful start)."""
     from services.audit_service import AuditService
 
-    inst = _make_institution(test_db, "tf758-wrong-pw-audit")
+    inst = _make_institution(test_db, "ec125-stale-audit")
     superadmin = _make_user(
-        test_db, inst, "super@tf758-wrong-pw-audit.ch", is_superuser=True
+        test_db, inst, "super@ec125-stale-audit.ch", is_superuser=True
     )
-    target = _make_user(test_db, inst, "target@tf758-wrong-pw-audit.ch")
+    target = _make_user(test_db, inst, "target@ec125-stale-audit.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _stale_login(test_db, superadmin)
 
-    _impersonate(test_client, admin_token, target.id, admin_password="WrongPassword!")
+    _impersonate(test_client, admin_token, target.id)
 
     log_entry = (
         test_db.query(AuditLog)
@@ -802,264 +830,79 @@ def test_impersonation_wrong_admin_password_is_audited(test_client, test_db):
     assert log_entry.resource_id == str(target.id)
 
 
-def test_impersonation_missing_admin_password_field_rejected(test_client, test_db):
-    """``admin_password`` is a required field -- omitting it is a 422, not a
-    silent bypass of the step-up."""
-    inst = _make_institution(test_db, "tf758-missing-pw")
+def test_impersonation_stale_login_and_nonexistent_target_returns_403_not_404(
+    test_client, test_db
+):
+    """The step-up runs before anything about the target is revealed, so a
+    stale login cannot use 404-vs-403 as an oracle to enumerate user IDs."""
+    inst = _make_institution(test_db, "ec125-stale-404")
     superadmin = _make_user(
-        test_db, inst, "super@tf758-missing-pw.ch", is_superuser=True
+        test_db, inst, "super@ec125-stale-404.ch", is_superuser=True
     )
-    target = _make_user(test_db, inst, "target@tf758-missing-pw.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _stale_login(test_db, superadmin)
 
-    response = test_client.post(
-        f"/api/admin/users/{target.id}/impersonate",
-        json={"reason": "Support-Anfrage TICKET-1"},
-        headers=_auth(admin_token),
-    )
+    response = _impersonate(test_client, admin_token, 999_999_999)
 
-    assert response.status_code == 422
+    assert response.status_code == 403
+    assert "auth_reauth_required" in response.text
 
 
-def test_impersonation_oauth_only_admin_blocked(test_client, test_db):
-    """An admin with no password set (OAuth-only account) cannot use the
-    step-up at all -- rejected outright rather than silently skipped."""
-    inst = _make_institution(test_db, "tf758-oauth-admin")
-    oauth_admin = User(
-        email="oauth-admin@tf758-oauth-admin.ch",
-        password_hash=None,
-        first_name="Test",
-        last_name="Admin",
-        institution_id=inst.id,
-        status=UserStatus.ACTIVE.value,
-        is_superuser=True,
-        oauth_provider="google",
-    )
-    test_db.add(oauth_admin)
-    test_db.flush()
-    target = _make_user(test_db, inst, "target@tf758-oauth-admin.ch")
+def test_impersonation_stale_login_pre_empts_cross_institution_scope_check(
+    test_client, test_db
+):
+    """Same ordering guard against the institution-scope check: the response
+    must be the step-up error, not a scope error revealing the target."""
+    inst = _make_institution(test_db, "ec125-stale-cross-a")
+    other_inst = _make_institution(test_db, "ec125-stale-cross-b")
+    admin = _make_user(test_db, inst, "admin@ec125-stale-cross-a.ch")
+    _grant_impersonate_permission(test_db, admin)
+    target = _make_user(test_db, other_inst, "target@ec125-stale-cross-b.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, oauth_admin)["access_token"]
+    admin_token = _stale_login(test_db, admin)
 
     response = _impersonate(test_client, admin_token, target.id)
 
     assert response.status_code == 403
-    assert (
-        test_db.query(ImpersonationSession)
-        .filter(ImpersonationSession.admin_user_id == oauth_admin.id)
-        .count()
-        == 0
-    )
+    assert "auth_reauth_required" in response.text
 
 
-def test_impersonation_correct_admin_password_still_succeeds(test_client, test_db):
-    """Sanity check: the step-up doesn't break the happy path."""
-    inst = _make_institution(test_db, "tf758-correct-pw")
-    superadmin = _make_user(
-        test_db, inst, "super@tf758-correct-pw.ch", is_superuser=True
-    )
-    target = _make_user(test_db, inst, "target@tf758-correct-pw.ch")
+def test_impersonation_fresh_login_just_inside_window_succeeds(test_client, test_db):
+    inst = _make_institution(test_db, "ec125-fresh")
+    superadmin = _make_user(test_db, inst, "super@ec125-fresh.ch", is_superuser=True)
+    target = _make_user(test_db, inst, "target@ec125-fresh.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    response = _impersonate(
-        test_client, admin_token, target.id, admin_password="Test1234!"
+    admin_token = _login(
+        test_db,
+        superadmin,
+        authenticated_at=datetime.now(timezone.utc) - timedelta(minutes=9),
     )
+
+    response = _impersonate(test_client, admin_token, target.id)
 
     assert response.status_code == 200
 
 
-# ---------------------------------------------------------------------------
-# TF-758 review fixes: check-ordering regression coverage, lockout, audit
-# symmetry
-# ---------------------------------------------------------------------------
-
-
-def test_impersonation_wrong_password_and_nonexistent_target_returns_400_not_404(
-    test_client, test_db
-):
-    """The step-up's whole point is that a hijacked admin session can't use
-    404-vs-400 as an oracle to enumerate target user IDs -- so a wrong
-    password against a *nonexistent* target must still be a plain 400, not
-    the 404 that ``test_target_user_not_found_returns_404`` gets with the
-    correct password. Regression guard for the check ordering described in
-    the comment above the step-up in api/admin.py."""
-    inst = _make_institution(test_db, "tf758-wrong-pw-404")
+def test_impersonation_start_returns_no_tokens_and_sets_cookie(test_client, test_db):
+    inst = _make_institution(test_db, "ec125-no-tokens")
     superadmin = _make_user(
-        test_db, inst, "super@tf758-wrong-pw-404.ch", is_superuser=True
+        test_db, inst, "super@ec125-no-tokens.ch", is_superuser=True
     )
+    target = _make_user(test_db, inst, "target@ec125-no-tokens.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    response = _impersonate(
-        test_client, admin_token, 999_999_999, admin_password="WrongPassword!"
-    )
-
-    assert response.status_code == 400
-
-
-def test_impersonation_wrong_password_and_cross_institution_target_returns_400_not_403(
-    test_client, test_db
-):
-    """Same regression guard as the 404 case above, but against the
-    institution-scope 403 that ``test_institution_admin_blocked_cross_institution``
-    gets with the correct password -- a wrong password must pre-empt that
-    too, not reveal that the target exists in another institution."""
-    inst = _make_institution(test_db, "tf758-wrong-pw-cross-a")
-    other_inst = _make_institution(test_db, "tf758-wrong-pw-cross-b")
-    admin = _make_user(test_db, inst, "admin@tf758-wrong-pw-cross-a.ch")
-    _grant_impersonate_permission(test_db, admin)
-    target = _make_user(test_db, other_inst, "target@tf758-wrong-pw-cross-b.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, admin)["access_token"]
-
-    response = _impersonate(
-        test_client, admin_token, target.id, admin_password="WrongPassword!"
-    )
-
-    assert response.status_code == 400
-
-
-def test_impersonation_empty_admin_password_rejected(test_client, test_db):
-    """``min_length=1`` on ``admin_password`` is enforced by Pydantic, not
-    just by the frontend's non-empty guard -- an empty string sent directly
-    to the API is a 422, same as omitting the field entirely."""
-    inst = _make_institution(test_db, "tf758-empty-pw")
-    superadmin = _make_user(test_db, inst, "super@tf758-empty-pw.ch", is_superuser=True)
-    target = _make_user(test_db, inst, "target@tf758-empty-pw.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    response = _impersonate(test_client, admin_token, target.id, admin_password="")
-
-    assert response.status_code == 422
-
-
-def test_impersonation_oauth_only_admin_rejection_is_audited(test_client, test_db):
-    """Review fix: the "no password set" (403) branch must be audited just
-    like the "wrong password" (400) branch -- both are attempts to use the
-    step-up on a hijacked/left-open admin session, so both need a trail."""
-    from services.audit_service import AuditService
-
-    inst = _make_institution(test_db, "tf758-oauth-audit")
-    oauth_admin = User(
-        email="oauth-admin@tf758-oauth-audit.ch",
-        password_hash=None,
-        first_name="Test",
-        last_name="Admin",
-        institution_id=inst.id,
-        status=UserStatus.ACTIVE.value,
-        is_superuser=True,
-        oauth_provider="google",
-    )
-    test_db.add(oauth_admin)
-    test_db.flush()
-    target = _make_user(test_db, inst, "target@tf758-oauth-audit.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, oauth_admin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     response = _impersonate(test_client, admin_token, target.id)
-    assert response.status_code == 403
 
-    log_entry = (
-        test_db.query(AuditLog)
-        .filter(
-            AuditLog.action == AuditService.ACTION_IMPERSONATION_START,
-            AuditLog.status == AuditService.STATUS_FAILURE,
-            AuditLog.user_id == oauth_admin.id,
-        )
-        .first()
-    )
-    assert log_entry is not None
-    assert log_entry.resource_id == str(target.id)
-
-
-def test_impersonation_locks_out_after_repeated_wrong_password_attempts(
-    test_client, test_db, monkeypatch
-):
-    """Critical review fix: without a lockout, the step-up would be a free
-    password oracle for a hijacked admin token. After
-    ``MAX_FAILED_PASSWORD_ATTEMPTS`` wrong guesses, even the *correct*
-    password is rejected with 429 -- same account-wide lockout
-    POST /auth/login enforces, since both share the same counter.
-
-    Uses a generously loosened TF-760 rate limiter so this test exercises
-    the TF-758 lockout specifically and isn't coincidentally gated by the
-    (independent, differently-scoped) per-admin rate limit instead --
-    which defaults to the same threshold (10/hour) this test's own
-    ``MAX_FAILED_PASSWORD_ATTEMPTS`` happens to use."""
-    from middleware.rate_limit import ImpersonationRateLimiter
-
-    _patch_impersonation_rate_limiter(
-        monkeypatch,
-        ImpersonationRateLimiter(requests_per_hour=1000, requests_per_day=1000),
-    )
-
-    inst = _make_institution(test_db, "tf758-lockout")
-    superadmin = _make_user(test_db, inst, "super@tf758-lockout.ch", is_superuser=True)
-    target = _make_user(test_db, inst, "target@tf758-lockout.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    for _ in range(AuthService.MAX_FAILED_PASSWORD_ATTEMPTS):
-        response = _impersonate(
-            test_client, admin_token, target.id, admin_password="WrongPassword!"
-        )
-        assert response.status_code == 400
-
-    locked_response = _impersonate(
-        test_client, admin_token, target.id, admin_password="Test1234!"
-    )
-
-    assert locked_response.status_code == 429
-    assert (
-        test_db.query(ImpersonationSession)
-        .filter(ImpersonationSession.admin_user_id == superadmin.id)
-        .count()
-        == 0
-    )
-
-
-def test_impersonation_correct_password_resets_failed_attempt_counter(
-    test_client, test_db, monkeypatch
-):
-    """A successful step-up clears the shared failed-attempt counter, same
-    as a successful POST /auth/login -- a few wrong guesses followed by the
-    right password must not carry a residual count toward a later
-    lockout.
-
-    Same TF-760 rate-limiter decoupling as the lockout test above -- 10
-    total calls here would otherwise sit right at that limiter's own
-    default hourly threshold too."""
-    from middleware.rate_limit import ImpersonationRateLimiter
-
-    _patch_impersonation_rate_limiter(
-        monkeypatch,
-        ImpersonationRateLimiter(requests_per_hour=1000, requests_per_day=1000),
-    )
-
-    inst = _make_institution(test_db, "tf758-reset-counter")
-    superadmin = _make_user(
-        test_db, inst, "super@tf758-reset-counter.ch", is_superuser=True
-    )
-    target = _make_user(test_db, inst, "target@tf758-reset-counter.ch")
-    test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
-
-    for _ in range(AuthService.MAX_FAILED_PASSWORD_ATTEMPTS - 1):
-        _impersonate(
-            test_client, admin_token, target.id, admin_password="WrongPassword!"
-        )
-
-    success_response = _impersonate(
-        test_client, admin_token, target.id, admin_password="Test1234!"
-    )
-    assert success_response.status_code == 200
-
-    test_db.refresh(superadmin)
-    assert superadmin.failed_login_attempts == 0
-    assert superadmin.last_failed_login is None
+    assert response.status_code == 200
+    assert set(response.json()) == {
+        "expires_in",
+        "expires_at",
+        "impersonation_session_id",
+        "target_user_id",
+        "target_user_email",
+    }
+    assert _imp_token(response)
 
 
 # ---------------------------------------------------------------------------
@@ -1086,7 +929,7 @@ def test_admin_is_rate_limited_after_too_many_impersonation_attempts(
     superadmin = _make_user(test_db, inst, "super@tf760-hourly.ch", is_superuser=True)
     target = _make_user(test_db, inst, "target@tf760-hourly.ch")
     test_db.commit()
-    admin_token = _tokens(test_db, superadmin)["access_token"]
+    admin_token = _login(test_db, superadmin)
 
     first = _impersonate(test_client, admin_token, target.id)
     assert first.status_code == 200
@@ -1131,8 +974,8 @@ def test_impersonation_rate_limit_is_tracked_per_admin(
     )
     target = _make_user(test_db, inst, "target@tf760-per-admin.ch")
     test_db.commit()
-    admin_one_token = _tokens(test_db, admin_one)["access_token"]
-    admin_two_token = _tokens(test_db, admin_two)["access_token"]
+    admin_one_token = _login(test_db, admin_one)
+    admin_two_token = _login(test_db, admin_two)
 
     first = _impersonate(test_client, admin_one_token, target.id)
     assert first.status_code == 200

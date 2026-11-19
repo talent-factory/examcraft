@@ -1,14 +1,12 @@
 /**
  * GradingSchemesService — API client for `/api/v1/grading-schemes/*`.
  *
- * Mirrors the backend in `core/backend/api/grading_schemes.py`. Auth-
- * token handling matches the project's other service classes (Bearer
- * from localStorage). All errors raise an `ApiError` with a `kind`
+ * Mirrors the backend in `core/backend/api/grading_schemes.py`. Auth
+ * runs on the session cookie (EXAMCRAFT-126), like the other service classes. All errors raise an `ApiError` with a `kind`
  * field so callers can branch on intent without re-parsing status
  * codes.
  */
 
-import { ACCESS_TOKEN_KEY } from '../api/tokenRefreshLock';
 import { ApiError, statusToKind } from './submissionsService';
 import { ErrorEnvelope, readErrorEnvelope } from './apiErrorBody';
 import {
@@ -21,15 +19,16 @@ import {
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const ROOT = '/api/v1/grading-schemes';
 
+// Die Anmeldung läuft über das httpOnly-Session-Cookie (EXAMCRAFT-126);
+// fetch() sendet es per Interceptor mit, Header braucht es nicht.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.ok) {
     if (response.status === 204) {
-      return undefined as unknown as T;
+      return undefined as never;
     }
     return (await response.json()) as T;
   }

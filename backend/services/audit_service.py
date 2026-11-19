@@ -530,6 +530,45 @@ class AuditService:
         )
 
     @staticmethod
+    def log_grant_denied(
+        db: Session,
+        *,
+        user_id: int,
+        role_id: int,
+        resource_type: str,
+        resource_id: Optional[Any] = None,
+        request: Optional[Request] = None,
+    ) -> None:
+        """Audit a refused attempt to grant a superuser-grant-only role (mcp:use).
+
+        Best effort: ``log_action`` never raises, the caller answers 403 either
+        way. A missing entry is logged with the role id.
+        """
+        entry = AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_PERMISSION_DENIED,
+            status=AuditService.STATUS_FAILURE,
+            user_id=user_id,
+            resource_type=resource_type,
+            resource_id=None if resource_id is None else str(resource_id),
+            request=request,
+            additional_data={
+                "attempted_action": "grant_superuser_only_role",
+                "required_permission": "superuser",
+                "role_id": role_id,
+            },
+        )
+        if entry is None:
+            # log_action swallows its own failures and returns None.
+            logger.error(
+                "Audit of denied role grant missing (user=%s, role=%s, %s:%s)",
+                user_id,
+                role_id,
+                resource_type,
+                resource_id,
+            )
+
+    @staticmethod
     def log_rate_limit_exceeded(
         db: Session,
         user_id: Optional[int] = None,

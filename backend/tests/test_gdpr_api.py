@@ -131,6 +131,39 @@ def test_export_data_returns_200(test_client, gdpr_test_user):
     assert data["data"]["user_profile"]["email"] == gdpr_test_user.email
 
 
+def test_export_data_includes_zitadel_profile(test_client, test_db, gdpr_test_user):
+    from unittest.mock import patch
+
+    gdpr_test_user.zitadel_sub = "sub-export"
+    test_db.commit()
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch("api.gdpr.fetch_zitadel_profile", return_value={"userId": "sub-export"}):
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["data"]["zitadel_profile"] == {"userId": "sub-export"}
+
+
+def test_export_data_marks_zitadel_profile_unavailable_on_error(
+    test_client, test_db, gdpr_test_user
+):
+    from unittest.mock import patch
+
+    gdpr_test_user.zitadel_sub = "sub-export-down"
+    test_db.commit()
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch("api.gdpr.fetch_zitadel_profile", side_effect=ConnectionError("down")):
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["data"]["zitadel_profile"] == {
+        "status": "unavailable",
+        "reason": "temporarily_unavailable",
+    }
+
+
 def test_request_deletion_returns_200_and_sets_schedule(test_client, gdpr_test_user):
     headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
 
@@ -362,3 +395,82 @@ def test_delete_account_now_returns_500_on_unexpected_non_runtime_error(
 
     assert response.status_code == 500
     assert response.json()["error_code"] == "gdpr_deletion_failed"
+
+
+@pytest.mark.parametrize("error_cls", ["ZitadelError", "ZitadelTransientError"])
+def test_delete_account_now_zitadel_failure_keeps_user(
+    test_client, test_db, gdpr_test_user, error_cls
+):
+    from unittest.mock import patch
+
+    from services import zitadel_user_service
+
+    gdpr_test_user.zitadel_sub = "sub-del-fail"
+    test_db.commit()
+    user_id = gdpr_test_user.id
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch(
+        "services.gdpr_deletion_service.delete_zitadel_user",
+        side_effect=getattr(zitadel_user_service, error_cls)("boom"),
+    ):
+        response = test_client.delete(
+            "/api/v1/gdpr/delete-account-now",
+            params={"password": "testpassword123"},
+            headers=headers,
+        )
+
+    assert response.status_code == 500
+    test_db.expire_all()
+    assert test_db.get(User, user_id) is not None
+
+
+def test_export_data_without_sub_states_reason(test_client, gdpr_test_user):
+    from unittest.mock import patch
+
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch("api.gdpr.fetch_zitadel_profile") as fetch:
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    fetch.assert_not_called()
+    assert response.json()["data"]["zitadel_profile"] == {
+        "status": "not_available",
+        "reason": "no_profile",
+    }
+
+
+def test_export_data_zitadel_config_error_states_reason(
+    test_client, test_db, gdpr_test_user
+):
+    from unittest.mock import patch
+
+    from services.zitadel_user_service import ZitadelError
+
+    gdpr_test_user.zitadel_sub = "sub-export-cfg"
+    test_db.commit()
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch("api.gdpr.fetch_zitadel_profile", side_effect=ZitadelError("cfg")):
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.json()["data"]["zitadel_profile"] == {
+        "status": "unavailable",
+        "reason": "not_configured",
+    }
+
+
+def test_export_data_zitadel_404_states_reason(test_client, test_db, gdpr_test_user):
+    from unittest.mock import patch
+
+    gdpr_test_user.zitadel_sub = "sub-export-404"
+    test_db.commit()
+    headers = _login_headers(test_client, gdpr_test_user.email, "testpassword123")
+
+    with patch("api.gdpr.fetch_zitadel_profile", return_value=None):
+        response = test_client.get("/api/v1/gdpr/export-data", headers=headers)
+
+    assert response.json()["data"]["zitadel_profile"] == {
+        "status": "not_available",
+        "reason": "no_profile",
+    }

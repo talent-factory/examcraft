@@ -1,40 +1,40 @@
 """
 WebSocket endpoint for real-time task progress
-Streams Celery task progress via WebSocket (pull-based via AsyncResult)
+Streams Celery task progress via WebSocket (pull-based via
+services.generation_job_state.read_state)
 """
 
 import asyncio
 import logging
+import os
 from typing import Dict
 
-from celery.result import AsyncResult
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
-from celery_app import celery_app
 from database import SessionLocal
-from models.auth import User
+from models.auth import User, UserStatus
 from models.document import Document
-from schemas.task import (
-    ProgressCode,
-    TaskStatus,
-    TaskStatusMessage,
-    progress_code_fields,
-)
-from services.auth_service import AuthService
+from schemas.task import TaskStatus, TaskStatusMessage
+from services import session_service
+from services.generation_job_state import CeleryUnknown, Progress, read_state
 from services.rag_errors import (
-    TASK_FAILED,
     TASK_PENDING_TIMEOUT,
     TASK_STATUS_UNAVAILABLE,
     TASK_STREAM_ERROR,
-    user_facing_task_error,
 )
 from services.translation_service import DEFAULT_LOCALE, t
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
+
+# Close codes of this endpoint (documented in docs/developer/websocket-close-codes.md).
+# 4401 = the handshake carried no valid session (cookie missing, expired,
+# revoked or user inactive). The frontend must not reconnect and checks the
+# session instead (EXAMCRAFT-136). 1008 stays for policy violations of a valid
+# session (foreign Origin, task of another user, unknown task).
+WS_CLOSE_UNAUTHENTICATED = 4401
 
 
 # Module-level singleton — only for single-instance deployment.
@@ -77,46 +77,64 @@ PENDING_TIMEOUT_SECONDS = 120
 POLL_INTERVAL_SECONDS = 1
 
 
-async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | None:
+def _allowed_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+
+
+async def _authenticate_websocket(websocket: WebSocket) -> User | None:
     """
-    Authenticates a WebSocket client via JWT token.
-    Replicates the logic of get_current_user() without FastAPI Depends.
+    Authenticates a WebSocket client via the session cookie (EXAMCRAFT-125).
+
+    The browser sends the httpOnly ``session_id`` cookie with the handshake
+    (same site). Replicates the logic of get_current_user() without FastAPI
+    Depends.
 
     Returns:
         User object on success, None on failure (WebSocket already closed)
     """
-    payload = AuthService.decode_token(token)
-    if not payload:
-        logger.warning("WebSocket Auth: Token decode fehlgeschlagen")
-        await websocket.close(code=1008)
-        return None
+    # Cross-site WebSocket hijacking: browsers always send Origin, and a
+    # SameSite=Lax cookie is no protection on every browser. Same list as CORS.
+    origin = websocket.headers.get("origin")
+    if origin is not None and "*" not in _allowed_origins():
+        if origin.rstrip("/") not in _allowed_origins():
+            logger.warning("WebSocket Auth: Origin %r nicht erlaubt", origin)
+            await websocket.close(code=1008)
+            return None
 
-    user_id = payload.get("sub")
-    if not user_id:
-        logger.warning("WebSocket Auth: Token enthält kein 'sub' Claim")
-        await websocket.close(code=1008)
-        return None
-
-    try:
-        user_id_int = int(user_id)
-    except (ValueError, TypeError):
-        logger.warning(f"WebSocket Auth: Ungültige user_id im Token: {user_id!r}")
-        await websocket.close(code=1008)
+    session_token = websocket.cookies.get(session_service.SESSION_COOKIE_NAME)
+    impersonation_token = websocket.cookies.get(
+        session_service.IMPERSONATION_COOKIE_NAME
+    )
+    if not session_token:
+        logger.warning("WebSocket Auth: kein Session-Cookie")
+        await websocket.close(code=WS_CLOSE_UNAUTHENTICATED)
         return None
 
     def _db_lookup() -> User | None:
         db = SessionLocal()
         try:
-            token_jti = payload.get("jti")
-            if token_jti and AuthService.is_token_revoked(token_jti, db):
+            auth_session = session_service.resolve_effective_session(
+                db, session_token, impersonation_token
+            )
+            if auth_session is None:
                 return None
 
-            return (
+            user = (
                 db.query(User)
                 .options(joinedload(User.roles))
-                .filter(User.id == user_id_int)
+                .filter(User.id == auth_session.user_id)
                 .first()
             )
+            # Same rule as get_current_user: only an impersonation may act as a
+            # non-active user (support use case).
+            if (
+                user is not None
+                and auth_session.impersonator_id is None
+                and user.status != UserStatus.ACTIVE.value
+            ):
+                return None
+            return user
         finally:
             db.close()
 
@@ -124,7 +142,7 @@ async def _authenticate_websocket(websocket: WebSocket, token: str) -> User | No
         loop = asyncio.get_running_loop()
         user = await loop.run_in_executor(None, _db_lookup)
         if not user:
-            await websocket.close(code=1008)
+            await websocket.close(code=WS_CLOSE_UNAUTHENTICATED)
             return None
         return user
     except Exception as e:
@@ -218,100 +236,21 @@ async def _check_task_ownership(websocket: WebSocket, task_id: str, user: User) 
         return False
 
 
-def _get_task_result(task_id: str) -> dict:
+async def _send_success(websocket: WebSocket, task_id: str, result: object) -> None:
+    """Send SUCCESS with the task's result and close the socket.
+
+    An optional user note (e.g. "only X of Y questions created", TF-358)
+    travels along in ``result.quality_metrics`` and is read from there by the
+    frontend, so no separate message channel is needed.
     """
-    Blocking Redis call — must be invoked via run_in_executor.
-    Reads state, info and result in a single executor call so that
-    no blocking I/O happens on the event loop.
-
-    On Redis connection errors, a PENDING-equivalent state is returned
-    so the polling loop can keep running (transient Redis outages).
-    """
-    try:
-        result = AsyncResult(task_id, app=celery_app)
-        state = result.state
-        return {
-            "state": state,
-            "info": result.info,
-            "result": result.result if state == "SUCCESS" else None,
-        }
-    except Exception as e:
-        logger.error(
-            f"Redis-Fehler beim Abrufen von Task {task_id}: {type(e).__name__}: {e}"
-        )
-        return {"state": "PENDING", "info": None, "result": None, "_redis_error": True}
-
-
-def _stored_success_result(task_id: str) -> tuple[bool, dict | None]:
-    """Whether the task's generation job is SUCCESS in the DB, plus its
-    result rebuilt from there (TF-964). The result is None if no questions
-    are linked to the job (see build_job_result).
-
-    The job row is authoritative: a task whose worker was lost after the
-    questions were committed can end as FAILURE in Celery, or its Celery
-    entry can expire. Blocking DB I/O — invoke via run_in_executor.
-    Document tasks have no job row and always get ``(False, None)``.
-    """
-    from models.question_generation_job import QuestionGenerationJob
-    from services.generation_job_result import build_job_result
-
-    db = SessionLocal()
-    try:
-        job = (
-            db.query(QuestionGenerationJob)
-            .filter(QuestionGenerationJob.task_id == task_id)
-            .first()
-        )
-        if job is None or job.status != "SUCCESS":
-            return False, None
-        return True, build_job_result(db, job)
-    finally:
-        db.close()
-
-
-async def _send_stored_success(
-    websocket: WebSocket, task_id: str, celery_state: str, celery_info: object
-) -> bool:
-    """Send SUCCESS from the DB if the job finished there (TF-964).
-
-    Returns True if it did (and closed the socket); the caller then stops.
-    A failed DB lookup returns False, so the caller reports Celery's state
-    as before instead of an internal error that hides the task's own.
-    """
-    loop = asyncio.get_running_loop()
-    try:
-        succeeded, stored_result = await loop.run_in_executor(
-            None, lambda: _stored_success_result(task_id)
-        )
-    except SQLAlchemyError:
-        logger.warning(
-            "DB lookup of generation job for task %s failed — reporting "
-            "Celery's state %s",
-            task_id,
-            celery_state,
-            exc_info=True,
-        )
-        return False
-    if not succeeded:
-        return False
-    # The task (or its worker) failed after the commit: the user sees the
-    # saved result, but the post-commit error must stay visible to ops.
-    logger.warning(
-        "Task %s: Celery=%s, DB=SUCCESS — reporting SUCCESS from the DB; "
-        "Celery info: %r",
-        task_id,
-        celery_state,
-        celery_info,
-    )
     msg = TaskStatusMessage(
         task_id=task_id,
         status=TaskStatus.SUCCESS,
         progress=100,
-        result=stored_result,
+        result=result,
     )
     await websocket.send_json(msg.model_dump())
     await websocket.close()
-    return True
 
 
 @router.websocket("/ws/tasks/{task_id}")
@@ -320,29 +259,16 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
     WebSocket endpoint for real-time task progress.
 
     Protocol:
-    1. Client connects
-    2. Client sends as first message: {"token": "<jwt>"}
-    3. Server validates token + ownership
-    4. Server streams TaskStatusMessage JSON until the terminal state
-    5. Server closes the connection after SUCCESS/FAILURE/REVOKED
+    1. Client connects (the httpOnly session cookie authenticates the
+       handshake; the client sends no message)
+    2. Server validates the session (close 4401 on failure) + ownership
+       (close 1008 on failure)
+    3. Server streams TaskStatusMessage JSON until the terminal state
+    4. Server closes the connection after SUCCESS/FAILURE/REVOKED
     """
     await manager.connect(task_id, websocket)
     try:
-        try:
-            handshake = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
-            token = handshake.get("token", "")
-        except asyncio.TimeoutError:
-            logger.warning(f"WebSocket Handshake-Timeout für Task {task_id}")
-            await websocket.close(code=1008)
-            return
-        except Exception as e:
-            logger.warning(
-                f"WebSocket Handshake-Fehler für Task {task_id}: {type(e).__name__}: {e}"
-            )
-            await websocket.close(code=1008)
-            return
-
-        user = await _authenticate_websocket(websocket, token)
+        user = await _authenticate_websocket(websocket)
         if user is None:
             return
 
@@ -353,13 +279,20 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
         redis_failures = 0
         max_redis_failures = 3
         loop = asyncio.get_running_loop()
+        consult_db = False
 
         while True:
-            task_data = await loop.run_in_executor(
-                None, lambda: _get_task_result(task_id)
+            state = await loop.run_in_executor(
+                None, lambda: read_state(task_id, consult_db=consult_db)
             )
 
-            if task_data.get("_redis_error"):
+            if isinstance(state.celery, CeleryUnknown):
+                cause = state.celery.cause
+                logger.error(
+                    f"Redis-Fehler beim Abrufen von Task {task_id}: "
+                    f"{type(cause).__name__}: {cause!r}",
+                    exc_info=cause,
+                )
                 redis_failures += 1
                 if redis_failures >= max_redis_failures:
                     msg = TaskStatusMessage(
@@ -376,92 +309,71 @@ async def task_progress_websocket(websocket: WebSocket, task_id: str) -> None:
                 continue
             redis_failures = 0
 
-            state = task_data["state"]
-            info = task_data["info"] or {}
+            # TF-964: SUCCESS in the DB wins over any other Celery state (FAILURE/
+            # REVOKED, or an expired entry that reads PENDING).
+            if state.db_overrode_celery:
+                await _send_success(websocket, task_id, state.result)
+                return
 
-            if state == TaskStatus.PROGRESS:
-                message_code, message_params = progress_code_fields(info)
+            celery_status = state.celery_status
+
+            if celery_status == TaskStatus.PROGRESS:
+                progress = state.progress or Progress(0, None, None, None)
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus.PROGRESS,
-                    progress=info.get("progress", 0),
-                    message=info.get("message") or None,
-                    message_code=message_code,
-                    message_params=message_params,
+                    progress=progress.percent,
+                    message=progress.message,
+                    message_code=progress.code,
+                    message_params=progress.params,
                 )
                 await websocket.send_json(msg.model_dump())
                 pending_seconds = 0
+                consult_db = False
 
-            elif state == TaskStatus.SUCCESS:
-                # An optional user note (e.g. "only X of Y questions created",
-                # TF-358) travels along in result.quality_metrics and is read
-                # from there by the frontend — no separate message channel needed.
-                msg = TaskStatusMessage(
-                    task_id=task_id,
-                    status=TaskStatus.SUCCESS,
-                    progress=100,
-                    result=task_data["result"],
-                )
-                await websocket.send_json(msg.model_dump())
-                await websocket.close()
+            elif celery_status == TaskStatus.SUCCESS:
+                await _send_success(websocket, task_id, state.result)
                 return
 
-            elif state in (TaskStatus.FAILURE, TaskStatus.REVOKED):
-                # TF-964: SUCCESS in the DB wins over Celery's FAILURE.
-                if await _send_stored_success(
-                    websocket, task_id, state, task_data["info"]
-                ):
-                    return
-                raw_info = task_data["info"]
-                task_error = user_facing_task_error(raw_info)
-                # Log the real error fully server-side (with traceback, if
-                # available); send the user only the safe, actionable
-                # message — no raw internals/PII (TF-358). Explicitly flag
-                # unknown error classes (generic fallback) so alerting is
-                # possible for new, unmapped errors.
-                unmapped = task_error.code == TASK_FAILED
-                logger.error(
-                    "Task %s failed (%s): %r",
-                    task_id,
-                    "unmapped error class" if unmapped else "mapped error",
-                    raw_info,
-                    exc_info=raw_info if isinstance(raw_info, BaseException) else None,
-                )
+            elif celery_status in (TaskStatus.FAILURE, TaskStatus.REVOKED):
+                # The real error was logged server-side by read_state; the
+                # user only gets the safe, actionable message (TF-358).
                 msg = TaskStatusMessage(
                     task_id=task_id,
-                    status=TaskStatus(state),
+                    status=TaskStatus(celery_status),
                     progress=0,
-                    error=task_error.message,
-                    error_code=task_error.code,
+                    error=state.error.message,
+                    error_code=state.error.code,
                 )
                 await websocket.send_json(msg.model_dump())
                 await websocket.close()
                 return
 
-            elif state in (TaskStatus.STARTED, TaskStatus.RETRY):
+            elif celery_status in (TaskStatus.STARTED, TaskStatus.RETRY):
                 pending_seconds = 0
+                consult_db = False
                 # TF-736: a code instead of a German text, like PROGRESS above.
-                message_code = (
-                    ProgressCode.TASK_STARTED
-                    if state == TaskStatus.STARTED
-                    else ProgressCode.TASK_RETRYING
-                ).value
+                progress = state.progress
                 msg = TaskStatusMessage(
                     task_id=task_id,
                     status=TaskStatus.PROGRESS,
-                    progress=info.get("progress", 0) if isinstance(info, dict) else 0,
-                    message_code=message_code,
-                    message_params={},
+                    progress=progress.percent,
+                    message_code=progress.code,
+                    message_params=progress.params,
                 )
                 await websocket.send_json(msg.model_dump())
 
             else:
                 pending_seconds += POLL_INTERVAL_SECONDS
-                if pending_seconds >= PENDING_TIMEOUT_SECONDS:
+                if pending_seconds >= PENDING_TIMEOUT_SECONDS and not consult_db:
                     # TF-964: an expired Celery entry reads as PENDING; a
-                    # job that finished in the DB is not a timeout.
-                    if await _send_stored_success(websocket, task_id, "PENDING", None):
-                        return
+                    # job that finished in the DB is not a timeout. Ask the
+                    # DB only now (not on every PENDING tick) and re-run the
+                    # whole evaluation above, so a Celery state that changed
+                    # meanwhile is handled like any other tick.
+                    consult_db = True
+                    continue
+                if pending_seconds >= PENDING_TIMEOUT_SECONDS:
                     # A task that never starts points at a stuck broker or
                     # worker — log it with the task id so operations see it.
                     logger.error(

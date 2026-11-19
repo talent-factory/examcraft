@@ -1,25 +1,20 @@
 /**
  * Profile Page Component
- * Main profile page with tabs for view, edit, and password change
+ * Main profile page with tabs for view and edit (passwords live in Zitadel)
  */
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProfileView } from './ProfileView';
 import { ProfileEdit } from './ProfileEdit';
-import { PasswordChange } from './PasswordChange';
 
-type ProfileTab = 'view' | 'edit' | 'password';
+type ProfileTab = 'view' | 'edit';
 
 export const ProfilePage: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ProfileTab>('view');
 
   const handleEditSuccess = () => {
-    setActiveTab('view');
-  };
-
-  const handlePasswordSuccess = () => {
     setActiveTab('view');
   };
 
@@ -57,16 +52,6 @@ export const ProfilePage: React.FC = () => {
             >
               ✏️ {t('profile.profilePage.tabEdit')}
             </button>
-            <button
-              onClick={() => setActiveTab('password')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'password'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              🔒 {t('profile.profilePage.tabPassword')}
-            </button>
           </nav>
         </div>
       </div>
@@ -80,12 +65,6 @@ export const ProfilePage: React.FC = () => {
           <ProfileEdit
             onCancel={() => setActiveTab('view')}
             onSuccess={handleEditSuccess}
-          />
-        )}
-        {activeTab === 'password' && (
-          <PasswordChange
-            onCancel={() => setActiveTab('view')}
-            onSuccess={handlePasswordSuccess}
           />
         )}
       </div>

@@ -217,7 +217,11 @@ def _build_avv() -> ComplianceDocument:
                 "können die Löschung ihres Kontos jederzeit selbst "
                 "beantragen; nach Ablauf einer 30-tägigen Widerrufsfrist "
                 "wird die Löschung automatisiert durch einen täglichen "
-                "Systemlauf ausgeführt (siehe TOM-Anlage Abschnitt 5).",
+                "Systemlauf ausgeführt (siehe TOM-Anlage Abschnitt 5). Die "
+                "Löschung umfasst auch das Benutzerkonto im selbst "
+                "betriebenen Identitätsdienst tessera/Zitadel; dieses wird "
+                "zuerst gelöscht, die Daten in ExamCraft AI erst nach "
+                "erfolgreicher Löschung.",
             ),
         ),
         ComplianceSection(
@@ -332,7 +336,20 @@ def _build_tom() -> ComplianceDocument:
                 "personenbezogener Daten automatisiert gelöscht. Ein "
                 "täglicher, geplanter Systemlauf ermittelt fällige "
                 "Löschungen und führt sie aus, ohne dass eine manuelle "
-                "Aktion durch den Auftragnehmer erforderlich ist.",
+                "Aktion durch den Auftragnehmer erforderlich ist. Die "
+                "Löschung erfasst zuerst das Benutzerkonto im selbst "
+                "betriebenen Identitätsdienst tessera/Zitadel und erst bei "
+                "Erfolg die Daten in ExamCraft AI.",
+                "Im Identitätsdienst verbleiben technische Anmeldedaten "
+                "(IP-Adresse, User-Agent, Spracheinstellung des Browsers) "
+                "in den Ereignisprotokollen; ein geplanter Löschlauf "
+                "entfernt sie nach 90 Tagen. Die Profildaten gelöschter "
+                "Konten bleiben in den Ereignisprotokollen bestehen, bis "
+                "eine Feldlöschung die Felder leert (Einträge werden nicht "
+                "gelöscht). Tägliche Sicherungen des "
+                "Identitätsdienstes werden 30 Tage aufbewahrt; nach einer "
+                "Wiederherstellung werden Löschlauf und Feldlöschung erneut "
+                "ausgeführt.",
                 "Über die Kontolöschung hinausgehende, generelle "
                 "Aufbewahrungsfristen für einzelne Datenkategorien während "
                 "der laufenden Vertragslaufzeit sind derzeit nicht separat "
@@ -474,6 +491,19 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
             change_notice=_CHANGE_NOTICE_STANDARD,
         ),
         Subprocessor(
+            name="tessera/Zitadel (selbst betrieben)",
+            purpose="Anmeldung und Benutzerkonto («Talent Factory Login»: "
+            "E-Mail, Name, Passwort-Hash, bevorzugte Sprache, technische "
+            "Anmeldedaten) sowie Vermittlung der optionalen "
+            "Single-Sign-On-Anbieter; Bestandskonten werden einmalig "
+            "übernommen (Art. 6 Abs. 1 lit. b DSGVO)",
+            location="Frankfurt am Main, Deutschland (EU) — als Fly.io-"
+            "App im gleichen Rechenzentrum wie die Applikation betrieben",
+            transfer_mechanism="Kein Drittlandtransfer (Selbstbetrieb "
+            "innerhalb der EU)",
+            change_notice=_CHANGE_NOTICE_STANDARD,
+        ),
+        Subprocessor(
             name="Brevo (Sendinblue SA)",
             purpose="E-Mail-Versand für Newsletter- und "
             "Transaktions-Mails als Transport-Anbieter von SubscribeFlow",
@@ -486,9 +516,10 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
         ),
         Subprocessor(
             name="Google LLC / Microsoft Corporation (OAuth-Provider)",
-            purpose="Optionale Single-Sign-On-Anmeldung; verarbeitet nur "
-            "Identitätsdaten des anmeldenden Nutzers (E-Mail, Name), "
-            "sofern der Nutzer diese Anmeldeart aktiv wählt",
+            purpose="Optionale Single-Sign-On-Anmeldung, vermittelt über "
+            "tessera/Zitadel; verarbeitet nur Identitätsdaten des "
+            "anmeldenden Nutzers (E-Mail, Name), sofern der Nutzer diese "
+            "Anmeldeart aktiv wählt",
             location="USA (OAuth-Identitätsdienste)",
             transfer_mechanism="EU-Standardvertragsklauseln (SCC) gemäss "
             "Google/Microsoft-Datenverarbeitungsbedingungen",

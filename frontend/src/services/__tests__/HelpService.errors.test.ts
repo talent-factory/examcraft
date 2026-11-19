@@ -29,7 +29,7 @@ describe('HelpService wirft AppError statt englischer Texte', () => {
 
   it('sendMessage behält den Status für die Rate-Limit-Auswertung', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 429 }) as unknown as typeof fetch;
-    const err = await helpService.sendMessage('tok', 'Frage?', '/dashboard').catch((e) => e);
+    const err = await helpService.sendMessage('Frage?', '/dashboard').catch((e) => e);
     expect(err).toBeInstanceOf(AppError);
     expect(err.code).toBe('help_message_failed');
     expect(err.status).toBe(429);
@@ -42,7 +42,7 @@ describe('HelpService wirft AppError statt englischer Texte', () => {
       json: async () => ({ detail: 'Limit erreicht', error_code: 'help_rate_limit_exceeded' }),
     }) as unknown as typeof fetch;
 
-    expect((await thrownBy(helpService.sendMessage('tok', 'Frage?', '/dashboard'))).code).toBe(
+    expect((await thrownBy(helpService.sendMessage('Frage?', '/dashboard'))).code).toBe(
       'help_rate_limit_exceeded',
     );
   });
@@ -55,14 +55,14 @@ describe('HelpService wirft AppError statt englischer Texte', () => {
     }) as unknown as typeof fetch;
 
     expect(
-      (await thrownBy(helpService.updateTrackStep('tok', 'unknown-track', 1, 3))).code,
+      (await thrownBy(helpService.updateTrackStep('unknown-track', 1, 3))).code,
     ).toBe('help_track_id_invalid');
   });
 
   it('macht auch aus einer Netzwerkablehnung einen AppError mit Operationscode', async () => {
     global.fetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 
-    const err = await thrownBy(helpService.getOnboardingStatus('tok'));
+    const err = await thrownBy(helpService.getOnboardingStatus());
 
     expect(err.code).toBe('help_onboarding_status_failed');
     expect(err.status).toBeUndefined();
@@ -72,27 +72,27 @@ describe('HelpService wirft AppError statt englischer Texte', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }) as unknown as typeof fetch;
 
     expect((await thrownBy(helpService.getStatus())).code).toBe('help_status_failed');
-    expect((await thrownBy(helpService.getOnboardingStatus('t'))).code).toBe(
+    expect((await thrownBy(helpService.getOnboardingStatus())).code).toBe(
       'help_onboarding_status_failed',
     );
-    expect((await thrownBy(helpService.completeOnboardingStep('t', 1))).code).toBe(
+    expect((await thrownBy(helpService.completeOnboardingStep(1))).code).toBe(
       'help_onboarding_step_failed',
     );
-    expect((await thrownBy(helpService.skipOnboardingStep('t', 1))).code).toBe(
+    expect((await thrownBy(helpService.skipOnboardingStep(1))).code).toBe(
       'help_onboarding_skip_failed',
     );
-    expect((await thrownBy(helpService.updateTrackStep('t', 'track-1', 1, 3))).code).toBe(
+    expect((await thrownBy(helpService.updateTrackStep('track-1', 1, 3))).code).toBe(
       'help_onboarding_track_step_failed',
     );
-    expect((await thrownBy(helpService.getContextHint('t', '/dashboard'))).code).toBe(
+    expect((await thrownBy(helpService.getContextHint('/dashboard'))).code).toBe(
       'help_context_hint_failed',
     );
-    expect((await thrownBy(helpService.dismissHint('t', 1))).code).toBe('help_hint_dismiss_failed');
-    expect((await thrownBy(helpService.sendMessage('t', 'Frage?', '/dashboard'))).code).toBe(
+    expect((await thrownBy(helpService.dismissHint(1))).code).toBe('help_hint_dismiss_failed');
+    expect((await thrownBy(helpService.sendMessage('Frage?', '/dashboard'))).code).toBe(
       'help_message_failed',
     );
     expect(
-      (await thrownBy(helpService.submitFeedback('t', { question: 'q', rating: 'up', route: '/x' }))).code,
+      (await thrownBy(helpService.submitFeedback({ question: 'q', rating: 'up', route: '/x' }))).code,
     ).toBe('help_feedback_failed');
   });
 });

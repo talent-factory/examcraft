@@ -103,7 +103,6 @@ core/
 │   │   ├── document_service.py# Document Processing
 │   │   ├── rag_service.py     # RAG Pipeline
 │   │   ├── auth_service.py    # JWT Authentication
-│   │   ├── oauth_service.py   # Google/Microsoft OAuth
 │   │   ├── payment_service.py # Stripe Integration
 │   │   ├── exam_export_service.py # Export (MD/JSON/Moodle)
 │   │   └── ...                # Redis, Audit, RBAC, etc.
@@ -226,11 +225,37 @@ just stop
 
 `just dev` erstellt automatisch Test-Daten (beim ersten Start):
 
-- **Admin**: `admin@talent-factory.ch` / `admin123`
+- **Admin**: `admin@talent-factory.ch` (Login über tessera/Zitadel, kein lokales Passwort)
 - **Institution**: Talent Factory (Professional Tier)
 - **Auto-Assignment**: Alle `@talent-factory.ch` E-Mails werden automatisch zugeordnet
 
 Manuelles Seeding: `just seed`
+
+#### Login lokal (tessera/Zitadel)
+
+Es gibt keinen lokalen Passwort-Login und keinen geseedeten Test-User. Lokal meldest du dich an
+der **produktiven** tessera-Instanz (`https://auth.talent-factory.ch`) an, aber mit dem eigenen
+Dev-Client `examcraft-dev`. Die Credentials des Prod-Clients gehören nie auf einen
+Entwickler-Rechner.
+
+1. `.env` aus `.env.example` anlegen (`just dev` tut das beim ersten Lauf).
+2. `OIDC_ISSUER` und `OIDC_REDIRECT_URI` (`http://localhost:8000/api/v1/auth/callback`) sind
+   vorbelegt. `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` und `ZITADEL_ORG_ID` stammen aus den
+   Terraform-Outputs der tessera-Config (`examcraft_dev_client_id`, `examcraft_dev_client_secret`,
+   `examcraft_org_id`) bzw. vom tessera-Maintainer.
+3. Stack neu starten (`just stop && just dev`): ein laufendes Backend liest die `.env` nicht neu
+   ein, auch `--reload` greift nur bei `.py`-Änderungen.
+4. `http://localhost:3000` öffnen, anmelden und einen Zitadel-Nutzer der Org `examcraft`
+   verwenden. Der lokale `users`-Eintrag entsteht beim ersten Login (die erste Person einer
+   Institution mit passender E-Mail-Domain wird `admin`, nur bei bestätigter E-Mail).
+
+Die Werte gehören nur in die ungetrackte `.env`, nie in `.env.example`. Ohne `OIDC_CLIENT_ID` oder
+`OIDC_CLIENT_SECRET` endet der Login auf `/login?error=idp_unavailable`, ohne `ZITADEL_ORG_ID`
+landet er auf der Default-Org von Zitadel statt auf der Org `examcraft`.
+
+Für E2E-Tests gibt es `POST /api/v1/auth/test-login` (`{"email": …}`) mit `E2E_TEST_LOGIN=true`;
+das Backend verweigert den Start, wenn das Flag ausserhalb einer Dev-Umgebung gesetzt ist.
+Das Frontend-Ticket (EXAMCRAFT-126) liefert die Anmelden-Schaltfläche.
 
 ## Entwicklung
 

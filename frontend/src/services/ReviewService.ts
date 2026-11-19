@@ -22,14 +22,12 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export class ReviewService {
   /**
-   * Get auth headers with token
+   * Get request headers (the session cookie is sent by the fetch interceptor)
    */
   private static getAuthHeaders(additionalHeaders: HeadersInit = {}): HeadersInit {
-    const token = localStorage.getItem('examcraft_access_token');
     return {
       'Content-Type': 'application/json',
       ...additionalHeaders,
-      ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
 

@@ -1,73 +1,43 @@
 /**
  * Authentication Service
- * API calls for authentication and user management
+ *
+ * EXAMCRAFT-126: Die Anmeldung läuft als OIDC-BFF über das Backend
+ * (`/api/v1/auth/login`); der Browser hält nur ein httpOnly-Session-Cookie.
+ * Hier bleiben Profil und Logout. Alle Aufrufe senden das Cookie über
+ * `credentials: 'include'`.
  */
 
-import {
-  LoginRequest,
-  RegisterRequest,
-  TokenResponse,
-  RefreshTokenRequest,
-  ChangePasswordRequest,
-  PasswordResetRequest,
-  PasswordResetConfirm,
-  UpdateProfileRequest,
-  UserResponse,
-  OAuthLoginResponse,
-  OAuthProvider
-} from '../types/auth';
+import { UpdateProfileRequest, UserResponse } from '../types/auth';
 import { appErrorFromResponse } from '../errors';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 class AuthService {
   /**
-   * Register a new user
+   * URL, die den Login-Flow startet (Weiterleitung des ganzen Fensters).
+   * `reauth` erzwingt eine frische Anmeldung beim IdP (Step-up), `returnTo`
+   * is the relative in-app path the callback redirects to afterwards.
    */
-  async register(data: RegisterRequest): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_registration_failed');
-    }
-
-    return response.json();
+  getLoginUrl(
+    options: { reauth?: boolean; switchAccount?: boolean; returnTo?: string } = {},
+  ): string {
+    const params = new URLSearchParams();
+    if (options.reauth) params.set('reauth', 'true');
+    // `switchAccount`: account chooser at the IdP (prompt=select_account).
+    if (options.switchAccount) params.set('switch_account', 'true');
+    // The backend re-validates `return_to` (relative in-app paths only).
+    if (options.returnTo) params.set('return_to', options.returnTo);
+    const query = params.toString();
+    return `${API_BASE_URL}/api/v1/auth/login${query ? `?${query}` : ''}`;
   }
 
   /**
-   * Login with email and password
+   * Beendet die lokale Server-Session (die SSO-Session bei Zitadel bleibt).
    */
-  async login(data: LoginRequest): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  async logout(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_login_failed');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Logout (revoke tokens)
-   */
-  async logout(accessToken: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      credentials: 'include',
     });
 
     if (!response.ok && response.status !== 401) {
@@ -76,33 +46,12 @@ class AuthService {
   }
 
   /**
-   * Refresh access token
-   */
-  async refreshToken(data: RefreshTokenRequest): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_token_refresh_failed');
-    }
-
-    return response.json();
-  }
-
-  /**
    * Get current user profile
    */
-  async getProfile(accessToken: string): Promise<UserResponse> {
+  async getProfile(): Promise<UserResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -115,11 +64,11 @@ class AuthService {
   /**
    * Update user profile
    */
-  async updateProfile(accessToken: string, data: UpdateProfileRequest): Promise<UserResponse> {
+  async updateProfile(data: UpdateProfileRequest): Promise<UserResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
       method: 'PATCH',
+      credentials: 'include',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -127,108 +76,6 @@ class AuthService {
 
     if (!response.ok) {
       throw await appErrorFromResponse(response, 'auth_profile_update_failed');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Set password for OAuth-only users
-   */
-  async setPassword(accessToken: string, password: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/set-password`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ password }),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_password_set_failed');
-    }
-  }
-
-  /**
-   * Change password
-   */
-  async changePassword(accessToken: string, data: ChangePasswordRequest): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_password_change_failed');
-    }
-  }
-
-  /**
-   * Request password reset
-   */
-  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/password-reset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_password_reset_request_failed');
-    }
-  }
-
-  /**
-   * Confirm password reset
-   */
-  async confirmPasswordReset(data: PasswordResetConfirm): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_password_reset_failed');
-    }
-  }
-
-  /**
-   * Get OAuth login URL
-   */
-  async getOAuthLoginUrl(provider: OAuthProvider): Promise<OAuthLoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/${provider}/login`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_oauth_url_failed');
-    }
-
-    return response.json();
-  }
-
-  /**
-   * Exchange a short-lived OAuth code for tokens
-   */
-  async exchangeOAuthCode(code: string): Promise<TokenResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/oauth/exchange`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-
-    if (!response.ok) {
-      throw await appErrorFromResponse(response, 'auth_oauth_exchange_failed');
     }
 
     return response.json();

@@ -66,9 +66,26 @@ _RESERVED_ACTIONS = {
     # ACTION_ASSIGN_ROLE / ACTION_REMOVE_ROLE were reserved pending TF-502 (#159);
     # that PR is now on develop and admin.py emits both, so they are reachable and
     # no longer reserved (test_reserved_actions_are_not_reachable enforces this).
-    # ACTION_CREATE_USER was reserved pending TF-503 (#160); both the core and
-    # enterprise OAuth signup paths now emit it and the scan covers enterprise/,
-    # so it's reachable and no longer reserved.
+    # ACTION_CREATE_USER was reserved pending TF-503 (#160); the OAuth signup
+    # paths emitted it. Since EXAMCRAFT-125 users are provisioned from the
+    # Zitadel OIDC login (user_provisioning.py), which emits no such event, so
+    # it is reserved again (see below).
+    "ACTION_CREATE_USER": (
+        "EXAMCRAFT-125: user provisioning happens in the OIDC callback and "
+        "writes no create_user audit row; constant kept for existing audit_log rows"
+    ),
+    "ACTION_REGISTER": (
+        "EXAMCRAFT-125: local registration removed (login runs through Zitadel); "
+        "constant kept for existing audit_log rows"
+    ),
+    "ACTION_PASSWORD_CHANGE": (
+        "EXAMCRAFT-125: local passwords removed; constant kept for existing "
+        "audit_log rows"
+    ),
+    "ACTION_PASSWORD_RESET": (
+        "EXAMCRAFT-125: local passwords removed; constant kept for existing "
+        "audit_log rows"
+    ),
     "ACTION_OAUTH_LOGIN": (
         "core OAuth callback audit not yet wired (separate follow-up)"
     ),

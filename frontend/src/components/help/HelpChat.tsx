@@ -23,7 +23,7 @@ interface HelpChatProps {
 
 const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
   const { t } = useTranslation();
-  const { accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       return JSON.parse(sessionStorage.getItem('ec_help_chat_messages') || '[]');
@@ -48,7 +48,7 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || !accessToken || loading) return;
+    if (!input.trim() || !isAuthenticated || loading) return;
 
     const question = input.trim();
     setInput('');
@@ -57,7 +57,7 @@ const HelpChat: React.FC<HelpChatProps> = ({ route }) => {
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const result = await helpService.sendMessage(accessToken, question, route, history);
+      const result = await helpService.sendMessage(question, route, history);
       setMessages((prev) => [
         ...prev,
         {

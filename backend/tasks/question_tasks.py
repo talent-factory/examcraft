@@ -6,14 +6,12 @@ Automatically persists generated questions to question_reviews (status: pending)
 
 import contextlib
 import dataclasses
-import enum
 import logging
-import time
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, NoReturn, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Optional
 
 from celery.exceptions import Ignore, Reject
 from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError, ProgrammingError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from config.observability import set_span_tag
 
@@ -24,83 +22,11 @@ from celery_app import celery_app
 from models.question_generation_job import QuestionGenerationJob
 from schemas.task import ProgressCode
 from services.claude_service import ModelUnavailableError
+from services.generation_job_state import record_terminal
 from services.structured_text import structured_to_markdown
 from tasks.document_tasks import ProgressTask, run_async
 
 logger = logging.getLogger(__name__)
-
-
-class JobStatusUpdateError(Exception):
-    """Raised when _update_job_status fails after exhausting all retry attempts.
-
-    Indicates that QuestionGenerationJob.status could not be persisted to the DB
-    despite retries — caller MUST log loudly so phantom PENDING jobs are visible
-    to monitoring and the reconciliation watchdog (TF-329).
-
-    Carries structured fields so Sentry / observability tooling can tag and
-    aggregate by task_id, target status, and attempt count without parsing the
-    formatted message string.
-    """
-
-    def __init__(
-        self,
-        task_id: str,
-        status: str,
-        attempts: int,
-        last_err: Exception,
-    ) -> None:
-        super().__init__(
-            f"Failed to update job status to {status} for task {task_id} "
-            f"after {attempts} attempts: {last_err}"
-        )
-        self.task_id = task_id
-        self.status = status
-        self.attempts = attempts
-        self.last_err = last_err
-
-
-class JobNotFoundError(Exception):
-    """Raised when no QuestionGenerationJob row exists for the given task_id.
-
-    Distinct from JobStatusUpdateError: NOT retriable. Indicates a data-integrity
-    issue (row deleted between dispatch and status update, or wrong task_id passed)
-    rather than a transient DB failure. Caller MUST log loudly so the silent-
-    PENDING failure mode the original `_update_job_status` had cannot reappear
-    via this code path.
-    """
-
-    def __init__(self, task_id: str, status: str) -> None:
-        super().__init__(
-            f"No QuestionGenerationJob found for task {task_id} "
-            f"(attempted status: {status})"
-        )
-        self.task_id = task_id
-        self.status = status
-
-
-# Backoffs (seconds) BETWEEN status-update attempts. Total attempts = len + 1 = 4.
-# Covers the 5-15 s Postgres restart window observed during the 2026-04-28 incident
-# (TF-325): the fourth attempt fires ~17 s after the first failure, comfortably past
-# typical Fly.io managed PG restart durations.
-_JOB_STATUS_UPDATE_BACKOFFS: tuple[int, ...] = (2, 5, 10)
-
-# Type alias for terminal job states (subset of QuestionGenerationJob.status values
-# excluding the implicit initial "PENDING"). Constrains all status-update functions
-# to prevent typo-induced phantom states like "SUKZESS" being silently written.
-JobTerminalStatus = Literal["SUCCESS", "FAILURE", "REVOKED"]
-
-
-class JobStatusWrite(enum.Enum):
-    """Outcome of ``_safe_update_job_status``.
-
-    KEPT_SUCCESS is not an error: the row already says SUCCESS and is left
-    alone (TF-964). The watchdog must not count it as reconciled nor mirror
-    a FAILURE into Celery's backend for it.
-    """
-
-    WRITTEN = "written"
-    KEPT_SUCCESS = "kept_success"
-    FAILED = "failed"
 
 
 # Time estimation lookup table (minutes) based on question type and difficulty
@@ -126,146 +52,6 @@ except ImportError as _import_err:
         "Fragengenerierung ist in diesem Worker nicht verfügbar."
     )
     RAGService = None  # type: ignore[assignment,misc]
-
-
-def _try_update_job_status(task_id: str, status: str) -> bool:
-    """Single-attempt status update.
-
-    Opens a fresh SessionLocal so SQLAlchemy's pool_pre_ping (configured globally
-    on the engine in database.py) validates the connection at checkout — this
-    lets the retry loop recover from a stale pool entry without reusing a session
-    whose internal transaction state may be poisoned by a prior exception.
-    Raises JobNotFoundError if no matching row exists. Lets DB exceptions bubble;
-    the retry loop in _update_job_status decides whether to retry.
-
-    A SUCCESS row is never changed (TF-964): SUCCESS is committed together
-    with the questions, so it is the truth about the job. A later FAILURE
-    write — the task raising after that commit on its last retry, or the
-    watchdog / ``/active-tasks`` mirroring Celery's FAILURE after they
-    loaded the row as PENDING and the task committed SUCCESS meanwhile —
-    would show a finished job as failed and offer a retry that generates
-    it twice.
-
-    Returns True if the status was written, False if a SUCCESS row was
-    kept.
-    """
-    from database import SessionLocal
-
-    session = SessionLocal()
-    try:
-        # Locked like in _save_generation: a writer that loaded the row as
-        # PENDING waits for the task's SUCCESS commit and then sees it.
-        job = (
-            session.query(QuestionGenerationJob)
-            .filter_by(task_id=task_id)
-            .with_for_update()
-            .first()
-        )
-        if job is None:
-            raise JobNotFoundError(task_id, status)
-        if job.status == "SUCCESS" and status != "SUCCESS":
-            logger.warning(
-                "Not overwriting SUCCESS with %s for task %s — the job's "
-                "questions are already saved",
-                status,
-                task_id,
-            )
-            return False
-        job.status = status
-        session.commit()
-        return True
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def _update_job_status(task_id: str, status: str) -> bool:
-    """Update QuestionGenerationJob.status to terminal state, with retries.
-
-    Calls `_try_update_job_status` up to `len(_JOB_STATUS_UPDATE_BACKOFFS) + 1`
-    times (currently 4 — i.e. 3 retries on top of the initial attempt). Backoffs
-    from `_JOB_STATUS_UPDATE_BACKOFFS` are slept BETWEEN attempts; no sleep after
-    the final attempt before the raise.
-
-    Retries only `(SQLAlchemyError, OSError)`. `JobNotFoundError` and any
-    programmer-error exceptions (TypeError, AttributeError, ...) propagate
-    immediately so they fail loudly instead of being silently retried.
-
-    Raises `JobStatusUpdateError` (with structured task_id/status/attempts/cause
-    fields) on final failure. The Celery task wraps its calls in
-    `_safe_update_job_status` to ensure a status-update failure never overrides
-    the actual task outcome.
-
-    Returns what `_try_update_job_status` returned: False if a SUCCESS row
-    was kept.
-    """
-    attempts = len(_JOB_STATUS_UPDATE_BACKOFFS) + 1
-    last_err: Exception | None = None
-    for attempt in range(1, attempts + 1):
-        try:
-            written = _try_update_job_status(task_id, status)
-            if attempt > 1:
-                logger.info(
-                    "Recovered job status update for task %s on attempt %d/%d",
-                    task_id,
-                    attempt,
-                    attempts,
-                )
-            return written
-        except (SQLAlchemyError, OSError) as err:
-            last_err = err
-            log = logger.error if attempt == attempts else logger.warning
-            log(
-                "Job status update attempt %d/%d failed for task %s: %s",
-                attempt,
-                attempts,
-                task_id,
-                err,
-            )
-            if attempt < attempts:
-                time.sleep(_JOB_STATUS_UPDATE_BACKOFFS[attempt - 1])
-    raise JobStatusUpdateError(task_id, status, attempts, last_err) from last_err
-
-
-def _safe_update_job_status(task_id: str, status: str) -> JobStatusWrite:
-    """Best-effort status update used by Celery task body and the TF-329
-    watchdog. Swallows `JobStatusUpdateError` and `JobNotFoundError` after
-    logging at CRITICAL so a status-write failure never overrides the actual
-    task outcome (e.g., losing a successful generation because the DB write
-    failed, or the row vanished).
-
-    Returns:
-        ``WRITTEN`` if the row was updated, ``KEPT_SUCCESS`` if it already
-        said SUCCESS and was left alone (TF-964), ``FAILED`` on any swallowed
-        failure. Callers like the watchdog need this signal to keep their
-        counters honest — previously the watchdog incremented ``reconciled``
-        unconditionally, so beat-health metrics looked green during a real
-        DB outage.
-    """
-    try:
-        if _update_job_status(task_id, status):
-            return JobStatusWrite.WRITTEN
-        return JobStatusWrite.KEPT_SUCCESS
-    except JobStatusUpdateError:
-        logger.critical(
-            "Could not persist %s status for task %s after retries — "
-            "job will appear PENDING until reconciliation",
-            status,
-            task_id,
-            exc_info=True,
-        )
-        return JobStatusWrite.FAILED
-    except JobNotFoundError:
-        logger.critical(
-            "Cannot update status to %s for task %s: no QuestionGenerationJob row "
-            "found (data-integrity issue — possible row deletion or stale task_id)",
-            status,
-            task_id,
-            exc_info=True,
-        )
-        return JobStatusWrite.FAILED
 
 
 # TF-964: the Nth redelivery of a job's message (N = _MAX_REDELIVERIES) is
@@ -922,7 +708,7 @@ def generate_questions_task(
     set_span_tag("user_id", str(user_id))
 
     if RAGService is None:
-        _safe_update_job_status(self.request.id, "FAILURE")
+        record_terminal(self.request.id, "FAILURE")
         raise Reject(
             "Premium RAGService nicht verfügbar (Core-Deployment). Task wird nicht wiederholt.",
             requeue=False,
@@ -1031,7 +817,7 @@ def generate_questions_task(
         ValueError,
         ModelUnavailableError,  # TF-438: fail fast, no endless retry like TF-437
     ):
-        _safe_update_job_status(self.request.id, "FAILURE")
+        record_terminal(self.request.id, "FAILURE")
         raise
     except Exception as generation_err:
         logger.error(
@@ -1041,5 +827,5 @@ def generate_questions_task(
         # Only mark as FAILURE on final retry attempt — autoretry_for may still retry
         max_retries = self.retry_kwargs.get("max_retries", 0)
         if self.request.retries >= max_retries:
-            _safe_update_job_status(self.request.id, "FAILURE")
+            record_terminal(self.request.id, "FAILURE")
         raise

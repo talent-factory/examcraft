@@ -84,7 +84,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 // ============================================================================
 
 export const useFeatures = (): UseFeaturesReturn => {
-  const { user, accessToken, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const [data, setData] = useState<UserFeatures | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -94,7 +94,7 @@ export const useFeatures = (): UseFeaturesReturn => {
    * Fetch features from API
    */
   const fetchFeatures = useCallback(async () => {
-    if (!isAuthenticated || !accessToken) {
+    if (!isAuthenticated) {
       setData(null);
       setIsLoading(false);
       return;
@@ -106,8 +106,8 @@ export const useFeatures = (): UseFeaturesReturn => {
 
       const response = await fetch(`${API_BASE_URL}/api/auth/features`, {
         method: 'GET',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
@@ -132,13 +132,13 @@ export const useFeatures = (): UseFeaturesReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, accessToken, user?.id, t]);
+  }, [isAuthenticated, user?.id, t]);
 
   /**
    * Load features from cache or fetch from API
    */
   useEffect(() => {
-    if (!isAuthenticated || !accessToken) {
+    if (!isAuthenticated) {
       setData(null);
       setIsLoading(false);
       return;
@@ -171,7 +171,7 @@ export const useFeatures = (): UseFeaturesReturn => {
 
     // Cache miss or expired - fetch from API
     fetchFeatures();
-  }, [isAuthenticated, accessToken, user?.id, fetchFeatures]);
+  }, [isAuthenticated, user?.id, fetchFeatures]);
 
   /**
    * Check if a specific feature is enabled

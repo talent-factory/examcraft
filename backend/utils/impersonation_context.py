@@ -1,8 +1,8 @@
 """Request-scoped impersonation context (TF-741, part of the TF-739 epic).
 
 ``get_current_user`` (``utils/auth_utils.py``) populates this from the
-``impersonator_id``/``impersonation_session_id`` JWT claims minted by
-``AuthService.create_impersonation_token``. Downstream code — the
+``impersonator_id``/``impersonation_session_id`` columns of the
+impersonation ``AuthSession``. Downstream code — the
 account-security guard in this ticket, and the audit-log wiring in
 TF-742 — reads it instead of needing the claims threaded through every
 function signature.
@@ -21,7 +21,7 @@ class ImpersonationContext(NamedTuple):
 
     impersonator_id: int
     impersonation_session_id: int
-    token_jti: str
+    auth_session_id: int
 
 
 _impersonation_context: ContextVar[Optional[ImpersonationContext]] = ContextVar(

@@ -1,5 +1,5 @@
 import { fetchOpsHealth } from './opsHealthService';
-import { API_BASE_URL, ACCESS_TOKEN_KEY } from './httpClient';
+import { API_BASE_URL } from './httpClient';
 
 describe('fetchOpsHealth', () => {
   const originalFetch = global.fetch;
@@ -10,8 +10,7 @@ describe('fetchOpsHealth', () => {
     jest.restoreAllMocks();
   });
 
-  it('GETs /api/v1/ops/health with the auth header and returns the parsed snapshot', async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, 'test-token');
+  it('GETs /api/v1/ops/health and returns the parsed snapshot', async () => {
     const snapshot = {
       generated_at: '2026-09-05T08:00:00+00:00',
       overall_status: 'green',
@@ -80,7 +79,6 @@ describe('fetchOpsHealth', () => {
       `${API_BASE_URL}/api/v1/ops/health`,
       expect.objectContaining({
         method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
       }),
     );
     expect(result).toEqual(snapshot);

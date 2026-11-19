@@ -39,6 +39,24 @@ def _init_worker_observability(**_kwargs):
     init_worker_observability()
 
 
+@celeryd_init.connect
+def _check_zitadel_user_delete_config(**_kwargs):
+    """Warn at worker boot if the GDPR-deletion Zitadel service user is broken.
+
+    A missing or wrong secret on ``examcraft-celery`` would otherwise only show
+    up when the first scheduled deletion fails (EXAMCRAFT-134). Only checks in
+    production; never blocks the worker start.
+    """
+    if os.getenv("ENVIRONMENT") != "production":
+        return
+    try:
+        from services.zitadel_user_service import check_zitadel_user_delete_config
+
+        check_zitadel_user_delete_config()  # logs an ERROR itself if not "ok"
+    except Exception:
+        logger.exception("Zitadel-Konfigurationsprüfung im Worker fehlgeschlagen")
+
+
 @after_setup_logger.connect
 def _reattach_observability_log_handler(**_kwargs):
     """Re-attach SpeculaLogHandler after Celery's own logging setup (TF-916).

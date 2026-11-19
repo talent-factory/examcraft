@@ -48,11 +48,8 @@ export interface FeedbackRequest {
 }
 
 class HelpService {
-  private getHeaders(token: string): HeadersInit {
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    };
+  private getHeaders(): HeadersInit {
+    return { 'Content-Type': 'application/json' };
   }
 
   /**
@@ -79,26 +76,26 @@ class HelpService {
     return this.request(`${API_BASE_URL}/api/v1/help/status`, {}, 'help_status_failed');
   }
 
-  async getOnboardingStatus(token: string): Promise<OnboardingStatus> {
+  async getOnboardingStatus(): Promise<OnboardingStatus> {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/status`,
-      { headers: this.getHeaders(token) },
+      { headers: this.getHeaders() },
       'help_onboarding_status_failed',
     );
   }
 
-  async completeOnboardingStep(token: string, step: number): Promise<OnboardingStatus> {
+  async completeOnboardingStep(step: number): Promise<OnboardingStatus> {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/step`,
-      { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
+      { method: 'PUT', headers: this.getHeaders(), body: JSON.stringify({ step }) },
       'help_onboarding_step_failed',
     );
   }
 
-  async skipOnboardingStep(token: string, step: number): Promise<OnboardingStatus> {
+  async skipOnboardingStep(step: number): Promise<OnboardingStatus> {
     return this.request(
       `${API_BASE_URL}/api/v1/help/onboarding/skip`,
-      { method: 'PUT', headers: this.getHeaders(token), body: JSON.stringify({ step }) },
+      { method: 'PUT', headers: this.getHeaders(), body: JSON.stringify({ step }) },
       'help_onboarding_skip_failed',
     );
   }
@@ -111,7 +108,6 @@ class HelpService {
    * list, to avoid drift like TF-604.
    */
   async updateTrackStep(
-    token: string,
     trackId: string,
     step: number,
     totalSteps: number,
@@ -121,28 +117,28 @@ class HelpService {
       `${API_BASE_URL}/api/v1/help/onboarding/track/${encodeURIComponent(trackId)}/step`,
       {
         method: 'PUT',
-        headers: this.getHeaders(token),
+        headers: this.getHeaders(),
         body: JSON.stringify({ step, total_steps: totalSteps, skipped }),
       },
       'help_onboarding_track_step_failed',
     );
   }
 
-  async getContextHint(token: string, route: string): Promise<ContextHint> {
+  async getContextHint(route: string): Promise<ContextHint> {
     const path = route.replace(/^\//, '');
     return this.request(
       `${API_BASE_URL}/api/v1/help/context/${path}`,
-      { headers: this.getHeaders(token) },
+      { headers: this.getHeaders() },
       'help_context_hint_failed',
     );
   }
 
-  async dismissHint(token: string, hintId: number): Promise<void> {
+  async dismissHint(hintId: number): Promise<void> {
     await this.request(
       `${API_BASE_URL}/api/v1/help/context/dismiss`,
       {
         method: 'POST',
-        headers: this.getHeaders(token),
+        headers: this.getHeaders(),
         body: JSON.stringify({ hint_id: hintId }),
       },
       'help_hint_dismiss_failed',
@@ -150,7 +146,6 @@ class HelpService {
   }
 
   async sendMessage(
-    token: string,
     question: string,
     route: string,
     conversationHistory?: Array<{ role: string; content: string }>
@@ -159,17 +154,17 @@ class HelpService {
       `${API_BASE_URL}/api/v1/help/message`,
       {
         method: 'POST',
-        headers: this.getHeaders(token),
+        headers: this.getHeaders(),
         body: JSON.stringify({ question, route, conversation_history: conversationHistory }),
       },
       'help_message_failed',
     );
   }
 
-  async submitFeedback(token: string, feedback: FeedbackRequest): Promise<void> {
+  async submitFeedback(feedback: FeedbackRequest): Promise<void> {
     await this.request(
       `${API_BASE_URL}/api/v1/help/feedback`,
-      { method: 'POST', headers: this.getHeaders(token), body: JSON.stringify(feedback) },
+      { method: 'POST', headers: this.getHeaders(), body: JSON.stringify(feedback) },
       'help_feedback_failed',
     );
   }

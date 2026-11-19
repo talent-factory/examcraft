@@ -30,8 +30,6 @@ describe('PackageTierBadge', () => {
 
   it('shows Professional tier for authenticated user with Professional subscription', async () => {
     // Arrange: Set correct localStorage key
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     // Mock API response for Professional tier
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -66,17 +64,13 @@ describe('PackageTierBadge', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       `${MOCK_API_URL}/api/v1/rbac/tiers/my`,
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer fake-jwt-token',
-        }),
+        credentials: 'include',
       })
     );
   });
 
   it('shows Starter tier for authenticated user with Starter subscription', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -103,26 +97,21 @@ describe('PackageTierBadge', () => {
   });
 
   it('shows Free tier for unauthenticated user', async () => {
-    // Arrange: No token in localStorage
-    // (localStorage is already clear from beforeEach)
+    // Arrange: the backend answers 401 for a request without a session
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 401 });
 
     // Act
     render(<PackageTierBadge />);
 
-    // Assert: Should show Free tier immediately (no API call)
+    // Assert: Should fall back to Free tier
     await waitFor(() => {
       expect(screen.getByText(/Core/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/Free/i)).toBeInTheDocument();
-
-    // Verify NO API call was made
-    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('shows Enterprise tier for authenticated user with Enterprise subscription', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -147,59 +136,10 @@ describe('PackageTierBadge', () => {
     });
   });
 
-  // ==================== LocalStorage Key Tests ====================
-
-  it('uses correct localStorage key "examcraft_access_token"', async () => {
-    // Arrange: Set WRONG key (old key)
-    localStorage.setItem('access_token', 'wrong-key-token');
-
-    // Act
-    render(<PackageTierBadge />);
-
-    // Assert: Should show Free tier (token not found)
-    await waitFor(() => {
-      expect(screen.getByText(/Free/i)).toBeInTheDocument();
-    });
-
-    // Verify NO API call was made (no token found)
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('does not use old localStorage key "access_token"', async () => {
-    // Arrange: Set both keys
-    localStorage.setItem('access_token', 'old-token');
-    localStorage.setItem('examcraft_access_token', 'new-token');
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        name: 'professional',
-        display_name: 'Professional',
-      }),
-    });
-
-    // Act
-    render(<PackageTierBadge />);
-
-    // Assert: Should use NEW key
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer new-token',
-          }),
-        })
-      );
-    });
-  });
-
   // ==================== Error Handling Tests ====================
 
   it('falls back to Free tier on API error', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
     // Act
@@ -213,8 +153,6 @@ describe('PackageTierBadge', () => {
 
   it('falls back to Free tier on 401 Unauthorized', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'invalid-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
       status: 401,
@@ -231,8 +169,6 @@ describe('PackageTierBadge', () => {
 
   it('falls back to Free tier on 403 Forbidden', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
       status: 403,
@@ -251,8 +187,6 @@ describe('PackageTierBadge', () => {
 
   it('shows loading state while fetching tier', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     // Mock slow API response
     (global.fetch as jest.Mock).mockImplementation(
       () =>
@@ -285,8 +219,6 @@ describe('PackageTierBadge', () => {
 
   it('shows correct tooltip for Professional tier', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -311,8 +243,6 @@ describe('PackageTierBadge', () => {
 
   it('uses purple color for Professional tier', async () => {
     // Arrange
-    localStorage.setItem('examcraft_access_token', 'fake-jwt-token');
-
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -335,7 +265,8 @@ describe('PackageTierBadge', () => {
   });
 
   it('uses gray color for Free tier', async () => {
-    // Arrange: No token
+    // Arrange: the backend rejects the request (no session)
+    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 401 });
 
     // Act
     render(<PackageTierBadge />);

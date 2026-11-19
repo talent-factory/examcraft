@@ -31,7 +31,7 @@ from services.translation_service import t
 # for a module attribute keeps this independent of who imported the module:
 # logging.getLogger is a global registry lookup that returns the same
 # singleton for a given name.
-_rag_exams_logger = logging.getLogger("api.rag_exams")
+_job_state_logger = logging.getLogger("services.generation_job_state")
 
 
 # ---------------------------------------------------------------------------
@@ -126,10 +126,10 @@ class TestGetTaskResult:
         """The owner gets the full generation result."""
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "SUCCESS"
-            mock_result.result = EXAM_RESULT
+            mock_result.info = EXAM_RESULT
             mock_ar_cls.return_value = mock_result
 
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
@@ -159,12 +159,12 @@ class TestGetTaskResult:
         # unreliable in the full suite (propagation/module-instance quirks,
         # see test_rag_competency_wiring.py for the same pattern).
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
-            patch.object(_rag_exams_logger, "error") as mock_error,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
+            patch.object(_job_state_logger, "error") as mock_error,
         ):
             mock_result = Mock()
             mock_result.state = state
-            mock_result.result = RuntimeError(
+            mock_result.info = RuntimeError(
                 "Claude timeout: connection to internal-db-host:5432 refused"
             )
             mock_ar_cls.return_value = mock_result
@@ -199,10 +199,10 @@ class TestGetTaskResult:
         a parity test against the same mapping in the WebSocket recovery path."""
         _wire_job(mock_db, _make_job(status=state))
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = state
-            mock_result.result = NoContextError("no context available for topic")
+            mock_result.info = NoContextError("no context available for topic")
             mock_ar_cls.return_value = mock_result
 
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
@@ -219,10 +219,10 @@ class TestGetTaskResult:
         running again and wait forever for progress."""
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PENDING"  # Result entry already discarded
-            mock_result.result = None
+            mock_result.info = None
             mock_ar_cls.return_value = mock_result
 
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
@@ -247,10 +247,10 @@ class TestGetTaskResult:
             ),
         )
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "SUCCESS"
-            mock_result.result = EXAM_RESULT
+            mock_result.info = EXAM_RESULT
             mock_ar_cls.return_value = mock_result
 
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
@@ -275,10 +275,10 @@ class TestGetTaskResult:
             ),
         )
 
-        with patch("celery.result.AsyncResult") as mock_ar_cls:
+        with patch("services.generation_job_state.AsyncResult") as mock_ar_cls:
             mock_result = Mock()
             mock_result.state = "PENDING"  # Result entry already discarded
-            mock_result.result = None
+            mock_result.info = None
             mock_ar_cls.return_value = mock_result
 
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
@@ -301,7 +301,8 @@ class TestGetTaskResult:
         )
 
         with patch(
-            "celery.result.AsyncResult", side_effect=Exception("Broker unreachable")
+            "services.generation_job_state.AsyncResult",
+            side_effect=Exception("Broker unreachable"),
         ):
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
 
@@ -317,7 +318,8 @@ class TestGetTaskResult:
         _wire_job(mock_db, _make_job(status="SUCCESS"))
 
         with patch(
-            "celery.result.AsyncResult", side_effect=Exception("Broker unreachable")
+            "services.generation_job_state.AsyncResult",
+            side_effect=Exception("Broker unreachable"),
         ):
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
 
@@ -338,7 +340,7 @@ class TestGetTaskResult:
         """Foreign jobs are rejected (not a superuser)."""
         _wire_job(mock_db, _make_job(user_id=42))
 
-        with patch("celery.result.AsyncResult"):
+        with patch("services.generation_job_state.AsyncResult"):
             response = auth_client.get("/api/v1/rag/tasks/task-1/result")
 
         assert response.status_code == 403
@@ -375,12 +377,12 @@ class TestGetTaskResultSuperuser:
         _wire_job(mock_db, _make_job(user_id=42))
 
         with (
-            patch("celery.result.AsyncResult") as mock_ar_cls,
+            patch("services.generation_job_state.AsyncResult") as mock_ar_cls,
             patch("services.audit_service.AuditService") as mock_audit,
         ):
             mock_result = Mock()
             mock_result.state = "SUCCESS"
-            mock_result.result = EXAM_RESULT
+            mock_result.info = EXAM_RESULT
             mock_ar_cls.return_value = mock_result
 
             response = super_client.get("/api/v1/rag/tasks/task-1/result")

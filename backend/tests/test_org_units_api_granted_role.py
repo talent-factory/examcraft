@@ -635,3 +635,134 @@ def test_me_endpoint_surfaces_granted_role_permission(test_db: Session) -> None:
     all_permissions = {perm for role in body["roles"] for perm in role["permissions"]}
     assert "submissions:grade" in all_permissions
     assert any(role["id"] == granted.id for role in body["roles"])
+
+
+def test_assign_member_to_unit_with_mcp_use_role_requires_superuser(
+    test_db: Session,
+) -> None:
+    """EXAMCRAFT-127: membership in a unit whose granted role carries mcp:use is
+    a grant of mcp:use; only a superuser may do it (platform-wide ops tools)."""
+    from models.org_unit import OrgUnit
+
+    inst = _make_institution(test_db, "granted-mcp-member")
+    caller = _make_institution_admin(test_db, inst.id, "ia@granted-mcp-member.ch")
+    mcp_role = Role(name="mcp_user_ou", display_name="MCP", permissions=["mcp:use"])
+    test_db.add(mcp_role)
+    test_db.flush()
+    unit = OrgUnit(
+        institution_id=inst.id,
+        unit_type="team",
+        name="MCP-Team",
+        role_id=mcp_role.id,
+    )
+    test_db.add(unit)
+    test_db.commit()
+
+    client = _client(test_db, caller)
+    response = client.post(
+        f"/api/v1/org-units/{unit.id}/members",
+        json={"user_id": caller.id, "role": "member"},
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["error_code"] == "org_units_grant_role_admin_only"
+    denied = (
+        test_db.query(AuditLog)
+        .filter(AuditLog.user_id == caller.id, AuditLog.action == "permission_denied")
+        .count()
+    )
+    assert denied == 1
+
+
+def test_create_org_unit_with_mcp_use_role_requires_superuser(
+    test_db: Session,
+) -> None:
+    """EXAMCRAFT-127: an institution admin must not hand out mcp:use by creating
+    a unit that carries a role with that permission."""
+    inst = _make_institution(test_db, "granted-mcp-create")
+    admin = _make_institution_admin(test_db, inst.id, "ia@granted-mcp-create.ch")
+    mcp_role = Role(
+        name="mcp_user_create",
+        display_name="MCP",
+        permissions=["documents:read", "mcp:use"],
+    )
+    test_db.add(mcp_role)
+    test_db.commit()
+
+    response = _client(test_db, admin).post(
+        "/api/v1/org-units",
+        json={
+            "unit_type": "team",
+            "name": "MCP-Team",
+            "parent_org_unit_id": None,
+            "role_id": mcp_role.id,
+        },
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["error_code"] == "org_units_grant_role_admin_only"
+    denied = (
+        test_db.query(AuditLog)
+        .filter(AuditLog.user_id == admin.id, AuditLog.action == "permission_denied")
+        .all()
+    )
+    assert len(denied) == 1
+    assert denied[0].resource_type == "org_unit"
+    assert json.loads(denied[0].additional_data)["role_id"] == mcp_role.id
+
+
+def test_patch_org_unit_to_mcp_use_role_requires_superuser(
+    test_db: Session,
+) -> None:
+    inst = _make_institution(test_db, "granted-mcp-patch")
+    admin = _make_institution_admin(test_db, inst.id, "ia@granted-mcp-patch.ch")
+    mcp_role = Role(name="mcp_user_patch", display_name="MCP", permissions=["mcp:use"])
+    test_db.add(mcp_role)
+    test_db.commit()
+    client = _client(test_db, admin)
+    unit_id = client.post(
+        "/api/v1/org-units",
+        json={"unit_type": "team", "name": "Team", "parent_org_unit_id": None},
+    ).json()["id"]
+
+    response = client.patch(
+        f"/api/v1/org-units/{unit_id}", json={"role_id": mcp_role.id}
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["error_code"] == "org_units_grant_role_admin_only"
+    denied = (
+        test_db.query(AuditLog)
+        .filter(AuditLog.user_id == admin.id, AuditLog.action == "permission_denied")
+        .all()
+    )
+    assert len(denied) == 1
+    assert denied[0].resource_type == "org_unit"
+    assert json.loads(denied[0].additional_data)["role_id"] == mcp_role.id
+
+
+def test_denied_mcp_use_grant_does_not_persist_rename(test_db: Session) -> None:
+    """A refused grant must not commit other fields sent in the same PATCH."""
+    inst = _make_institution(test_db, "granted-mcp-rename")
+    admin = _make_institution_admin(test_db, inst.id, "ia@granted-mcp-rename.ch")
+    mcp_role = Role(name="mcp_user_rn", display_name="MCP", permissions=["mcp:use"])
+    test_db.add(mcp_role)
+    test_db.commit()
+    client = _client(test_db, admin)
+    unit_id = client.post(
+        "/api/v1/org-units",
+        json={"unit_type": "team", "name": "Alt", "parent_org_unit_id": None},
+    ).json()["id"]
+
+    response = client.patch(
+        f"/api/v1/org-units/{unit_id}",
+        json={"name": "Neu", "role_id": mcp_role.id},
+    )
+
+    assert response.status_code == 403, response.text
+    test_db.expire_all()
+    from models.org_unit import OrgUnit
+
+    unit = test_db.query(OrgUnit).filter(OrgUnit.id == unit_id).one()
+    assert unit.name == "Alt"
+    assert unit.role_id is None

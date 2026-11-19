@@ -25,6 +25,7 @@ REQUIRED_SUBPROCESSORS = {
     "Google",
     "Microsoft",
     "SubscribeFlow",
+    "tessera/Zitadel",
     "Brevo",
 }
 
@@ -130,6 +131,42 @@ def test_tom_names_specula_as_the_self_hosted_error_tracking_system() -> None:
 
     assert "Specula" in tom_text
     assert "selbst betrieben" in tom_text
+
+
+def _document_text(document) -> str:
+    return " ".join(
+        section.heading + " " + " ".join(section.paragraphs)
+        for section in document.sections
+    )
+
+
+def test_avv_and_tom_document_tessera_deletion_and_retention() -> None:
+    """EXAMCRAFT-131: AVV §12 and TOM 5 must state that the account in the
+    identity service is deleted first, and the TOM must carry the 90-day
+    event-log and 30-day snapshot periods from ADR 0008.
+    """
+    content = get_compliance_content()
+    avv_text = _document_text(content.avv)
+    tom_text = _document_text(content.tom)
+
+    assert "tessera/Zitadel" in avv_text
+    assert "zuerst gelöscht" in avv_text
+    assert "erst nach erfolgreicher Löschung" in avv_text
+    assert "erst bei Erfolg" in tom_text
+    assert "tessera/Zitadel" in tom_text
+    assert "nach 90 Tagen" in tom_text
+    assert "30 Tage aufbewahrt" in tom_text
+    assert "Feldlöschung" in tom_text
+
+
+def test_tessera_subprocessor_is_complete_and_self_hosted_in_eu() -> None:
+    content = get_compliance_content()
+    entry = next(sp for sp in content.subprocessors if "tessera/Zitadel" in sp.name)
+
+    assert "selbst betrieben" in entry.name
+    assert "Frankfurt" in entry.location
+    assert "Kein Drittlandtransfer" in entry.transfer_mechanism
+    assert "Art. 6 Abs. 1 lit. b" in entry.purpose
 
 
 def test_llm_subprocessors_document_the_actual_processing_path() -> None:

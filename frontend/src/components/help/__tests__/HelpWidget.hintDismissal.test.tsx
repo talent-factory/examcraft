@@ -10,7 +10,7 @@ import HelpWidget from '../HelpWidget';
 jest.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 1, roles: [{ name: 'teacher' }], institution: null },
-    accessToken: 'test-token',
+    isAuthenticated: true,
     hasRole: (role: string) => role === 'teacher',
     hasPermission: () => true,
   }),
@@ -98,7 +98,7 @@ describe('HelpWidget context hint dismissal', () => {
     openPanel();
     expandHint();
     fireEvent.click(screen.getByRole('button', { name: /nicht mehr anzeigen/i }));
-    await waitFor(() => expect(mockDismissHint).toHaveBeenCalledWith('test-token', 6));
+    await waitFor(() => expect(mockDismissHint).toHaveBeenCalledWith(6));
     // The local hide runs after the awaited server call, so it needs its own wait.
     await waitFor(() => expect(mockAcknowledgeHint).toHaveBeenCalledWith(6));
   });

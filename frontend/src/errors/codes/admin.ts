@@ -42,17 +42,16 @@
  * `impersonateUser` needs no such fallback: `impersonation_start_failed` is a
  * real backend code that already says exactly that.
  *
- * Two more frontend-only codes do not come from a service at all.
- * `AuthContext.startImpersonation` refuses locally in two situations —
- * no active admin session, and a recovery snapshot that could not be persisted
- * (`sessionStorage` full or restricted) — and both refusals are rendered by
- * `ImpersonationReasonDialog`, which catches the service call and the context
- * call together. They used to be English developer sentences on screen:
- *
- *   impersonation_no_admin_session, impersonation_snapshot_failed
- *
- * Its third refusal reuses the backend's `impersonation_already_active`, which
- * says the same thing.
+ * Three more frontend-only codes do not come from a service at all.
+ * `AuthContext.startImpersonation` refuses locally when there is no active
+ * admin session (`impersonation_no_admin_session`) and reuses the backend's
+ * `impersonation_already_active` when one is already running. When starting
+ * fails after the backend created the session and closing that orphaned
+ * session fails as well, it throws `impersonation_cleanup_failed`, because the
+ * server-side session may still be active. `ImpersonationReasonDialog` renders
+ * all of them, since it catches the service call and the context call together.
+ * `impersonation_snapshot_failed` is no longer thrown by the frontend; it is
+ * kept for the backend/locale contract.
  *
  * `impersonation_no_password_set` and `impersonation_rate_limit_exceeded`
  * exist in both `translation.json` and `core/backend/locales/t.*.json` with
@@ -97,6 +96,7 @@ export const ADMIN_ERROR_CODES = [
   'admin_users_load_failed',
   'impersonation_action_locked',
   'impersonation_already_active',
+  'impersonation_cleanup_failed',
   'impersonation_end_failed',
   'impersonation_no_admin_session',
   'impersonation_no_password_set',

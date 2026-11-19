@@ -1,5 +1,5 @@
 import { fetchLiveActivity, sendActivityHeartbeat } from './liveActivityService';
-import { API_BASE_URL, ACCESS_TOKEN_KEY } from './httpClient';
+import { API_BASE_URL } from './httpClient';
 
 describe('fetchLiveActivity', () => {
   const originalFetch = global.fetch;
@@ -10,8 +10,7 @@ describe('fetchLiveActivity', () => {
     jest.restoreAllMocks();
   });
 
-  it('GETs /api/v1/ops/activity with the auth header and returns the parsed snapshot', async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, 'test-token');
+  it('GETs /api/v1/ops/activity and returns the parsed snapshot', async () => {
     const snapshot = {
       generated_at: '2026-09-16T08:00:00+00:00',
       buckets: {
@@ -32,8 +31,7 @@ describe('fetchLiveActivity', () => {
       `${API_BASE_URL}/api/v1/ops/activity`,
       expect.objectContaining({
         method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
-      }),
+              }),
     );
     expect(result).toEqual(snapshot);
   });
@@ -61,7 +59,6 @@ describe('sendActivityHeartbeat', () => {
   });
 
   it('POSTs the bucket_id to /api/v1/activity/heartbeat and resolves without parsing a body', async () => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, 'test-token');
     const mockFetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 204,
@@ -75,7 +72,6 @@ describe('sendActivityHeartbeat', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          Authorization: 'Bearer test-token',
           'Content-Type': 'application/json',
         }),
         body: JSON.stringify({ bucket_id: 'questions_review' }),
@@ -95,7 +91,7 @@ describe('sendActivityHeartbeat', () => {
     await expect(sendActivityHeartbeat('questions_review')).rejects.toMatchObject({ status: 422 });
   });
 
-  it('does not go through the auth-retry/logout path on a 401 (PR #286 review: a background ping must not force-logout mid-workflow)', async () => {
+  it('rejects on a 401 without retrying the request', async () => {
     const mockFetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 401,
@@ -106,8 +102,7 @@ describe('sendActivityHeartbeat', () => {
 
     await expect(sendActivityHeartbeat('questions_review')).rejects.toMatchObject({ status: 401 });
 
-    // withAuthRetry would attempt a token refresh and then re-call fetch a
-    // second time — a single call proves the retry path was bypassed.
+    // A single call proves the request is not retried.
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });
