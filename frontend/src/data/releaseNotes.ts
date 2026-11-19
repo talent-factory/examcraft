@@ -96,6 +96,20 @@ export const resolveScreenshotSrc = (
  */
 export const RELEASE_NOTES: readonly ReleaseNoteEntry[] = [
   {
+    version: '1.16.0',
+    date: '2026-11-18',
+    groups: [
+      {
+        kind: 'new',
+        items: [{ id: 'v1_16_0_central_login' }, { id: 'v1_16_0_switch_account' }],
+      },
+      {
+        kind: 'fixes',
+        items: [{ id: 'v1_16_0_login_errors' }],
+      },
+    ],
+  },
+  {
     version: '1.15.1',
     date: '2026-10-30',
     groups: [{ kind: 'improvements', items: [{ id: 'v1_15_1_ilias_titles' }] }],

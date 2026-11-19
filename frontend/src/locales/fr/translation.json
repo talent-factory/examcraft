@@ -3943,6 +3943,9 @@
       "security": "Sécurité et fiabilité"
     },
     "entries": {
+      "v1_16_0_central_login": "La connexion passe désormais par le login central de Talent Factory. Un seul compte suffit pour ExamCraft AI et d'autres services.",
+      "v1_16_0_switch_account": "Sur la page de connexion, « Se connecter avec un autre compte » permet de se connecter volontairement avec un autre compte.",
+      "v1_16_0_login_errors": "Les erreurs de connexion s'affichent clairement sur la page de connexion, et les sessions expirées ramènent proprement à la connexion.",
       "v1_15_1_ilias_titles": "Export ILIAS : les questions apparaissent dans ILIAS avec leur numéro et leur thème, par exemple « 01 – Types de rabots », au lieu de simplement « Question 1 » (si un thème est renseigné)",
       "v1_15_0_plan_limits": "Évaluation : les actions non incluses dans l'offre actuelle (p. ex. validation groupée dans la révision des questions ou barèmes personnalisés) apparaissent désactivées et indiquent l'offre qui les propose",
       "v1_15_0_ui_language": "Les textes intégrés, comme « Fermer » ou les indications de page dans les tableaux, suivent désormais la langue choisie",

@@ -3943,6 +3943,9 @@
       "security": "Security & Reliability"
     },
     "entries": {
+      "v1_16_0_central_login": "Sign-in now goes through the central Talent Factory login. One account is enough for ExamCraft AI and other services.",
+      "v1_16_0_switch_account": "On the login page, \"Sign in with a different account\" lets you deliberately sign in with another account.",
+      "v1_16_0_login_errors": "Sign-in errors are now shown clearly on the login page, and expired sessions return you cleanly to the login.",
       "v1_15_1_ilias_titles": "ILIAS export: questions now appear in ILIAS with their number and topic, for example “01 – Types of hand planes”, instead of just “Question 1” (if a topic is set)",
       "v1_15_0_plan_limits": "Evaluation: actions not included in the current plan (e.g. bulk approval in the question review or custom grading schemes) now appear disabled and show which plan includes them",
       "v1_15_0_ui_language": "Built-in texts such as “Close” or page labels in tables now follow the selected language",

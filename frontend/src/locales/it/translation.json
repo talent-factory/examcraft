@@ -3943,6 +3943,9 @@
       "security": "Sicurezza e affidabilità"
     },
     "entries": {
+      "v1_16_0_central_login": "L'accesso avviene ora tramite il login centrale di Talent Factory. Un solo account basta per ExamCraft AI e altri servizi.",
+      "v1_16_0_switch_account": "Nella pagina di accesso, «Accedi con un altro account» permette di accedere deliberatamente con un altro account.",
+      "v1_16_0_login_errors": "Gli errori di accesso vengono mostrati chiaramente nella pagina di accesso e le sessioni scadute riportano correttamente al login.",
       "v1_15_1_ilias_titles": "Esportazione ILIAS: le domande compaiono in ILIAS con numero e argomento, ad esempio «01 – Tipi di pialla», invece di semplicemente «Domanda 1» (se è indicato un argomento)",
       "v1_15_0_plan_limits": "Valutazione: le azioni non incluse nel piano attuale (ad es. approvazione collettiva nella revisione delle domande o schemi di voto personalizzati) appaiono disattivate e indicano da quale piano sono disponibili",
       "v1_15_0_ui_language": "I testi integrati, come «Chiudi» o l'indicazione delle pagine nelle tabelle, seguono ora la lingua selezionata",
