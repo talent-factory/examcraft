@@ -80,6 +80,41 @@ class AuthService {
 
     return response.json();
   }
+
+  /**
+   * Upload a profile picture (replaces the IdP picture)
+   */
+  async uploadAvatar(file: File): Promise<UserResponse> {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch(`${API_BASE_URL}/api/auth/me/avatar`, {
+      method: 'POST',
+      credentials: 'include',
+      body,
+    });
+
+    if (!response.ok) {
+      throw await appErrorFromResponse(response, 'auth_avatar_upload_failed');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Remove the uploaded profile picture
+   */
+  async deleteAvatar(): Promise<UserResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me/avatar`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw await appErrorFromResponse(response, 'auth_avatar_delete_failed');
+    }
+
+    return response.json();
+  }
 }
 
 const authService = new AuthService();

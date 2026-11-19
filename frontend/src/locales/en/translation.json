@@ -2693,7 +2693,11 @@
       "settings": "Settings",
       "language": "Language",
       "languageHint": "Changes the language of the entire application",
-      "languageSaveFailed": "The language applies in this browser but could not be saved to your account. Other devices will not pick it up yet."
+      "languageSaveFailed": "The language applies in this browser but could not be saved to your account. Other devices will not pick it up yet.",
+      "avatarTitle": "Profile picture",
+      "avatarUpload": "Upload picture",
+      "avatarRemove": "Remove picture",
+      "avatarHint": "Images up to 2 MB are allowed. An uploaded picture replaces the one from your sign-in provider."
     },
     "profileEdit": {
       "header": "Edit Profile",
@@ -3134,6 +3138,10 @@
     "auth_account_locked": "Account locked. Please try again later",
     "auth_account_not_active": "Your account is not active",
     "auth_account_status_invalid": "Your account is {{status}}",
+    "auth_avatar_invalid_image": "The file is not a valid image",
+    "auth_avatar_too_large": "The image is larger than {{max_mb}} MB",
+    "auth_avatar_upload_failed": "Failed to upload profile picture",
+    "auth_avatar_delete_failed": "Failed to remove profile picture",
     "auth_email_taken": "Email address is already registered",
     "auth_logout_failed": "Logout failed",
     "auth_password_incorrect": "Current password is incorrect",

@@ -64,6 +64,15 @@ async def export_user_data(
                 if current_user.created_at
                 else None,
                 "institution_id": current_user.institution_id,
+                "avatar": {
+                    "source": current_user.avatar_source,
+                    "content_type": current_user.avatar_content_type,
+                    "updated_at": current_user.avatar_updated_at.isoformat()
+                    if current_user.avatar_updated_at
+                    else None,
+                }
+                if current_user.avatar_source
+                else None,
                 "roles": [role.name for role in current_user.roles]
                 if current_user.roles
                 else [],

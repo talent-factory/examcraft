@@ -87,6 +87,8 @@ export interface User {
   is_email_verified: boolean;  // Email verification status
   oauth_provider?: string;  // OAuth provider (google, microsoft, etc.)
   avatar_url?: string;  // Profile picture URL (from OAuth or uploaded)
+  avatar_updated_at?: string | null;  // Cache-buster for the stored picture
+  avatar_source?: 'idp' | 'upload' | null;
   previous_login_at?: string | null;  // Login before the current one (TF-1060)
   created_at: string;
   updated_at?: string;
@@ -200,6 +202,10 @@ export interface AuthContextType extends AuthState {
   /** Resolves with `backendEndFailed` when an impersonation could not be ended (the user stays signed in as the target). */
   logout: () => Promise<{ backendEndFailed: boolean } | void>;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  /** Upload a profile picture (replaces the IdP picture). */
+  uploadAvatar: (file: File) => Promise<void>;
+  /** Remove the uploaded picture; the IdP picture returns at the next login. */
+  deleteAvatar: () => Promise<void>;
   /**
    * Prüft die Session per `GET /api/auth/me`. Bei 401 wird die lokale Session
    * abgebaut (die Anmeldeseite erscheint) und `false` geliefert. Jeder andere

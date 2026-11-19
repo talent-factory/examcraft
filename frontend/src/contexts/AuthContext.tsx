@@ -446,6 +446,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   /**
+   * Upload / remove the profile picture. Unlike `updateProfile` these do not
+   * flip the global `isLoading` (which would blank the page); the caller
+   * shows its own error from the rethrown AppError.
+   */
+  const uploadAvatar = useCallback(async (file: File) => {
+    const user = await AuthService.uploadAvatar(file);
+    setState(prev => ({ ...prev, user }));
+  }, []);
+
+  const deleteAvatar = useCallback(async () => {
+    const user = await AuthService.deleteAvatar();
+    setState(prev => ({ ...prev, user }));
+  }, []);
+
+  /**
    * 401 on `/api/auth/me` ends the local session; any other outcome keeps it.
    */
   const checkSession = useCallback(async (): Promise<boolean> => {
@@ -517,6 +532,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     updateProfile,
+    uploadAvatar,
+    deleteAvatar,
     checkSession,
     clearError,
     hasPermission,

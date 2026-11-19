@@ -74,6 +74,7 @@ email-validator>=2.3.0              # Email validation for Pydantic EmailStr
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.32            # pydantic-ai 1.x / mcp floor (war 0.0.6)
+pillow==12.3.0                      # Profilbild: Validierung/Normalisierung (EXAMCRAFT-168)
 authlib==1.3.0                      # OAuth2 Client Library
 itsdangerous==2.1.2                 # Secure Token Generation for OAuth State
 

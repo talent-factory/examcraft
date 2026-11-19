@@ -2693,7 +2693,11 @@
       "settings": "Paramètres",
       "language": "Langue",
       "languageHint": "Change la langue de toute l'application",
-      "languageSaveFailed": "La langue s'applique dans ce navigateur, mais n'a pas pu être enregistrée dans ton compte. Tes autres appareils ne la reprennent pas encore."
+      "languageSaveFailed": "La langue s'applique dans ce navigateur, mais n'a pas pu être enregistrée dans ton compte. Tes autres appareils ne la reprennent pas encore.",
+      "avatarTitle": "Photo de profil",
+      "avatarUpload": "Téléverser une photo",
+      "avatarRemove": "Supprimer la photo",
+      "avatarHint": "Images jusqu'à 2 Mo. Une photo téléversée remplace celle de votre fournisseur de connexion."
     },
     "profileEdit": {
       "header": "Modifier le profil",
@@ -3134,6 +3138,10 @@
     "auth_account_locked": "Compte verrouillé. Réessaie plus tard",
     "auth_account_not_active": "Ton compte n'est pas actif",
     "auth_account_status_invalid": "Ton compte a le statut « {{status}} »",
+    "auth_avatar_invalid_image": "Le fichier n'est pas une image valide",
+    "auth_avatar_too_large": "L'image dépasse {{max_mb}} Mo",
+    "auth_avatar_upload_failed": "Impossible de téléverser la photo de profil",
+    "auth_avatar_delete_failed": "Impossible de supprimer la photo de profil",
     "auth_email_taken": "Cette adresse e-mail est déjà enregistrée",
     "auth_logout_failed": "Échec de la déconnexion",
     "auth_password_incorrect": "Le mot de passe actuel est incorrect",

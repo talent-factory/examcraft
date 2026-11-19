@@ -15,8 +15,9 @@ from sqlalchemy import (
     CheckConstraint,
     Index,
     ARRAY,
+    LargeBinary,
 )
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import backref, deferred, relationship
 from sqlalchemy.sql import func, text
 from datetime import datetime, timezone
 import enum
@@ -280,6 +281,15 @@ class User(Base):
     avatar_url = Column(
         String(2000), nullable=True
     )  # Increased for OAuth providers (Google URLs can be very long - up to 2000 chars)
+    # Stored profile picture (EXAMCRAFT-168): a normalised copy (square, PNG,
+    # no metadata) so the avatar no longer depends on the IdP's CDN.
+    # ``avatar_source`` is "idp" (synced at login from the OIDC ``picture``
+    # claim, kept in ``avatar_url`` for change detection) or "upload" (chosen
+    # by the user, never overwritten by the sync).
+    avatar_data = deferred(Column(LargeBinary, nullable=True))
+    avatar_content_type = Column(String(50), nullable=True)
+    avatar_source = Column(String(10), nullable=True)
+    avatar_updated_at = Column(DateTime(timezone=True), nullable=True)
     bio = Column(Text, nullable=True)
     phone = Column(String(50), nullable=True)
 

@@ -2693,7 +2693,11 @@
       "settings": "Impostazioni",
       "language": "Lingua",
       "languageHint": "Cambia la lingua dell'intera applicazione",
-      "languageSaveFailed": "La lingua vale per questo browser, ma non è stato possibile salvarla nel tuo account. Gli altri dispositivi non la applicano ancora."
+      "languageSaveFailed": "La lingua vale per questo browser, ma non è stato possibile salvarla nel tuo account. Gli altri dispositivi non la applicano ancora.",
+      "avatarTitle": "Immagine del profilo",
+      "avatarUpload": "Carica immagine",
+      "avatarRemove": "Rimuovi immagine",
+      "avatarHint": "Immagini fino a 2 MB. Un'immagine caricata sostituisce quella del tuo provider di accesso."
     },
     "profileEdit": {
       "header": "Modifica profilo",
@@ -3134,6 +3138,10 @@
     "auth_account_locked": "Account bloccato. Riprova più tardi",
     "auth_account_not_active": "Il tuo account non è attivo",
     "auth_account_status_invalid": "Il tuo account ha lo stato «{{status}}»",
+    "auth_avatar_invalid_image": "Il file non è un'immagine valida",
+    "auth_avatar_too_large": "L'immagine supera {{max_mb}} MB",
+    "auth_avatar_upload_failed": "Impossibile caricare l'immagine del profilo",
+    "auth_avatar_delete_failed": "Impossibile rimuovere l'immagine del profilo",
     "auth_email_taken": "L'indirizzo e-mail è già registrato",
     "auth_logout_failed": "Disconnessione fallita",
     "auth_password_incorrect": "La password attuale non è corretta",

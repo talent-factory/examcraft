@@ -4,7 +4,8 @@ Profile, avatar and feature endpoints. Login runs through OIDC (api/auth_oidc.py
 """
 
 from datetime import timedelta
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, File, UploadFile, status, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -16,7 +17,13 @@ from models.auth import (
     User,
     Role,
 )
-from services.avatar_service import AvatarService
+from services.avatar_service import (
+    AVATAR_MAX_UPLOAD_BYTES,
+    AVATAR_SOURCE_UPLOAD,
+    InvalidAvatarImage,
+    clear_avatar,
+    store_avatar,
+)
 from services.audit_service import AuditService
 from services.translation_service import get_request_locale
 from utils.auth_utils import (
@@ -74,6 +81,8 @@ class UserProfileResponse(BaseModel):
     institution: Optional[InstitutionResponse] = None
     oauth_provider: Optional[str] = None  # OAuth provider (google, microsoft, etc.)
     avatar_url: Optional[str] = None  # Profile picture URL (from OAuth or uploaded)
+    avatar_updated_at: Optional[str] = None  # Cache-buster for the stored picture
+    avatar_source: Optional[str] = None  # "idp" or "upload"
     preferred_language: Optional[str] = None
     roles: list[RoleResponse]
     created_at: str
@@ -90,7 +99,6 @@ class UserProfileUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
-    avatar_url: Optional[str] = None
     preferred_language: Optional[str] = Field(None, pattern="^(de|en|fr|it)$")
 
 
@@ -192,6 +200,10 @@ async def get_current_user_profile(
         institution=institution_resp,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
+        avatar_updated_at=current_user.avatar_updated_at.isoformat()
+        if current_user.avatar_updated_at
+        else None,
+        avatar_source=current_user.avatar_source,
         preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
@@ -224,9 +236,6 @@ async def update_current_user_profile(
 
     if request.bio is not None:
         current_user.bio = request.bio
-
-    if request.avatar_url is not None:
-        current_user.avatar_url = request.avatar_url
 
     if request.preferred_language is not None:
         current_user.preferred_language = request.preferred_language
@@ -281,6 +290,10 @@ async def update_current_user_profile(
         institution=institution_resp,
         oauth_provider=current_user.oauth_provider,
         avatar_url=current_user.avatar_url,
+        avatar_updated_at=current_user.avatar_updated_at.isoformat()
+        if current_user.avatar_updated_at
+        else None,
+        avatar_source=current_user.avatar_source,
         preferred_language=current_user.preferred_language,
         roles=role_responses,
         created_at=current_user.created_at.isoformat(),
@@ -311,59 +324,113 @@ async def get_user_avatar(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_active_user),
 ):
     """
-    Avatar Proxy Endpoint
+    Avatar endpoint
 
-    Proxies OAuth avatar URLs (e.g., Google) to avoid rate limiting (429 errors).
-    Caches avatar images in Redis for 24 hours.
+    Serves the stored picture (synced from the IdP at login or uploaded). There
+    is no download fallback: ``avatar_url`` is only the change marker of the
+    IdP sync, never fetched here (EXAMCRAFT-168).
 
-    **Why this endpoint?**
-    - Google's CDN rate limits direct avatar URL requests
-    - This endpoint downloads the image once and caches it
-    - Frontend uses this endpoint instead of the original OAuth URL
-
-    **Example:**
-    - Original: `https://lh3.googleusercontent.com/a-/ALV-UjUtfwF7...` (429 error)
-    - Proxied: `http://localhost:8000/api/auth/avatar/1` (cached, no rate limit)
+    Requires a signed-in user, and only the own picture, a superuser's view or
+    a user of the same institution is served: uploaded pictures are personal
+    data and must not be enumerable by user id (EXAMCRAFT-168). The browser
+    sends the session cookie with the ``<img>`` request.
     """
     locale = get_request_locale(request)
     # Get user from database
     user = db.query(User).filter(User.id == user_id).first()
 
+    # Own picture, superuser or same institution only. Everybody else gets the
+    # same 404 as for an unknown id, so ids cannot be probed across tenants.
+    if user is not None and not (
+        user.id == _current_user.id
+        or _current_user.is_superuser
+        or user.institution_id == _current_user.institution_id
+    ):
+        user = None
+
     if not user:
         raise api_error(status.HTTP_404_NOT_FOUND, "auth_user_not_found", locale)
 
-    if not user.avatar_url:
-        raise api_error(status.HTTP_404_NOT_FOUND, "auth_avatar_not_found", locale)
-
-    # Download and cache avatar
-    avatar_service = AvatarService()
-    avatar_bytes = avatar_service.get_avatar(user_id, user.avatar_url)
-
-    if not avatar_bytes:
-        raise api_error(
-            status.HTTP_502_BAD_GATEWAY, "auth_avatar_download_failed", locale
+    if user.avatar_data:
+        # Stored copy (EXAMCRAFT-168): synced from the IdP at login or uploaded.
+        return Response(
+            content=user.avatar_data,
+            media_type=user.avatar_content_type or "image/png",
+            headers={
+                "Cache-Control": "private, max-age=0, must-revalidate",
+                "X-Avatar-Source": user.avatar_source or "stored",
+            },
         )
 
-    # Return image with appropriate content type
-    # Detect content type from first bytes (magic numbers)
-    content_type = "image/jpeg"  # Default
-    if avatar_bytes[:4] == b"\x89PNG":
-        content_type = "image/png"
-    elif avatar_bytes[:3] == b"GIF":
-        content_type = "image/gif"
-    elif avatar_bytes[:4] == b"RIFF" and avatar_bytes[8:12] == b"WEBP":
-        content_type = "image/webp"
+    raise api_error(status.HTTP_404_NOT_FOUND, "auth_avatar_not_found", locale)
 
-    return Response(
-        content=avatar_bytes,
-        media_type=content_type,
-        headers={
-            "Cache-Control": "public, max-age=86400",  # 24 hours
-            "X-Avatar-Source": "cached" if avatar_bytes else "downloaded",
-        },
-    )
+
+@router.post("/me/avatar", response_model=UserProfileResponse)
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Replace the profile picture with an uploaded image.
+
+    The upload wins over the IdP picture: later logins no longer overwrite it.
+    The image is validated, centre-cropped, resized and re-encoded (no EXIF).
+    """
+    locale = get_request_locale(request, current_user)
+    raw = await file.read(AVATAR_MAX_UPLOAD_BYTES + 1)
+    if len(raw) > AVATAR_MAX_UPLOAD_BYTES:
+        raise api_error(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            "auth_avatar_too_large",
+            locale,
+            max_mb=AVATAR_MAX_UPLOAD_BYTES // (1024 * 1024),
+        )
+    try:
+        # CPU-bound (decode, resize, re-encode): keep it off the event loop.
+        await run_in_threadpool(store_avatar, current_user, raw, AVATAR_SOURCE_UPLOAD)
+    except InvalidAvatarImage as exc:
+        logger.info("Avatar-Upload abgelehnt (user_id=%s): %s", current_user.id, exc)
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST, "auth_avatar_invalid_image", locale
+        ) from exc
+    db.commit()
+    db.refresh(current_user)
+    _audit_avatar_change(db, current_user, request, "upload")
+    return await get_current_user_profile(current_user=current_user)
+
+
+@router.delete("/me/avatar", response_model=UserProfileResponse)
+async def delete_avatar(
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the uploaded picture; the IdP picture returns at the next login."""
+    clear_avatar(current_user)
+    db.commit()
+    db.refresh(current_user)
+    _audit_avatar_change(db, current_user, request, "delete")
+    return await get_current_user_profile(current_user=current_user)
+
+
+def _audit_avatar_change(db: Session, user: User, request: Request, change: str):
+    try:
+        AuditService.log_action(
+            db=db,
+            action=AuditService.ACTION_UPDATE_USER,
+            user_id=user.id,
+            resource_type=AuditService.RESOURCE_USER,
+            resource_id=str(user.id),
+            additional_data={"changed_fields": ["avatar"], "avatar_change": change},
+            request=request,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create audit log for avatar change of {user.id}: {e}")
+        db.refresh(user)
 
 
 # ============================================================================

@@ -8,8 +8,10 @@
  * `utils/auth_utils.py`.
  *
  * SCOPE. Only the endpoints `AuthService` actually calls are represented.
- * `GET /api/auth/avatar/{id}` (`auth_avatar_*`) is deliberately absent: it is
- * used as an <img> src, so its failures never become an AppError.
+ * `GET /api/auth/avatar/{id}` (`auth_avatar_not_found`) is
+ * deliberately absent: it is used as an <img> src, so its failures never
+ * become an AppError. Upload/delete (`POST`/`DELETE /api/auth/me/avatar`) are
+ * called by `AuthService` and registered below (EXAMCRAFT-168).
  *
  * EXAMCRAFT-126/139: the OIDC-BFF login removed the password, verification,
  * reset and OAuth endpoints, so their codes (and the `auth_login_failed`,
@@ -49,6 +51,10 @@ export const AUTH_ERROR_CODES = [
   'auth_account_locked',
   'auth_account_not_active',
   'auth_account_status_invalid',
+  'auth_avatar_delete_failed',
+  'auth_avatar_invalid_image',
+  'auth_avatar_too_large',
+  'auth_avatar_upload_failed',
   'auth_email_taken',
   'auth_logout_failed',
   'auth_password_incorrect',

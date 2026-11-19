@@ -2693,7 +2693,11 @@
       "settings": "Einstellungen",
       "language": "Sprache",
       "languageHint": "Ändert die Sprache der gesamten Anwendung",
-      "languageSaveFailed": "Die Sprache gilt für diesen Browser, konnte aber nicht im Konto gespeichert werden. Andere Geräte übernehmen sie noch nicht."
+      "languageSaveFailed": "Die Sprache gilt für diesen Browser, konnte aber nicht im Konto gespeichert werden. Andere Geräte übernehmen sie noch nicht.",
+      "avatarTitle": "Profilbild",
+      "avatarUpload": "Bild hochladen",
+      "avatarRemove": "Bild entfernen",
+      "avatarHint": "Erlaubt sind Bilder bis 2 MB. Ein hochgeladenes Bild ersetzt das Bild deines Anmeldedienstes."
     },
     "profileEdit": {
       "header": "Profil bearbeiten",
@@ -3134,6 +3138,10 @@
     "auth_account_locked": "Konto gesperrt. Bitte versuch es später erneut",
     "auth_account_not_active": "Dein Konto ist nicht aktiv",
     "auth_account_status_invalid": "Dein Konto hat den Status «{{status}}»",
+    "auth_avatar_invalid_image": "Die Datei ist kein gültiges Bild",
+    "auth_avatar_too_large": "Das Bild ist grösser als {{max_mb}} MB",
+    "auth_avatar_upload_failed": "Profilbild konnte nicht hochgeladen werden",
+    "auth_avatar_delete_failed": "Profilbild konnte nicht entfernt werden",
     "auth_email_taken": "E-Mail-Adresse ist bereits registriert",
     "auth_logout_failed": "Abmeldung fehlgeschlagen",
     "auth_password_incorrect": "Aktuelles Passwort ist falsch",

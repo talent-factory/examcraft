@@ -3,7 +3,7 @@
  * Display user profile information
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../../utils/dateLocale';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,6 +11,7 @@ import AuthService from '../../services/AuthService';
 import { useLanguageChange } from '../../hooks/useLanguageChange';
 import { getPendingLanguage, clearPendingLanguage } from '../../utils/languagePreference';
 import { SupportedLanguage } from '../../types/auth';
+import { translateError } from '../../errors';
 
 interface ProfileViewProps {
   onEdit?: () => void;
@@ -18,10 +19,13 @@ interface ProfileViewProps {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   const { t, i18n } = useTranslation();
-  const { user } = useAuth();
+  const { user, uploadAvatar, deleteAvatar } = useAuth();
   const { changeLanguage } = useLanguageChange();
   const [avatarError, setAvatarError] = useState(false);
   const [languageSaveFailed, setLanguageSaveFailed] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // A choice that never reached the account gets one more try whenever this
   // page is opened. Without it the browser and the account stay apart until
@@ -54,7 +58,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
   }
 
   // Get proxied avatar URL to avoid Google rate limiting (429 errors)
-  const getAvatarUrl = (userId: number): string => {
+  const getAvatarUrl = (userId: number, version?: string | null): string => {
     const API_BASE_URL = process.env.REACT_APP_API_URL;
 
     if (!API_BASE_URL) {
@@ -62,7 +66,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
       return ''; // Return empty string to trigger onError fallback
     }
 
-    return `${API_BASE_URL}/api/auth/avatar/${userId}`;
+    const v = version ? `?v=${encodeURIComponent(version)}` : '';
+    return `${API_BASE_URL}/api/auth/avatar/${userId}${v}`;
+  };
+
+  const runAvatarAction = async (
+    action: () => Promise<void>,
+    fallback: 'upload' | 'delete',
+  ) => {
+    setAvatarBusy(true);
+    setAvatarMessage(null);
+    try {
+      await action();
+      setAvatarError(false);
+    } catch (error) {
+      setAvatarMessage(
+        fallback === 'upload'
+          ? translateError(error, t, 'errors.auth_avatar_upload_failed')
+          : translateError(error, t, 'errors.auth_avatar_delete_failed'),
+      );
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const handleAvatarFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) {
+      void runAvatarAction(() => uploadAvatar(file), 'upload');
+    }
   };
 
   const LANGUAGE_OPTIONS = [
@@ -110,7 +143,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
           {/* Avatar with fallback to initials */}
           {user.id && !avatarError ? (
             <img
-              src={getAvatarUrl(user.id)}
+              src={getAvatarUrl(user.id, user.avatar_updated_at)}
               alt={`${user.first_name} ${user.last_name}`}
               className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
               onError={() => setAvatarError(true)}
@@ -133,6 +166,43 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onEdit }) => {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Avatar actions */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            data-testid="avatar-file-input"
+            aria-label={t('profile.profileView.avatarTitle')}
+            onChange={handleAvatarFile}
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              disabled={avatarBusy}
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              {t('profile.profileView.avatarUpload')}
+            </button>
+            {user.avatar_source === 'upload' && (
+              <button
+                type="button"
+                disabled={avatarBusy}
+                onClick={() => void runAvatarAction(deleteAvatar, 'delete')}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                {t('profile.profileView.avatarRemove')}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{t('profile.profileView.avatarHint')}</p>
+          {avatarMessage && (
+            <p role="alert" className="text-sm text-red-600 mt-1">{avatarMessage}</p>
+          )}
         </div>
 
         {/* Information Grid */}
