@@ -74,6 +74,7 @@
       "colPercentage": "Percentuale",
       "colGradeStatus": "Stato",
       "gradeStatus": {
+        "proposed": "Proposta IA",
         "pending_review": "Da revisionare",
         "partially_reviewed": "Parzialmente revisionato",
         "fully_reviewed": "Revisionato",

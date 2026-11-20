@@ -74,6 +74,7 @@
       "colPercentage": "Prozent",
       "colGradeStatus": "Status",
       "gradeStatus": {
+        "proposed": "KI-Vorschlag",
         "pending_review": "In Review",
         "partially_reviewed": "Teilweise reviewt",
         "fully_reviewed": "Reviewt",
