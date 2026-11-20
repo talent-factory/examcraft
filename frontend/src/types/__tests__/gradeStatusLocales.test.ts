@@ -14,10 +14,12 @@ describe("auswertungen.exam.gradeStatus locales", () => {
     (_lang, translation) => {
       const labels = (
         translation as unknown as {
-          auswertungen: { exam: { gradeStatus: Record<string, string> } };
+          auswertungen?: { exam?: { gradeStatus?: Record<string, string> } };
         }
-      ).auswertungen.exam.gradeStatus;
+      ).auswertungen?.exam?.gradeStatus as Record<string, string>;
+      expect(labels).toBeDefined();
       for (const status of expected) {
+        expect(labels).toHaveProperty([status]);
         expect(labels[status]).toBeTruthy();
       }
     },
