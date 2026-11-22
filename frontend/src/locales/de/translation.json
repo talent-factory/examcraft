@@ -468,6 +468,10 @@
         "title": "Anmeldung und Benutzerkonto",
         "text": "Die Anmeldung erfolgt über den selbst betriebenen Identitätsdienst «Talent Factory Login» (tessera/Zitadel, Region Frankfurt, DE). Dort werden E-Mail-Adresse, Name, Passwort-Hash, bevorzugte Sprache sowie technische Anmeldedaten (IP-Adresse, User-Agent, Spracheinstellung des Browsers) verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Dies gilt auch für die einmalige Übernahme bestehender Konten, einschliesslich des Passwort-Hashes, in den Identitätsdienst: Sie dient dazu, dass Sie sich weiterhin mit Ihrem bisherigen Passwort anmelden können. Technische Anmeldedaten in den Ereignisprotokollen des Identitätsdienstes werden nach 90 Tagen entfernt. Bei einer Kontolöschung wird zuerst das Konto im Identitätsdienst gelöscht, erst nach erfolgreicher Löschung die Daten in ExamCraft AI. Profildaten gelöschter Konten werden in den Ereignisprotokollen durch eine Feldlöschung geleert. Tägliche Sicherungen des Identitätsdienstes werden nach 30 Tagen gelöscht. Optional können Sie sich über Google, Microsoft oder GitHub anmelden; die Anmeldung erfolgt dann bei diesem Anbieter und wird über den Identitätsdienst vermittelt."
       },
+      "avatar": {
+        "title": "Profilbild",
+        "text": "Optional können Sie ein Profilbild verwenden. Das Bild stammt entweder von Ihrem Anmeldedienst (derzeit Google; die Übernahme erfolgt beim Login) oder wird von Ihnen selbst hochgeladen. Bei der Übernahme lädt der ExamCraft-Server das Bild von der vom Anbieter gelieferten URL herunter; dabei wird dem Anbieter die IP-Adresse des Servers bekannt, nicht Ihre. Das Bild wird auf ein quadratisches PNG (256 × 256 Pixel) umgerechnet, wobei Metadaten wie EXIF- oder GPS-Angaben entfallen, und in Ihrem Benutzerkonto in ExamCraft AI gespeichert. Es ist für Sie selbst, für angemeldete Nutzerinnen und Nutzer Ihrer Institution sowie für die Plattform-Administration sichtbar. Ein selbst hochgeladenes Bild wird beim Login nicht durch das Bild des Anmeldedienstes ersetzt. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung: Darstellung Ihres Kontos) bzw. bei einem selbst hochgeladenen Bild Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO, die Sie durch das Hochladen erteilen und durch das Entfernen des Bildes in Ihrem Profil widerrufen können. Ein vom Anmeldedienst übernommenes Bild wird nach dem Entfernen beim nächsten Login erneut übernommen; dauerhaft verhindern lässt sich das nur durch das Entfernen des Bildes beim Anbieter. Bei einer Kontolöschung wird das Bild zusammen mit Ihrem Benutzerkonto gelöscht."
+      },
       "hosting": {
         "title": "Hosting und Speicherort",
         "text": "Die Plattform wird in der Fly.io-Region Frankfurt (Deutschland) betrieben. Datenbanken, Vektor-DB und Message-Queue laufen in derselben Region. Fehleranalysen werden über das selbst betriebene Error-Tracking-System Specula (Betrieb in der Region Frankfurt, DE) mit maskierten Daten verarbeitet."
@@ -515,7 +519,7 @@
           },
           {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Optionale Single-Sign-On-Anmeldung, vermittelt über unseren Identitätsdienst; Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Optionale Single-Sign-On-Anmeldung, vermittelt über unseren Identitätsdienst; beim Login lädt unser Server das Bild von der vom Anbieter gelieferten Profilbild-URL herunter (die Server-IP-Adresse wird dem Anbieter dabei bekannt); Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },

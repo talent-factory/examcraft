@@ -468,6 +468,10 @@
         "title": "Sign-in and user account",
         "text": "Sign-in uses our self-operated identity service “Talent Factory Login” (tessera/Zitadel, Frankfurt region, DE). It processes your email address, name, password hash, preferred language and technical sign-in data (IP address, user agent, browser language setting). The legal basis is Art. 6(1)(b) GDPR (performance of a contract). This also covers the one-time transfer of existing accounts, including the password hash, to the identity service, so that you can keep signing in with your current password. Technical sign-in data in the identity service's event logs is removed after 90 days. When an account is deleted, the account in the identity service is deleted first, and the data in ExamCraft AI only after that deletion has succeeded. Profile data of deleted accounts in the event logs is emptied by a field deletion. Daily backups of the identity service are deleted after 30 days. Optionally you can sign in with Google, Microsoft or GitHub; sign-in then takes place with that provider and is brokered through the identity service."
       },
+      "avatar": {
+        "title": "Profile picture",
+        "text": "You may optionally use a profile picture. The picture comes either from your sign-in provider (currently Google; it is taken over at login) or is uploaded by you. When it is taken over, the ExamCraft server downloads the picture from the URL supplied by the provider; the provider thereby learns the server's IP address, not yours. The picture is converted to a square PNG (256 × 256 pixels), which removes metadata such as EXIF or GPS data, and is stored in your user account in ExamCraft AI. It is visible to you, to signed-in users of your institution and to the platform administration. A picture you uploaded yourself is not replaced by the sign-in provider's picture at login. The legal basis is Art. 6(1)(b) GDPR (performance of the contract: displaying your account) or, for a picture you uploaded yourself, your consent under Art. 6(1)(a) GDPR, which you give by uploading and can withdraw by removing the picture in your profile. A picture taken over from the sign-in provider is taken over again at the next login after you remove it; this can only be prevented permanently by removing the picture at the provider. If your account is deleted, the picture is deleted together with your user account."
+      },
       "hosting": {
         "title": "Hosting and data location",
         "text": "The platform is operated in the Fly.io region Frankfurt (Germany). Databases, vector DB and message queue run in the same region. Error tracking is handled via the self-hosted error-tracking system Specula (operated in the Frankfurt region, DE), with masked data."
@@ -515,7 +519,7 @@
           },
           {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Optional single sign-on, brokered through our identity service; Provider: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Optional single sign-on, brokered through our identity service; at login our server downloads the picture from the profile picture URL supplied by the provider (the provider thereby learns the server's IP address); Provider: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },

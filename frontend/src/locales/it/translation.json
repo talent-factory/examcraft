@@ -468,6 +468,10 @@
         "title": "Accesso e account utente",
         "text": "L'accesso avviene tramite il nostro servizio di identità gestito in proprio «Talent Factory Login» (tessera/Zitadel, regione di Francoforte, DE). Vengono trattati indirizzo e-mail, nome, hash della password, lingua preferita e dati tecnici di accesso (indirizzo IP, user agent, lingua del browser). La base giuridica è l'art. 6 par. 1 lett. b GDPR (esecuzione del contratto). Ciò vale anche per il trasferimento una tantum degli account esistenti, compreso l'hash della password, nel servizio di identità: serve a consentire di continuare ad accedere con la password attuale. I dati tecnici di accesso nei registri degli eventi del servizio di identità vengono rimossi dopo 90 giorni. In caso di cancellazione dell'account viene eliminato prima l'account nel servizio di identità, e i dati in ExamCraft AI solo dopo il successo di tale eliminazione. I dati di profilo degli account eliminati nei registri degli eventi vengono svuotati tramite una cancellazione dei campi. I backup giornalieri del servizio di identità vengono eliminati dopo 30 giorni. In alternativa è possibile accedere con Google, Microsoft o GitHub; l'accesso avviene allora presso tale fornitore e viene intermediato dal servizio di identità."
       },
+      "avatar": {
+        "title": "Immagine del profilo",
+        "text": "È possibile utilizzare facoltativamente un'immagine del profilo. L'immagine proviene dal servizio di accesso (attualmente Google; viene acquisita al login) oppure viene caricata da voi. Durante l'acquisizione il server di ExamCraft scarica l'immagine dall'URL fornito dal fornitore; il fornitore viene così a conoscenza dell'indirizzo IP del server, non del vostro. L'immagine viene convertita in un PNG quadrato (256 × 256 pixel), con eliminazione dei metadati come i dati EXIF o GPS, e salvata nel vostro account utente in ExamCraft AI. È visibile a voi, agli utenti connessi della vostra istituzione e all'amministrazione della piattaforma. Un'immagine caricata da voi non viene sostituita al login da quella del servizio di accesso. La base giuridica è l'art. 6 par. 1 lett. b GDPR (esecuzione del contratto: visualizzazione del vostro account) oppure, per un'immagine caricata da voi, il vostro consenso ai sensi dell'art. 6 par. 1 lett. a GDPR, che esprimete con il caricamento e potete revocare rimuovendo l'immagine nel vostro profilo. Un'immagine acquisita dal servizio di accesso viene acquisita di nuovo al login successivo dopo la rimozione; ciò può essere evitato in modo permanente solo rimuovendo l'immagine presso il fornitore. In caso di cancellazione dell'account l'immagine viene eliminata insieme all'account utente."
+      },
       "hosting": {
         "title": "Hosting e localizzazione dei dati",
         "text": "La piattaforma è gestita nella regione Fly.io di Francoforte (Germania). Database, database vettoriale e coda di messaggi operano nella stessa regione. Il tracciamento degli errori è gestito tramite Specula, il nostro sistema di tracciamento degli errori gestito internamente (nella regione di Francoforte, DE), con dati mascherati."
@@ -515,7 +519,7 @@
           },
           {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Single sign-on facoltativo, intermediato dal nostro servizio di identità; Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Single sign-on facoltativo, intermediato dal nostro servizio di identità; al login il nostro server scarica l'immagine dall'URL dell'immagine del profilo indicato dal fornitore (il fornitore viene così a conoscenza dell'indirizzo IP del server); Fornitore: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
