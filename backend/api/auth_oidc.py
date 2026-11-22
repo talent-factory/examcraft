@@ -43,6 +43,7 @@ from models.auth import User, UserStatus
 from services import oidc_client, session_service
 from errors import api_error
 from services.audit_service import AuditService
+from services.avatar_service import sync_idp_avatar
 from services.translation_service import get_request_locale
 from services.auth_service import AuthService
 from services.user_provisioning import (
@@ -332,6 +333,10 @@ def callback(
             login_method="zitadel",
         )
         return _error_redirect("account_inactive")
+
+    # Profile picture (EXAMCRAFT-168): copy the IdP picture into the account.
+    # Never fails the login; an uploaded picture is left alone.
+    sync_idp_avatar(db, user, claims.get("picture"))
 
     # The redirect target is resolved before the session exists, so a
     # configuration problem can never leave a session without a cookie.

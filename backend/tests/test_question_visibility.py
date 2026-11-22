@@ -534,6 +534,8 @@ def test_edit_question_mutation_ignores_visibility(qv_db, qv_client):
         inst.id,
         created_by=creator.id,
         visibility=QuestionReviewVisibility.PRIVATE,
+        # EXAMCRAFT-171: approved questions are content-locked
+        status=ReviewStatus.PENDING.value,
     )
     qv_db.commit()
     login(qv_client, editor)
@@ -929,3 +931,60 @@ def test_org_unit_id_only_change_gets_its_own_audit_entry(qv_db, qv_client):
     assert history.changed_fields["org_unit_id"]["new"] == ou2.id
     # visibility itself didn't change -- must not claim it did.
     assert "visibility" not in history.changed_fields
+
+
+def test_visibility_change_keeps_approved_status_and_content_lock(qv_db, qv_client):
+    """EXAMCRAFT-171: a visibility-only edit must not drop the approval,
+    otherwise a follow-up content edit would bypass the lock."""
+    inst = make_institution(qv_db, "lk1")
+    editor = make_user_with_role(qv_db, inst.id, "lk1a", ["edit_questions"])
+    q = make_question(
+        qv_db, inst.id, created_by=editor.id, status=ReviewStatus.APPROVED.value
+    )
+    qv_db.commit()
+    login(qv_client, editor)
+
+    resp = qv_client.put(
+        f"/api/v1/questions/{q.id}/edit", json={"visibility": "private"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["review_status"] == ReviewStatus.APPROVED.value
+
+    resp = qv_client.put(
+        f"/api/v1/questions/{q.id}/edit",
+        json={"question_text": "Silently changed wording"},
+    )
+    assert resp.status_code == 409
+
+
+def test_noop_edit_of_approved_question_is_allowed(qv_db, qv_client):
+    inst = make_institution(qv_db, "lk2")
+    editor = make_user_with_role(qv_db, inst.id, "lk2a", ["edit_questions"])
+    q = make_question(
+        qv_db, inst.id, created_by=editor.id, status=ReviewStatus.APPROVED.value
+    )
+    qv_db.commit()
+    login(qv_client, editor)
+
+    resp = qv_client.put(
+        f"/api/v1/questions/{q.id}/edit", json={"question_text": q.question_text}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["review_status"] == ReviewStatus.APPROVED.value
+
+
+def test_content_edit_of_non_approved_question_is_allowed(qv_db, qv_client):
+    inst = make_institution(qv_db, "lk3")
+    editor = make_user_with_role(qv_db, inst.id, "lk3a", ["edit_questions"])
+    q = make_question(
+        qv_db, inst.id, created_by=editor.id, status=ReviewStatus.PENDING.value
+    )
+    qv_db.commit()
+    login(qv_client, editor)
+
+    resp = qv_client.put(
+        f"/api/v1/questions/{q.id}/edit",
+        json={"question_text": "Updated wording of the question"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["review_status"] == ReviewStatus.EDITED.value

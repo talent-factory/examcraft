@@ -1,17 +1,17 @@
 """
-Tests for the Avatar Proxy endpoint GET /api/auth/avatar/{user_id}
-
-Covers the route itself: user lookup, error codes and content-type
-detection. Download, Redis caching and TTL live in AvatarService and are
-covered by test_avatar_service.py, so AvatarService is mocked here.
+Tests for GET /api/auth/avatar/{user_id}: user lookup, error codes and
+serving of the stored picture. There is no download fallback
+(EXAMCRAFT-168): ``avatar_url`` is never fetched here.
 """
 
 from unittest.mock import patch
 
 import pytest
+from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from database import get_db
+from utils.auth_utils import get_current_active_user
 from main import app
 from models.auth import Institution, User, UserStatus
 
@@ -39,11 +39,15 @@ def client(db):
         yield db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(
+        id=-1, is_superuser=True, institution_id=None
+    )
     with TestClient(app) as test_client:
         yield test_client
+    app.dependency_overrides.pop(get_current_active_user, None)
 
 
-def _create_user(db, avatar_url):
+def _create_user(db, avatar_url, avatar_data=None, content_type=None):
     institution = db.query(Institution).filter_by(slug="avatar-test-university").one()
     user = User(
         email="avatar@avatar-test-university.ch",
@@ -52,6 +56,8 @@ def _create_user(db, avatar_url):
         institution_id=institution.id,
         status=UserStatus.ACTIVE.value,
         avatar_url=avatar_url,
+        avatar_data=avatar_data,
+        avatar_content_type=content_type,
     )
     db.add(user)
     db.commit()
@@ -60,56 +66,50 @@ def _create_user(db, avatar_url):
 
 
 def test_unknown_user_returns_404(client):
-    with patch("api.auth.AvatarService") as service_cls:
-        response = client.get("/api/auth/avatar/999999999")
+    response = client.get("/api/auth/avatar/999999999")
 
     assert response.status_code == 404
     assert response.json()["error_code"] == "auth_user_not_found"
-    service_cls.assert_not_called()
 
 
-def test_user_without_avatar_url_returns_404(client, db):
+def test_user_without_stored_picture_returns_404(client, db):
     user = _create_user(db, avatar_url=None)
 
-    with patch("api.auth.AvatarService") as service_cls:
+    response = client.get(f"/api/auth/avatar/{user.id}")
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "auth_avatar_not_found"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        AVATAR_URL,
+        "http://127.0.0.1:8000/internal",
+        "http://169.254.169.254/latest/meta-data",
+    ],
+)
+def test_avatar_url_is_never_fetched(client, db, url):
+    """Legacy rows with only an avatar_url get a 404, no outbound request."""
+    user = _create_user(db, avatar_url=url)
+
+    with patch("httpx.Client") as http_client, patch("httpx.get") as http_get:
         response = client.get(f"/api/auth/avatar/{user.id}")
 
     assert response.status_code == 404
     assert response.json()["error_code"] == "auth_avatar_not_found"
-    service_cls.assert_not_called()
+    http_client.assert_not_called()
+    http_get.assert_not_called()
 
 
-def test_failed_download_returns_502(client, db):
-    user = _create_user(db, avatar_url=AVATAR_URL)
+def test_serves_stored_picture(client, db):
+    user = _create_user(
+        db, avatar_url=AVATAR_URL, avatar_data=b"\x89PNG-data", content_type="image/png"
+    )
 
-    with patch("api.auth.AvatarService") as service_cls:
-        service_cls.return_value.get_avatar.return_value = None
-        response = client.get(f"/api/auth/avatar/{user.id}")
-
-    assert response.status_code == 502
-    assert response.json()["error_code"] == "auth_avatar_download_failed"
-
-
-@pytest.mark.parametrize(
-    "image_bytes, content_type",
-    [
-        (b"\x89PNG\r\n\x1a\n-png-data", "image/png"),
-        (b"GIF89a-gif-data", "image/gif"),
-        (b"RIFF\x00\x00\x00\x00WEBP-webp-data", "image/webp"),
-        (b"\xff\xd8\xff\xe0-jpeg-data", "image/jpeg"),
-    ],
-)
-def test_returns_avatar_with_detected_content_type(
-    client, db, image_bytes, content_type
-):
-    user = _create_user(db, avatar_url=AVATAR_URL)
-
-    with patch("api.auth.AvatarService") as service_cls:
-        service_cls.return_value.get_avatar.return_value = image_bytes
-        response = client.get(f"/api/auth/avatar/{user.id}")
+    response = client.get(f"/api/auth/avatar/{user.id}")
 
     assert response.status_code == 200
-    assert response.content == image_bytes
-    assert response.headers["content-type"] == content_type
-    assert response.headers["cache-control"] == "public, max-age=86400"
-    service_cls.return_value.get_avatar.assert_called_once_with(user.id, AVATAR_URL)
+    assert response.content == b"\x89PNG-data"
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"].startswith("private")

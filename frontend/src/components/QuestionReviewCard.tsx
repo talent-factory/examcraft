@@ -106,6 +106,9 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
     loadComments();
   }, [showComments, question.id, comments.length]);
 
+  // EXAMCRAFT-171: approved questions are locked until versioning (EXAMCRAFT-172)
+  const isEditLocked = question.review_status === ReviewStatus.APPROVED;
+
   const getStatusColor = (status: ReviewStatus): 'default' | 'success' | 'error' | 'warning' | 'info' => {
     switch (status) {
       case ReviewStatus.APPROVED:
@@ -541,14 +544,23 @@ const QuestionReviewCard: React.FC<QuestionReviewCardProps> = ({
           </Tooltip>
         </Box>
         <Box>
-          <Tooltip title={t('components.questionCard.editQuestion')}>
-            <IconButton
-              onClick={() => onEdit?.(question.id)}
-              disabled={loading}
-              size="small"
-            >
-              <Edit />
-            </IconButton>
+          <Tooltip
+            title={
+              isEditLocked
+                ? t('components.questionCard.editLockedApproved')
+                : t('components.questionCard.editQuestion')
+            }
+          >
+            <span>
+              <IconButton
+                aria-label={t('components.questionCard.editQuestion')}
+                onClick={() => onEdit?.(question.id)}
+                disabled={loading || isEditLocked}
+                size="small"
+              >
+                <Edit />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title={t('components.questionCard.addComment')}>
             <IconButton

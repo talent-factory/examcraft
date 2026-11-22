@@ -9,6 +9,40 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-22
+
+### Added
+
+- **Profilbild:** Das Bild des Identity Providers wird beim Login in
+  das Konto kopiert (normalisiert, quadratisches PNG) und lässt sich im
+  Profil durch ein eigenes Bild ersetzen oder entfernen. Ein
+  hochgeladenes Bild wird vom Login-Sync nie überschrieben. Neue
+  Migration `ec168_user_avatar_storage` (additiv, vier nullable Spalten
+  in `users`), neue Abhängigkeit `pillow` (EXAMCRAFT-168, #437).
+- **CSV-Notenexport der Portfolio-Bewertung** (Premium): Endpunkt und
+  Service für den Export der Noten einer Bewertung; neuer
+  Response-Header `X-Portfolio-Export-Excluded` (EXAMCRAFT-69, #441).
+
+### Changed
+
+- **Genehmigte Fragen sind inhaltlich gesperrt:** Änderungen an Text,
+  Optionen, Antwort, Erklärung, Schwierigkeit, Bloom-Stufe und Zeit
+  liefern `409 review_question_locked_approved`. Sichtbarkeit und
+  Organisationseinheit bleiben änderbar. Übergangslösung bis zur
+  Versionierung (EXAMCRAFT-171, EXAMCRAFT-172, #443).
+- DSGVO-Export enthält die Metadaten des Profilbilds (#437).
+- Compliance: Profilbild in Datenschutzerklärung, TOM 5 und AVV §12
+  aufgenommen, Subprozessor-Beschreibung um den serverseitigen Abruf
+  der Bild-URL ergänzt (EXAMCRAFT-185, #444).
+
+### Fixed
+
+- Zitadel-Bulk-Import gegen Prod lauffähig: Pflichtfeld `timeout`,
+  bereits vorhandene Org `examcraft` zählt nicht mehr als Fehler,
+  Fehlerausgabe ohne Personendaten (#435).
+- Fehlende Übersetzung `gradeStatus.proposed` im Abgabe-Fenster der
+  Portfolio-Bewertung ergänzt (#440).
+
 ## [1.16.0] - 2026-11-18
 
 ### Added

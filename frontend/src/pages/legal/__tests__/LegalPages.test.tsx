@@ -147,11 +147,31 @@ describe('Legal pages', () => {
       async (locale) => {
         await i18n.changeLanguage(locale);
         renderWithRouter(<PrivacyPage />);
-        expect(screen.getByText(/Talent Factory Login/)).toBeInTheDocument();
-        expect(screen.getByText(/art\. 6.{0,20}(lit\. b|let\. b|lett\. b|\(1\)\(b\))/i)).toBeInTheDocument();
+        // Im Login-Absatz selbst prüfen: der Profilbild-Absatz nennt Art. 6 ebenfalls.
+        const loginText = screen.getByText(/Talent Factory Login/);
+        expect(loginText).toBeInTheDocument();
+        expect(loginText.textContent).toMatch(/art\. 6.{0,20}(lit\. b|let\. b|lett\. b|\(1\)\(b\))/i);
         // Exakter Treffer: nur der Subprozessor-Eintrag, nicht der Fliesstext.
         expect(screen.getByText('tessera/Zitadel')).toBeInTheDocument();
       }
     );
+  });
+
+  describe('Profile picture section (EXAMCRAFT-185)', () => {
+    afterEach(async () => {
+      await i18n.changeLanguage('de');
+    });
+
+    it.each([
+      ['de', 'Profilbild'],
+      ['en', 'Profile picture'],
+      ['fr', 'Photo de profil'],
+      ['it', 'Immagine del profilo'],
+    ])('locale "%s" renders the profile picture section', async (locale, title) => {
+      await i18n.changeLanguage(locale);
+      renderWithRouter(<PrivacyPage />);
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+      expect(screen.getByText(/256/)).toBeInTheDocument();
+    });
   });
 });

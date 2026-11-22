@@ -39,6 +39,7 @@ export const REVIEW_ERROR_CODES = [
   'review_fetch_queue_failed',
   'review_four_eyes_principle',
   'review_invalid_status_for_review',
+  'review_question_locked_approved',
   'review_question_not_found',
   'review_reject_failed',
   'review_start_failed',

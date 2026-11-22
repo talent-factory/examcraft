@@ -285,3 +285,24 @@ def test_github_is_documented_as_user_linked_not_as_a_subprocessor() -> None:
     )
     assert "GitHub" in tom_text
     assert "Vom Nutzer selbst verknüpfte Drittdienste" in tom_text
+
+
+def test_profile_picture_is_documented_in_avv_tom_and_vvt() -> None:
+    """EXAMCRAFT-185: the profile picture (users.avatar_data) is a data type
+    that must appear in the AVV data categories and deletion clause, the TOM
+    deletion section and the VVT building block, and the OAuth subprocessor
+    must mention the server-side picture fetch."""
+    content = get_compliance_content()
+
+    def section(doc, prefix: str) -> str:
+        found = [s for s in doc.sections if s.heading.startswith(prefix)]
+        assert len(found) == 1, f"section {prefix!r} not found exactly once"
+        return " ".join(found[0].paragraphs)
+
+    assert "Profilbild" in section(content.avv, "3. ")
+    assert "Profilbild" in section(content.avv, "12. ")
+    assert "Profilbild" in section(content.tom, "5. ")
+    assert "Profilbild" in content.vvt_text
+    oauth = next((sp for sp in content.subprocessors if "OAuth" in sp.name), None)
+    assert oauth is not None, "OAuth subprocessor missing"
+    assert "Profilbild" in oauth.purpose

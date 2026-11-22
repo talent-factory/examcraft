@@ -74,6 +74,7 @@
       "colPercentage": "Percentage",
       "colGradeStatus": "Status",
       "gradeStatus": {
+        "proposed": "AI proposal",
         "pending_review": "Pending review",
         "partially_reviewed": "Partially reviewed",
         "fully_reviewed": "Reviewed",
@@ -467,6 +468,10 @@
         "title": "Sign-in and user account",
         "text": "Sign-in uses our self-operated identity service “Talent Factory Login” (tessera/Zitadel, Frankfurt region, DE). It processes your email address, name, password hash, preferred language and technical sign-in data (IP address, user agent, browser language setting). The legal basis is Art. 6(1)(b) GDPR (performance of a contract). This also covers the one-time transfer of existing accounts, including the password hash, to the identity service, so that you can keep signing in with your current password. Technical sign-in data in the identity service's event logs is removed after 90 days. When an account is deleted, the account in the identity service is deleted first, and the data in ExamCraft AI only after that deletion has succeeded. Profile data of deleted accounts in the event logs is emptied by a field deletion. Daily backups of the identity service are deleted after 30 days. Optionally you can sign in with Google, Microsoft or GitHub; sign-in then takes place with that provider and is brokered through the identity service."
       },
+      "avatar": {
+        "title": "Profile picture",
+        "text": "You may optionally use a profile picture. The picture comes either from your sign-in provider (currently Google; it is taken over at login) or is uploaded by you. When it is taken over, the ExamCraft server downloads the picture from the URL supplied by the provider; the provider thereby learns the server's IP address, not yours. The picture is converted to a square PNG (256 × 256 pixels), which removes metadata such as EXIF or GPS data, and is stored in your user account in ExamCraft AI. It is visible to you, to signed-in users of your institution and to the platform administration. A picture you uploaded yourself is not replaced by the sign-in provider's picture at login. The legal basis is Art. 6(1)(b) GDPR (performance of the contract: displaying your account) or, for a picture you uploaded yourself, your consent under Art. 6(1)(a) GDPR, which you give by uploading and can withdraw by removing the picture in your profile. A picture taken over from the sign-in provider is taken over again at the next login after you remove it; this can only be prevented permanently by removing the picture at the provider. If your account is deleted, the picture is deleted together with your user account."
+      },
       "hosting": {
         "title": "Hosting and data location",
         "text": "The platform is operated in the Fly.io region Frankfurt (Germany). Databases, vector DB and message queue run in the same region. Error tracking is handled via the self-hosted error-tracking system Specula (operated in the Frankfurt region, DE), with masked data."
@@ -514,7 +519,7 @@
           },
           {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Optional single sign-on, brokered through our identity service; Provider: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Optional single sign-on, brokered through our identity service; at login our server downloads the picture from the profile picture URL supplied by the provider (the provider thereby learns the server's IP address); Provider: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -2229,6 +2234,7 @@
       "approveBtn": "Approve",
       "rejectBtn": "Reject",
       "editQuestion": "Edit Question",
+      "editLockedApproved": "Approved questions are locked",
       "addComment": "Add Comment",
       "showDetails": "Show Details",
       "archiveBtn": "Archive",
@@ -2693,7 +2699,11 @@
       "settings": "Settings",
       "language": "Language",
       "languageHint": "Changes the language of the entire application",
-      "languageSaveFailed": "The language applies in this browser but could not be saved to your account. Other devices will not pick it up yet."
+      "languageSaveFailed": "The language applies in this browser but could not be saved to your account. Other devices will not pick it up yet.",
+      "avatarTitle": "Profile picture",
+      "avatarUpload": "Upload picture",
+      "avatarRemove": "Remove picture",
+      "avatarHint": "Images up to 2 MB are allowed. An uploaded picture replaces the one from your sign-in provider."
     },
     "profileEdit": {
       "header": "Edit Profile",
@@ -3134,6 +3144,10 @@
     "auth_account_locked": "Account locked. Please try again later",
     "auth_account_not_active": "Your account is not active",
     "auth_account_status_invalid": "Your account is {{status}}",
+    "auth_avatar_invalid_image": "The file is not a valid image",
+    "auth_avatar_too_large": "The image is larger than {{max_mb}} MB",
+    "auth_avatar_upload_failed": "Failed to upload profile picture",
+    "auth_avatar_delete_failed": "Failed to remove profile picture",
     "auth_email_taken": "Email address is already registered",
     "auth_logout_failed": "Logout failed",
     "auth_password_incorrect": "Current password is incorrect",
@@ -3516,6 +3530,7 @@
     "review_four_eyes_principle": "Four-eyes principle: creator cannot approve their own question",
     "review_invalid_status_for_review": "Invalid status for review",
     "review_question_not_found": "Question not found",
+    "review_question_locked_approved": "Approved questions cannot be edited because they may be used in exams",
     "review_reject_failed": "Failed to reject question",
     "review_start_failed": "Failed to start review",
     "stats_submission_not_found": "Submission not found",
@@ -3943,6 +3958,10 @@
       "security": "Security & Reliability"
     },
     "entries": {
+      "v1_17_0_profile_picture": "Profile picture: your picture from the sign-in service is taken over at login. In your profile you can upload your own picture instead or remove it.",
+      "v1_17_0_grade_export": "Portfolio assessment: the grades of an assessment can be exported as a CSV file, for example for import into the grade management system.",
+      "v1_17_0_approved_locked": "Approved questions are locked against later changes to their content, so existing exams do not change unnoticed. Visibility and organisation unit can still be changed.",
+      "v1_17_0_proposed_label": "In the submission window of the portfolio assessment, the grade status \"AI proposal\" is labelled correctly again.",
       "v1_16_0_central_login": "Sign-in now goes through the central Talent Factory login. One account is enough for ExamCraft AI and other services.",
       "v1_16_0_switch_account": "On the login page, \"Sign in with a different account\" lets you deliberately sign in with another account.",
       "v1_16_0_login_errors": "Sign-in errors are now shown clearly on the login page, and expired sessions return you cleanly to the login.",

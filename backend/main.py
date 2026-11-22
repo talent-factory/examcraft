@@ -807,7 +807,11 @@ app.add_middleware(
     allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition", "X-Export-Skipped-Positions"],
+    expose_headers=[
+        "Content-Disposition",
+        "X-Export-Skipped-Positions",
+        "X-Portfolio-Export-Excluded",
+    ],
 )
 
 

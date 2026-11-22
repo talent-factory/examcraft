@@ -74,6 +74,7 @@
       "colPercentage": "Prozent",
       "colGradeStatus": "Status",
       "gradeStatus": {
+        "proposed": "KI-Vorschlag",
         "pending_review": "In Review",
         "partially_reviewed": "Teilweise reviewt",
         "fully_reviewed": "Reviewt",
@@ -467,6 +468,10 @@
         "title": "Anmeldung und Benutzerkonto",
         "text": "Die Anmeldung erfolgt über den selbst betriebenen Identitätsdienst «Talent Factory Login» (tessera/Zitadel, Region Frankfurt, DE). Dort werden E-Mail-Adresse, Name, Passwort-Hash, bevorzugte Sprache sowie technische Anmeldedaten (IP-Adresse, User-Agent, Spracheinstellung des Browsers) verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Dies gilt auch für die einmalige Übernahme bestehender Konten, einschliesslich des Passwort-Hashes, in den Identitätsdienst: Sie dient dazu, dass Sie sich weiterhin mit Ihrem bisherigen Passwort anmelden können. Technische Anmeldedaten in den Ereignisprotokollen des Identitätsdienstes werden nach 90 Tagen entfernt. Bei einer Kontolöschung wird zuerst das Konto im Identitätsdienst gelöscht, erst nach erfolgreicher Löschung die Daten in ExamCraft AI. Profildaten gelöschter Konten werden in den Ereignisprotokollen durch eine Feldlöschung geleert. Tägliche Sicherungen des Identitätsdienstes werden nach 30 Tagen gelöscht. Optional können Sie sich über Google, Microsoft oder GitHub anmelden; die Anmeldung erfolgt dann bei diesem Anbieter und wird über den Identitätsdienst vermittelt."
       },
+      "avatar": {
+        "title": "Profilbild",
+        "text": "Optional können Sie ein Profilbild verwenden. Das Bild stammt entweder von Ihrem Anmeldedienst (derzeit Google; die Übernahme erfolgt beim Login) oder wird von Ihnen selbst hochgeladen. Bei der Übernahme lädt der ExamCraft-Server das Bild von der vom Anbieter gelieferten URL herunter; dabei wird dem Anbieter die IP-Adresse des Servers bekannt, nicht Ihre. Das Bild wird auf ein quadratisches PNG (256 × 256 Pixel) umgerechnet, wobei Metadaten wie EXIF- oder GPS-Angaben entfallen, und in Ihrem Benutzerkonto in ExamCraft AI gespeichert. Es ist für Sie selbst, für angemeldete Nutzerinnen und Nutzer Ihrer Institution sowie für die Plattform-Administration sichtbar. Ein selbst hochgeladenes Bild wird beim Login nicht durch das Bild des Anmeldedienstes ersetzt. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung: Darstellung Ihres Kontos) bzw. bei einem selbst hochgeladenen Bild Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO, die Sie durch das Hochladen erteilen und durch das Entfernen des Bildes in Ihrem Profil widerrufen können. Ein vom Anmeldedienst übernommenes Bild wird nach dem Entfernen beim nächsten Login erneut übernommen; dauerhaft verhindern lässt sich das nur durch das Entfernen des Bildes beim Anbieter. Bei einer Kontolöschung wird das Bild zusammen mit Ihrem Benutzerkonto gelöscht."
+      },
       "hosting": {
         "title": "Hosting und Speicherort",
         "text": "Die Plattform wird in der Fly.io-Region Frankfurt (Deutschland) betrieben. Datenbanken, Vektor-DB und Message-Queue laufen in derselben Region. Fehleranalysen werden über das selbst betriebene Error-Tracking-System Specula (Betrieb in der Region Frankfurt, DE) mit maskierten Daten verarbeitet."
@@ -514,7 +519,7 @@
           },
           {
             "name": "Google/Microsoft (OAuth)",
-            "description": "Optionale Single-Sign-On-Anmeldung, vermittelt über unseren Identitätsdienst; Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
+            "description": "Optionale Single-Sign-On-Anmeldung, vermittelt über unseren Identitätsdienst; beim Login lädt unser Server das Bild von der vom Anbieter gelieferten Profilbild-URL herunter (die Server-IP-Adresse wird dem Anbieter dabei bekannt); Anbieter: Google LLC / Microsoft Corporation, USA (SCC/DPF)"
           }
         ]
       },
@@ -2229,6 +2234,7 @@
       "approveBtn": "Genehmigen",
       "rejectBtn": "Ablehnen",
       "editQuestion": "Frage bearbeiten",
+      "editLockedApproved": "Genehmigte Fragen sind gesperrt",
       "addComment": "Kommentar hinzufügen",
       "showDetails": "Details anzeigen",
       "archiveBtn": "Archivieren",
@@ -2693,7 +2699,11 @@
       "settings": "Einstellungen",
       "language": "Sprache",
       "languageHint": "Ändert die Sprache der gesamten Anwendung",
-      "languageSaveFailed": "Die Sprache gilt für diesen Browser, konnte aber nicht im Konto gespeichert werden. Andere Geräte übernehmen sie noch nicht."
+      "languageSaveFailed": "Die Sprache gilt für diesen Browser, konnte aber nicht im Konto gespeichert werden. Andere Geräte übernehmen sie noch nicht.",
+      "avatarTitle": "Profilbild",
+      "avatarUpload": "Bild hochladen",
+      "avatarRemove": "Bild entfernen",
+      "avatarHint": "Erlaubt sind Bilder bis 2 MB. Ein hochgeladenes Bild ersetzt das Bild deines Anmeldedienstes."
     },
     "profileEdit": {
       "header": "Profil bearbeiten",
@@ -3134,6 +3144,10 @@
     "auth_account_locked": "Konto gesperrt. Bitte versuch es später erneut",
     "auth_account_not_active": "Dein Konto ist nicht aktiv",
     "auth_account_status_invalid": "Dein Konto hat den Status «{{status}}»",
+    "auth_avatar_invalid_image": "Die Datei ist kein gültiges Bild",
+    "auth_avatar_too_large": "Das Bild ist grösser als {{max_mb}} MB",
+    "auth_avatar_upload_failed": "Profilbild konnte nicht hochgeladen werden",
+    "auth_avatar_delete_failed": "Profilbild konnte nicht entfernt werden",
     "auth_email_taken": "E-Mail-Adresse ist bereits registriert",
     "auth_logout_failed": "Abmeldung fehlgeschlagen",
     "auth_password_incorrect": "Aktuelles Passwort ist falsch",
@@ -3516,6 +3530,7 @@
     "review_four_eyes_principle": "Vier-Augen-Prinzip: Ersteller kann eigene Frage nicht genehmigen",
     "review_invalid_status_for_review": "Ungültiger Status für Überprüfung",
     "review_question_not_found": "Frage nicht gefunden",
+    "review_question_locked_approved": "Genehmigte Fragen können nicht bearbeitet werden, da sie in Prüfungen verwendet werden könnten",
     "review_reject_failed": "Frage konnte nicht abgelehnt werden",
     "review_start_failed": "Überprüfung konnte nicht gestartet werden",
     "stats_submission_not_found": "Submission nicht gefunden",
@@ -3943,6 +3958,10 @@
       "security": "Sicherheit & Zuverlässigkeit"
     },
     "entries": {
+      "v1_17_0_profile_picture": "Profilbild: Ihr Bild vom Anmeldedienst wird beim Login übernommen. Im Profil können Sie stattdessen ein eigenes Bild hochladen oder es entfernen.",
+      "v1_17_0_grade_export": "Portfolio-Bewertung: Die Noten einer Bewertung lassen sich als CSV-Datei exportieren, zum Beispiel für den Import in das Notenverwaltungssystem.",
+      "v1_17_0_approved_locked": "Genehmigte Fragen sind gegen nachträgliche Änderungen am Inhalt gesperrt, damit sich bestehende Prüfungen nicht unbemerkt verändern. Sichtbarkeit und Organisationseinheit bleiben änderbar.",
+      "v1_17_0_proposed_label": "Im Abgabe-Fenster der Portfolio-Bewertung erscheint der Notenstatus «KI-Vorschlag» wieder korrekt beschriftet.",
       "v1_16_0_central_login": "Die Anmeldung läuft jetzt über den zentralen Login von Talent Factory. Ein Konto genügt für ExamCraft AI und weitere Dienste.",
       "v1_16_0_switch_account": "Auf der Login-Seite können Sie sich mit «Mit anderem Konto anmelden» bewusst mit einem anderen Konto anmelden.",
       "v1_16_0_login_errors": "Fehler bei der Anmeldung werden auf der Login-Seite verständlich angezeigt, und abgelaufene Sitzungen führen sauber zurück zum Login.",

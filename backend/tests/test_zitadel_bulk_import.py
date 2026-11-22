@@ -337,6 +337,90 @@ def test_post_import_error_message_has_ids_but_no_body(monkeypatch, tmp_path):
     assert "a@b.test" not in str(info.value)
 
 
+def _recording_client(response):
+    """Client, der den gesendeten JSON-Body in ``sent`` ablegt."""
+    sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return response
+
+    return httpx.Client(transport=httpx.MockTransport(handler)), sent
+
+
+def test_post_import_sends_server_timeout(monkeypatch, tmp_path):
+    # Ohne ``timeout`` antwortet Zitadel mit HTTP 500 ("invalid duration").
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text(json.dumps({"dataOrgs": {"orgs": []}}))
+    client, sent = _recording_client(httpx.Response(200, json={}))
+    zbi.post_import(str(f), client)
+    assert sent[0]["timeout"] == zbi._IMPORT_SERVER_TIMEOUT
+    assert sent[0]["dataOrgs"] == {"orgs": []}
+
+
+def test_post_import_keeps_timeout_from_file(monkeypatch, tmp_path):
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text(json.dumps({"timeout": "5m", "dataOrgs": {"orgs": []}}))
+    client, sent = _recording_client(httpx.Response(200, json={}))
+    zbi.post_import(str(f), client)
+    assert sent[0]["timeout"] == "5m"
+
+
+ORG_EXISTS = {
+    "type": "org",
+    "id": "org-1",
+    "message": "ID=ORG-lapo2n Message=Errors.Org.AlreadyExisting",
+}
+
+
+def test_post_import_ignores_existing_org_error(monkeypatch, tmp_path):
+    # Die Org existiert immer schon; Zitadel importiert die Benutzer trotzdem.
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text("{}")
+    body = json.dumps({"errors": [ORG_EXISTS], "success": {"orgs": [{"orgId": "o"}]}})
+    zbi.post_import(str(f), _client(200, body))
+
+
+def test_post_import_reports_user_errors_next_to_existing_org(monkeypatch, tmp_path):
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text("{}")
+    user_error = {
+        "type": "human_user",
+        "id": "examcraft-1",
+        "message": "ID=V3-DKcYh Message=Errors.User.ExternalIDP.AlreadyExists",
+    }
+    body = json.dumps({"errors": [ORG_EXISTS, user_error]})
+    with pytest.raises(zbi.ImportError_) as info:
+        zbi.post_import(str(f), _client(200, body))
+    text = str(info.value)
+    assert "1 Fehler" in text
+    assert "examcraft-1 (Errors.User.ExternalIDP.AlreadyExists)" in text
+
+
+def test_post_import_org_error_of_other_kind_is_not_ignored(monkeypatch, tmp_path):
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text("{}")
+    other = {"type": "org", "id": "org-1", "message": "Errors.Org.NotFound"}
+    with pytest.raises(zbi.ImportError_, match="1 Fehler"):
+        zbi.post_import(str(f), _client(200, json.dumps({"errors": [other]})))
+
+
+def test_post_import_error_key_never_leaks_free_text(monkeypatch, tmp_path):
+    _env(monkeypatch)
+    f = tmp_path / "i.json"
+    f.write_text("{}")
+    leaky = {"type": "human_user", "id": "examcraft-7", "message": "a@b.test"}
+    with pytest.raises(zbi.ImportError_) as info:
+        zbi.post_import(str(f), _client(200, json.dumps({"errors": [leaky]})))
+    assert "examcraft-7 (unbekannt)" in str(info.value)
+    assert "a@b.test" not in str(info.value)
+
+
 def test_post_import_unreadable_body_is_error(monkeypatch, tmp_path):
     _env(monkeypatch)
     f = tmp_path / "i.json"

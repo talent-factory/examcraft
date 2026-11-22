@@ -107,7 +107,8 @@ def _build_avv() -> ComplianceDocument:
             "3. Art der personenbezogenen Daten",
             (
                 "Kontaktdaten von Lehrpersonen und Institutions-"
-                "Administratoren (Name, E-Mail-Adresse), pseudonyme "
+                "Administratoren (Name, E-Mail-Adresse, optional ein "
+                "Profilbild), pseudonyme "
                 "Kennungen von Lernenden (external_id — Klarnamen werden "
                 "gemäss Systemdesign standardmässig nicht gespeichert), "
                 "Prüfungsantworten und daraus abgeleitete Bewertungen, "
@@ -116,6 +117,17 @@ def _build_avv() -> ComplianceDocument:
                 "Repository-Inhalt) und daraus abgeleitete Bewertungen, "
                 "technische Zugriffsdaten (IP-Adresse, User-Agent, "
                 "Zeitstempel) im Audit-Log.",
+                "Das optionale Profilbild stammt entweder vom "
+                "Anmeldedienst des Nutzers (derzeit Google; Übernahme "
+                "beim Login) oder wird vom Nutzer selbst hochgeladen. Es "
+                "wird serverseitig auf ein quadratisches PNG von 256 px "
+                "umgerechnet (Metadaten wie EXIF/GPS entfallen) und als "
+                "Binärdaten im Benutzerkonto in ExamCraft AI gespeichert. "
+                "Es ist für den Nutzer selbst, für angemeldete Nutzer "
+                "derselben Institution und für die Plattform-"
+                "Administration sichtbar. Ein selbst hochgeladenes Bild "
+                "wird beim Login nicht durch das Bild des Anmeldedienstes "
+                "ersetzt.",
             ),
         ),
         ComplianceSection(
@@ -123,7 +135,10 @@ def _build_avv() -> ComplianceDocument:
             (
                 "Lernende (Schülerinnen und Schüler bzw. Studierende), "
                 "Lehrpersonen, Institutions-Administratoren des "
-                "Auftraggebers.",
+                "Auftraggebers. Ein Profilbild wird nur von "
+                "Benutzerkonten (Lehrpersonen, Institutions-"
+                "Administratoren) gespeichert, nicht von Lernenden "
+                "mit pseudonymer Kennung.",
             ),
         ),
         ComplianceSection(
@@ -221,7 +236,11 @@ def _build_avv() -> ComplianceDocument:
                 "Löschung umfasst auch das Benutzerkonto im selbst "
                 "betriebenen Identitätsdienst tessera/Zitadel; dieses wird "
                 "zuerst gelöscht, die Daten in ExamCraft AI erst nach "
-                "erfolgreicher Löschung.",
+                "erfolgreicher Löschung. Ein gespeichertes Profilbild wird "
+                "mit der Kontolöschung zusammen mit dem Benutzerkonto "
+                "entfernt. Nutzerinnen und Nutzer können es zudem selbst "
+                "entfernen; ein vom Anmeldedienst übernommenes Bild wird "
+                "beim nächsten Login erneut übernommen.",
             ),
         ),
         ComplianceSection(
@@ -339,7 +358,10 @@ def _build_tom() -> ComplianceDocument:
                 "Aktion durch den Auftragnehmer erforderlich ist. Die "
                 "Löschung erfasst zuerst das Benutzerkonto im selbst "
                 "betriebenen Identitätsdienst tessera/Zitadel und erst bei "
-                "Erfolg die Daten in ExamCraft AI.",
+                "Erfolg die Daten in ExamCraft AI. Das Profilbild liegt in "
+                "der Benutzerzeile und wird dabei mit gelöscht; "
+                "Datenbank-Sicherungen (siehe Abschnitt 3) können es bis zu "
+                "ihrem Ablauf weiterhin enthalten.",
                 "Im Identitätsdienst verbleiben technische Anmeldedaten "
                 "(IP-Adresse, User-Agent, Spracheinstellung des Browsers) "
                 "in den Ereignisprotokollen; ein geplanter Löschlauf "
@@ -518,8 +540,10 @@ def _build_subprocessors() -> tuple[Subprocessor, ...]:
             name="Google LLC / Microsoft Corporation (OAuth-Provider)",
             purpose="Optionale Single-Sign-On-Anmeldung, vermittelt über "
             "tessera/Zitadel; verarbeitet nur Identitätsdaten des "
-            "anmeldenden Nutzers (E-Mail, Name), sofern der Nutzer diese "
-            "Anmeldeart aktiv wählt",
+            "anmeldenden Nutzers (E-Mail, Name, ggf. Bild-URL), sofern der "
+            "Nutzer diese Anmeldeart aktiv wählt; beim Login ruft der "
+            "ExamCraft-Server die vom Anbieter gelieferte Profilbild-URL "
+            "ab (die Server-IP-Adresse wird dem Anbieter dabei bekannt)",
             location="USA (OAuth-Identitätsdienste)",
             transfer_mechanism="EU-Standardvertragsklauseln (SCC) gemäss "
             "Google/Microsoft-Datenverarbeitungsbedingungen",
@@ -546,8 +570,8 @@ Kategorien betroffener Personen: Lernende, Lehrpersonen,
 Institutions-Administratoren.
 
 Kategorien personenbezogener Daten: Pseudonyme Lernenden-Kennungen,
-Prüfungsantworten, Bewertungen, Kontaktdaten von Lehrpersonen/Admins,
-technische Zugriffsprotokolle.
+Prüfungsantworten, Bewertungen, Kontaktdaten von Lehrpersonen/Admins
+(optional mit Profilbild), technische Zugriffsprotokolle.
 
 Empfänger: Talent Factory GmbH als Auftragsverarbeiter; die in der
 Subprozessoren-Liste genannten Unterauftragsverarbeiter (u. a. für

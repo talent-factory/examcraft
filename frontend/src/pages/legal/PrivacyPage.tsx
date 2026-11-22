@@ -76,6 +76,13 @@ export const PrivacyPage: React.FC = () => {
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-3">
+          {t('legal.privacy.avatar.title')}
+        </h2>
+        <p>{t('legal.privacy.avatar.text')}</p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-3">
           {t('legal.privacy.hosting.title')}
         </h2>
         <p>{t('legal.privacy.hosting.text')}</p>

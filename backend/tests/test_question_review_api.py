@@ -269,6 +269,25 @@ class TestQuestionReviewAPI:
 
         assert response.status_code == 404
 
+    def test_edit_approved_question_is_locked(self, auth_client, mock_question_review):
+        """EXAMCRAFT-171: approved questions must not be editable (409)."""
+        client, mock_db = auth_client
+        mock_question_review.review_status = ReviewStatus.APPROVED.value
+
+        with patch(
+            "api.question_review._get_scoped_question",
+            return_value=mock_question_review,
+        ):
+            response = client.put(
+                "/api/v1/questions/1/edit",
+                json={"question_text": "Changed question wording"},
+            )
+
+        assert response.status_code == 409
+        assert "review_question_locked_approved" in response.text
+        assert mock_question_review.question_text == "What is a heap data structure?"
+        mock_db.commit.assert_not_called()
+
     def test_get_question_review_denies_cross_tenant(self, auth_client, mock_user):
         """TF-383 review: the by-id detail endpoint is institution-scoped — a
         question outside the caller's tenant resolves to 404, so neither the
