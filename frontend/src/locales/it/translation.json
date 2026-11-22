@@ -3958,6 +3958,10 @@
       "security": "Sicurezza e affidabilità"
     },
     "entries": {
+      "v1_17_0_profile_picture": "Immagine del profilo: la tua immagine del servizio di accesso viene acquisita al login. Nel profilo puoi invece caricare un'immagine tua o rimuoverla.",
+      "v1_17_0_grade_export": "Valutazione del portfolio: i voti di una valutazione possono essere esportati come file CSV, ad esempio per l'importazione nel sistema di gestione dei voti.",
+      "v1_17_0_approved_locked": "Le domande approvate sono bloccate contro modifiche successive al contenuto, in modo che gli esami esistenti non cambino inosservati. Visibilità e unità organizzativa restano modificabili.",
+      "v1_17_0_proposed_label": "Nella finestra di consegna della valutazione del portfolio, lo stato del voto «Proposta dell'IA» è di nuovo etichettato correttamente.",
       "v1_16_0_central_login": "L'accesso avviene ora tramite il login centrale di Talent Factory. Un solo account basta per ExamCraft AI e altri servizi.",
       "v1_16_0_switch_account": "Nella pagina di accesso, «Accedi con un altro account» permette di accedere deliberatamente con un altro account.",
       "v1_16_0_login_errors": "Gli errori di accesso vengono mostrati chiaramente nella pagina di accesso e le sessioni scadute riportano correttamente al login.",

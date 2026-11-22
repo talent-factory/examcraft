@@ -3958,6 +3958,10 @@
       "security": "Sécurité et fiabilité"
     },
     "entries": {
+      "v1_17_0_profile_picture": "Photo de profil : votre photo du service de connexion est reprise lors de la connexion. Dans le profil, vous pouvez à la place téléverser votre propre image ou la supprimer.",
+      "v1_17_0_grade_export": "Évaluation de portfolio : les notes d'une évaluation peuvent être exportées au format CSV, par exemple pour l'importer dans le système de gestion des notes.",
+      "v1_17_0_approved_locked": "Les questions approuvées sont verrouillées contre toute modification ultérieure de leur contenu, afin que les examens existants ne changent pas à votre insu. La visibilité et l'unité d'organisation restent modifiables.",
+      "v1_17_0_proposed_label": "Dans la fenêtre de remise de l'évaluation de portfolio, le statut de note « Proposition de l'IA » est de nouveau correctement libellé.",
       "v1_16_0_central_login": "La connexion passe désormais par le login central de Talent Factory. Un seul compte suffit pour ExamCraft AI et d'autres services.",
       "v1_16_0_switch_account": "Sur la page de connexion, « Se connecter avec un autre compte » permet de se connecter volontairement avec un autre compte.",
       "v1_16_0_login_errors": "Les erreurs de connexion s'affichent clairement sur la page de connexion, et les sessions expirées ramènent proprement à la connexion.",

@@ -3958,6 +3958,10 @@
       "security": "Security & Reliability"
     },
     "entries": {
+      "v1_17_0_profile_picture": "Profile picture: your picture from the sign-in service is taken over at login. In your profile you can upload your own picture instead or remove it.",
+      "v1_17_0_grade_export": "Portfolio assessment: the grades of an assessment can be exported as a CSV file, for example for import into the grade management system.",
+      "v1_17_0_approved_locked": "Approved questions are locked against later changes to their content, so existing exams do not change unnoticed. Visibility and organisation unit can still be changed.",
+      "v1_17_0_proposed_label": "In the submission window of the portfolio assessment, the grade status \"AI proposal\" is labelled correctly again.",
       "v1_16_0_central_login": "Sign-in now goes through the central Talent Factory login. One account is enough for ExamCraft AI and other services.",
       "v1_16_0_switch_account": "On the login page, \"Sign in with a different account\" lets you deliberately sign in with another account.",
       "v1_16_0_login_errors": "Sign-in errors are now shown clearly on the login page, and expired sessions return you cleanly to the login.",
