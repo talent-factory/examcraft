@@ -96,6 +96,7 @@
     "delete_exam_failed": "Impossibile eliminare l'esame",
     "review_fetch_queue_failed": "Impossibile caricare la coda di revisione",
     "review_question_not_found": "Domanda non trovata",
+    "review_question_locked_approved": "Le domande approvate non possono essere modificate, perché potrebbero essere utilizzate negli esami",
     "review_fetch_question_failed": "Impossibile caricare la domanda",
     "review_create_failed": "Impossibile creare la domanda",
     "review_edit_failed": "Impossibile modificare la domanda",

@@ -88,6 +88,21 @@ describe('QuestionReviewDetail', () => {
     ).toBeInTheDocument();
   });
 
+  it('locks saving for approved questions (EXAMCRAFT-171)', async () => {
+    (ReviewService.getQuestionDetail as jest.Mock).mockResolvedValue({
+      ...mockQuestion,
+      review_status: ReviewStatus.APPROVED,
+    });
+
+    render(<QuestionReviewDetail />);
+
+    const save = await screen.findByText('components.questionDetail.save');
+    expect(save.closest('button')).toBeDisabled();
+    expect(
+      screen.getByText('components.questionCard.editLockedApproved'),
+    ).toBeInTheDocument();
+  });
+
   it('shows the translated message when editQuestion (save) rejects with a specific code', async () => {
     (ReviewService.getQuestionDetail as jest.Mock).mockResolvedValue(mockQuestion);
     (ReviewService.editQuestion as jest.Mock).mockRejectedValue(

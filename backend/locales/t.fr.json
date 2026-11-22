@@ -96,6 +96,7 @@
     "delete_exam_failed": "Échec de la suppression de l'examen",
     "review_fetch_queue_failed": "Échec du chargement de la file de révision",
     "review_question_not_found": "Question introuvable",
+    "review_question_locked_approved": "Les questions approuvées ne peuvent pas être modifiées, car elles peuvent être utilisées dans des examens",
     "review_fetch_question_failed": "Échec du chargement de la question",
     "review_create_failed": "Échec de la création de la question",
     "review_edit_failed": "Échec de la modification de la question",

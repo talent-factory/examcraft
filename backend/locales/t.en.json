@@ -96,6 +96,7 @@
     "delete_exam_failed": "Failed to delete the exam",
     "review_fetch_queue_failed": "Failed to load review queue",
     "review_question_not_found": "Question not found",
+    "review_question_locked_approved": "Approved questions cannot be edited because they may be used in exams",
     "review_fetch_question_failed": "Failed to load question",
     "review_create_failed": "Failed to create question",
     "review_edit_failed": "Failed to edit question",

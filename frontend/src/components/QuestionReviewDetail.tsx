@@ -51,6 +51,8 @@ const QuestionReviewDetail: React.FC = () => {
 
 
   const isReviewer = currentUser && question && currentUser.id === question.reviewed_by;
+  // EXAMCRAFT-171: approved questions are locked until versioning (EXAMCRAFT-172)
+  const isEditLocked = question?.review_status === ReviewStatus.APPROVED;
 
   const loadQuestion = useCallback(async () => {
     if (!id) return;
@@ -246,6 +248,11 @@ const QuestionReviewDetail: React.FC = () => {
 
             {activeTab === 0 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {isEditLocked && (
+                  <Alert severity="info">
+                    {t('components.questionCard.editLockedApproved')}
+                  </Alert>
+                )}
                 <TextField
                   label={t('components.questionDetail.questionText')}
                   multiline
@@ -420,7 +427,7 @@ const QuestionReviewDetail: React.FC = () => {
             variant="contained"
             startIcon={<Save />}
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || isEditLocked}
           >
             {t('components.questionDetail.save')}
           </Button>

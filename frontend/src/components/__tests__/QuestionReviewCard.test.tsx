@@ -204,6 +204,22 @@ describe('QuestionReviewCard', () => {
       expect(mockOnEdit).toHaveBeenCalledWith(1);
     });
 
+    it('locks the edit button for approved questions (EXAMCRAFT-171)', () => {
+      render(
+        <TestWrapper>
+          <QuestionReviewCard
+            question={{ ...mockQuestion, review_status: ReviewStatus.APPROVED }}
+            onEdit={mockOnEdit}
+          />
+        </TestWrapper>
+      );
+
+      const editButton = screen.getByRole('button', { name: /Frage bearbeiten/i });
+      expect(editButton).toBeDisabled();
+      fireEvent.click(editButton);
+      expect(mockOnEdit).not.toHaveBeenCalled();
+    });
+
     it('calls onComment when comment button is clicked', () => {
       render(
         <TestWrapper>

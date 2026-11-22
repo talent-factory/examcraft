@@ -719,6 +719,25 @@ async def edit_question(
         if not question:
             raise api_error(404, "review_question_not_found", locale)
 
+        # EXAMCRAFT-171: approved questions may be part of exams; editing them
+        # would silently change the wording of existing exams. Minimal lock
+        # until versioning (EXAMCRAFT-172) replaces it.
+        # Visibility / org-unit changes (TF-642) do not alter the wording and
+        # stay allowed.
+        if question.review_status == ReviewStatus.APPROVED.value and any(
+            new is not None and new != getattr(question, field)
+            for field, new in (
+                ("question_text", request.question_text),
+                ("options", request.options),
+                ("correct_answer", request.correct_answer),
+                ("explanation", request.explanation),
+                ("difficulty", request.difficulty),
+                ("bloom_level", request.bloom_level),
+                ("estimated_time_minutes", request.estimated_time_minutes),
+            )
+        ):
+            raise api_error(409, "review_question_locked_approved", locale)
+
         # Track changes
         changed_fields = {}
         old_status = question.review_status
@@ -818,6 +837,12 @@ async def edit_question(
                 and current_user.id == question.reviewed_by
             ):
                 pass  # Reviewer edits stay in_review
+            elif question.review_status == ReviewStatus.APPROVED.value:
+                # EXAMCRAFT-171: only visibility/org-unit changes reach this
+                # point for approved questions (content is locked above).
+                # They must not drop the approval, otherwise a second PUT
+                # would bypass the lock.
+                pass
             else:
                 question.review_status = ReviewStatus.EDITED.value
 
