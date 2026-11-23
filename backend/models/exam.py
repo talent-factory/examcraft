@@ -240,6 +240,16 @@ class ExamQuestion(Base):
         ForeignKey("question_reviews.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # EXAMCRAFT-192: the pinned version. Nullable until the write paths set it
+    # (EXAMCRAFT-175), which also enforce that it belongs to question_id.
+    question_version_id = Column(
+        Integer,
+        ForeignKey(
+            "question_versions.id", name="fk_exam_questions_question_version_id"
+        ),
+        nullable=True,
+        index=True,
+    )
     position = Column(Integer, nullable=False)
     points = Column(Float, nullable=False)
     section = Column(String(100), nullable=True)

@@ -180,13 +180,13 @@ def test_document_limit_backwards_compat(test_db, test_institution):
     SubscriptionLimits.check_document_limit(test_institution, test_db)  # no exception
 
 
-def _create_questions(test_db, institution, count, start_id=600):
+def _create_questions(test_db, institution, count):
     from models.question_review import QuestionReview, ReviewStatus
 
+    # Keine festen IDs: Die Sequenz der geteilten Test-DB läuft sonst in sie hinein.
     for i in range(count):
         test_db.add(
             QuestionReview(
-                id=start_id + i,
                 question_text=f"Q{i}",
                 question_type="single_choice",
                 options=["a", "b"],

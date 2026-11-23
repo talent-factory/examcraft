@@ -12,7 +12,8 @@ Retention-Policy:
     persönliche Dokument-Tags (DocumentPersonalTags), Help-Center-Daten
     (HelpOnboardingProgress, HelpConversations, HelpDismissedHints).
   - Anonymisiert, Zeile bleibt (FK ondelete=SET NULL): Exams,
-    QuestionReviews, AuditLogs (user_id + impersonator_user_id),
+    QuestionReviews, QuestionVersions (created_by + reviewed_by,
+    EXAMCRAFT-192), AuditLogs (user_id + impersonator_user_id),
     ImpersonationSessions, Grades/GradeHistory/ImportJobs/
     MoodleFeedbackPushJobs (Noten-/Import-Audit-Trail), Tags,
     TagMergeLogs, CompetencyFrameworks, Subscriptions, Prompts (Premium),

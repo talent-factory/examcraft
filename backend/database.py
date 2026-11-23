@@ -132,6 +132,7 @@ def create_tables():
             ReviewStatus,
             ReviewComment,
         )
+        from models.question_version import QuestionVersion  # noqa: F401
         from models.rbac import (  # noqa: F401
             RBACRole,
             SubscriptionTier,

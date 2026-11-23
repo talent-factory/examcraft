@@ -239,6 +239,22 @@ class QuestionReview(Base):
         cascade="all, delete-orphan",
         back_populates="question",
     )
+    # EXAMCRAFT-192: content snapshots with their own review status. Schema +
+    # backfill only; the live paths still read the columns above until
+    # EXAMCRAFT-175/189 switch them over.
+    versions = relationship(
+        "QuestionVersion",
+        back_populates="question",
+        # Deletion is left entirely to the DB (ON DELETE CASCADE removes versions
+        # and exam_questions in ONE statement; the pin FK is checked at statement
+        # end). An ORM DELETE of loaded versions would trip that pin FK, so there
+        # is no "delete" cascade and no delete-orphan: versions only go away
+        # together with their question.
+        cascade="save-update, merge",
+        passive_deletes="all",
+        order_by="QuestionVersion.version_number",
+        foreign_keys="QuestionVersion.question_id",
+    )
     # TF-400: read-only display relationship to the tested competency.
     # viewonly + no cascade — the FK is SET NULL, the question must outlive
     # the competency. lazy="selectin" batches the competency load across the

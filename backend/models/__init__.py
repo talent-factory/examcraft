@@ -17,6 +17,7 @@ from models.question_review import (
     ReviewStatus,
     QuestionSourceDocument,
 )
+from models.question_version import QuestionVersion, QuestionVersionStatus
 from models.auth import (
     User,
     Role,
@@ -74,6 +75,8 @@ __all__ = [
     "ReviewHistory",
     "ReviewStatus",
     "QuestionSourceDocument",
+    "QuestionVersion",
+    "QuestionVersionStatus",
     "User",
     "Role",
     "Institution",
